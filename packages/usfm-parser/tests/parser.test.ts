@@ -605,6 +605,62 @@ describe("Parser", () => {
     });
   });
 
+  describe("inline ref markers", () => {
+    it("should parse \\ref as a ref node in inline context", () => {
+      const input = `\\id GEN
+\\c 1
+\\s1 The Creation
+\\r (\\ref John 1:1–5|JHN 1:1-5\\ref*; \\ref Hebrews 11:1–3|HEB 11:1-3\\ref*)`;
+      const result = parse(input);
+      expect(result.errors).toHaveLength(0);
+
+      const book = result.document.children[0] as BookNode;
+      const chapter = book.children.find(
+        (c) => c.type === "chapter"
+      ) as ChapterNode;
+      const rPara = chapter.children.find(
+        (c) => c.type === "paragraph" && (c as ParagraphNode).marker === "r"
+      ) as ParagraphNode;
+      expect(rPara).toBeDefined();
+
+      const refs = rPara.children.filter((c) => c.type === "ref");
+      expect(refs).toHaveLength(2);
+      expect(refs[0].marker).toBe("ref");
+      expect(refs[0].attributes?.["loc"]).toBe("JHN 1:1-5");
+      expect(refs[1].attributes?.["loc"]).toBe("HEB 11:1-3");
+    });
+
+    it("should parse \\ref inside footnotes", () => {
+      const input = `\\id GEN
+\\c 1
+\\p
+\\v 1 Text\\f + \\fr 1:1 \\ft See \\ref Matthew 1:1|MAT 1:1\\ref*\\f*`;
+      const result = parse(input);
+      expect(result.errors).toHaveLength(0);
+
+      const book = result.document.children[0] as BookNode;
+      const chapter = book.children.find(
+        (c) => c.type === "chapter"
+      ) as ChapterNode;
+
+      // Walk to find the ref node inside the footnote
+      const walk = (children: { type: string }[]): UsfmNode | undefined => {
+        for (const c of children) {
+          if (c.type === "ref") return c as UsfmNode;
+          if ("children" in c) {
+            const found = walk((c as ParentNode).children);
+            if (found) return found;
+          }
+        }
+        return undefined;
+      };
+      const refNode = walk(chapter.children);
+      expect(refNode).toBeDefined();
+      expect(refNode!.type).toBe("ref");
+      expect(refNode!.attributes?.["loc"]).toBe("MAT 1:1");
+    });
+  });
+
   describe("error handling", () => {
     it("should collect errors for unknown markers in non-strict mode", () => {
       const input = `\\id GEN
