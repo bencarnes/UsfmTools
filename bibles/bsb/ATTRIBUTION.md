@@ -2,7 +2,7 @@
 
 ## Berean Standard Bible (BSB) — USFM Files
 
-The USFM files in this directory contain the complete **Berean Standard Bible (BSB)**, version 5.2, comprising all 66 books of the Old and New Testaments.
+The USFM files in the `usfm/` subdirectory contain the complete **Berean Standard Bible (BSB)**, version 5.2, comprising all 66 books of the Old and New Testaments.
 
 ### Source
 
