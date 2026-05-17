@@ -8,6 +8,8 @@ import type {
   CharNode,
   NoteNode,
   TextNode,
+  UsfmNode,
+  ParentNode,
   ParseResult,
 } from "@usfm-tools/parser";
 import { readFileSync, readdirSync } from "node:fs";
@@ -44,6 +46,33 @@ function collectText(children: { type: string; text?: string }[]): string {
     .filter((c) => c.type === "text")
     .map((c) => (c as TextNode).text)
     .join("");
+}
+
+/**
+ * Collect sibling nodes that follow a verse milestone in a parent container.
+ * Walks all paragraphs in the parent looking for the verse, then returns
+ * siblings until the next verse or end of paragraph.
+ */
+function collectAfterVerse(parent: ParentNode, verseNumber: string): UsfmNode[] {
+  for (const child of parent.children) {
+    if (!("children" in child)) continue;
+    const paraChildren = (child as ParentNode).children;
+    let collecting = false;
+    const result: UsfmNode[] = [];
+    for (const node of paraChildren) {
+      if (node.type === "verse") {
+        if ((node as VerseNode).number === verseNumber) {
+          collecting = true;
+          continue;
+        } else if (collecting) {
+          return result;
+        }
+      }
+      if (collecting) result.push(node);
+    }
+    if (collecting) return result;
+  }
+  return [];
 }
 
 // ---------------------------------------------------------------------------
@@ -116,19 +145,10 @@ describe("BSB Integration Tests", () => {
       const ch1 = findChild<ChapterNode>(book.children, "chapter");
       expect(ch1).toBeDefined();
 
-      const allVerses: VerseNode[] = [];
-      for (const child of ch1!.children) {
-        if (child.type === "verse") allVerses.push(child as VerseNode);
-        if (child.type === "paragraph") {
-          for (const gc of (child as ParagraphNode).children) {
-            if (gc.type === "verse") allVerses.push(gc as VerseNode);
-          }
-        }
-      }
-
-      const v1 = allVerses.find((v) => v.number === "1");
-      expect(v1).toBeDefined();
-      const text = collectText(v1!.children);
+      // Verse is a milestone — collect text siblings after it
+      const afterV1 = collectAfterVerse(ch1!, "1");
+      expect(afterV1.length).toBeGreaterThan(0);
+      const text = collectText(afterV1);
       expect(text).toContain("In the beginning God created");
     });
 
@@ -176,18 +196,11 @@ describe("BSB Integration Tests", () => {
     it("should have 'Blessed is the man' in Psalm 1:1", () => {
       const book = result.document.children[0] as BookNode;
       const ch1 = findChild<ChapterNode>(book.children, "chapter");
-      const allVerses: VerseNode[] = [];
-      for (const child of ch1!.children) {
-        if (child.type === "verse") allVerses.push(child as VerseNode);
-        if (child.type === "paragraph") {
-          for (const gc of (child as ParagraphNode).children) {
-            if (gc.type === "verse") allVerses.push(gc as VerseNode);
-          }
-        }
-      }
-      const v1 = allVerses.find((v) => v.number === "1");
-      expect(v1).toBeDefined();
-      const text = collectText(v1!.children);
+      expect(ch1).toBeDefined();
+
+      const afterV1 = collectAfterVerse(ch1!, "1");
+      expect(afterV1.length).toBeGreaterThan(0);
+      const text = collectText(afterV1);
       expect(text).toContain("Blessed is the man");
     });
   });
@@ -313,22 +326,21 @@ describe("BSB Integration Tests", () => {
       expect(refRelated / allErrors.length).toBeGreaterThan(0.9);
     });
 
-    it("should have stray \\wj* end markers from cross-verse spans (a known parser limitation)", () => {
+    it("should have no stray \\wj* errors (cross-verse spans are handled correctly)", () => {
       const wjStray = allErrors.filter((e) =>
         e.message.includes("Unexpected end marker '\\wj*'"),
       );
 
-      // \wj (words of Jesus) sometimes spans across verse boundaries in BSB.
-      // The parser's parseChar() breaks at \v markers, so the closing \wj*
-      // appears orphaned. This is a parser limitation, not a USFM error.
-      expect(wjStray.length).toBeGreaterThan(0);
+      // \wj (words of Jesus) spans across verse boundaries in BSB.
+      // Since verses are modeled as milestones (not containers), char markers
+      // like \wj can span freely across \v boundaries without breaking.
+      expect(wjStray).toHaveLength(0);
     });
 
-    it("should have no error types other than \\ref and \\wj limitations", () => {
+    it("should have no error types other than \\ref limitations", () => {
       const unexpectedErrors = allErrors.filter(
         (e) =>
           !e.message.includes("\\ref") &&
-          !e.message.includes("\\wj*") &&
           !e.message.includes("Attribute data not attached"),
       );
       expect(unexpectedErrors).toHaveLength(0);

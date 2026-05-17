@@ -121,7 +121,7 @@ The parser produces a tree of typed nodes. Key node types:
 | `document`    | Root node                                    | `children`                  |
 | `book`        | Book identification (`\id`)                  | `code`, `children`          |
 | `chapter`     | Chapter (`\c`)                               | `number`, `children`        |
-| `verse`       | Verse (`\v`)                                 | `number`, `children`        |
+| `verse`       | Verse milestone (`\v`)                       | `number`                    |
 | `paragraph`   | Paragraph-level element (`\p`, `\q1`, etc.)  | `marker`, `children`        |
 | `char`        | Character style (`\nd`, `\wj`, etc.)         | `marker`, `children`, `attributes?` |
 | `note`        | Footnote or cross-reference (`\f`, `\x`)     | `marker`, `caller`, `children` |
@@ -273,22 +273,22 @@ The parser groups character-level markers under `CHAR_CATEGORIES`: char, introch
 
 ### Verse-Level Boundary
 
-A **verse-level boundary** is the point where one verse ends and the next begins, marked by `\v`. Verses are structural milestones, not containers in the USFM spec — but this parser models them as container nodes for practical convenience.
+A **verse-level boundary** is the point where one verse ends and the next begins, marked by `\v`. Following the USFM spec, this parser models `\v` as a **milestone** — a positional marker in the stream, not a container that wraps content.
 
 ```usfm
 \p \v 1 First verse text. \v 2 Second verse text.
 ```
 
-The `\v 2` marker creates a verse-level boundary. The parser closes the current verse and starts a new one.
+In the AST, `\v 1` and `\v 2` are sibling milestone nodes within the paragraph. The text "First verse text." appears as a sibling text node between the two verse milestones. To extract "all text in verse 1", walk the paragraph's children and collect nodes between the `\v 1` and `\v 2` milestones.
 
-This boundary matters because **character-level markers are expected to close within a single verse**. When a char marker spans across a verse boundary, the parser cannot model it as a single node:
+Because verses are milestones (not containers), **character-level markers can span freely across verse boundaries**:
 
 ```usfm
 \v 17 Jesus said, \wj "I am the First and the Last,
 \v 18 the Living One."\wj*
 ```
 
-Here `\wj` opens in verse 17 but `\wj*` closes in verse 18. The parser's `parseChar()` breaks at the `\v 18` boundary, so the closing `\wj*` appears orphaned. The USFM spec provides **milestone** variants (`\wj-s...\wj-e`) for this purpose, but many real-world files use the simpler paired form across verse boundaries.
+The `\wj` char node contains both the text from verse 17, the `\v 18` milestone, and the text from verse 18 — all as children. The `\wj*` end marker is correctly matched regardless of how many verse milestones appear inside the span.
 
 ### Internal-Category Marker
 
