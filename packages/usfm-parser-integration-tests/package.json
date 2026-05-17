@@ -1,0 +1,17 @@
+{
+  "name": "@usfm-tools/parser-integration-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Integration tests for the USFM parser against the Berean Standard Bible",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "@usfm-tools/parser": "file:../usfm-parser"
+  }
+}
