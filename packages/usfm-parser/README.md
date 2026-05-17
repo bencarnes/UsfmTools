@@ -132,6 +132,234 @@ The parser produces a tree of typed nodes. Key node types:
 | `text`        | Plain text content                           | `text`                      |
 | `optbreak`    | Optional line break (`//`)                   | —                           |
 
+## Grammar Terminology
+
+USFM organizes content using **markers** — backslash-prefixed tags like `\p`, `\v`, and `\nd`. The parser classifies every marker into a **category** that determines where it can appear and how it interacts with surrounding content. This section defines the key terms and concepts.
+
+### Marker
+
+A marker is a backslash-prefixed tag that introduces a USFM element. Markers come in three forms:
+
+| Form | Example | Meaning |
+|------|---------|---------|
+| Opening marker | `\nd` | Starts an element |
+| Closing (end) marker | `\nd*` | Ends a paired element |
+| Nested marker | `\+nd` | Starts a nested element inside another element of the same level |
+
+```usfm
+\p \v 1 The \nd Lord\nd* spoke to Moses.
+```
+
+Here `\p` is a paragraph marker, `\v` is a verse marker, and `\nd...\nd*` is a paired character marker wrapping "Lord".
+
+### Category
+
+Every marker belongs to a **category** that determines its structural role. Categories are defined in `grammar.ts` and fall into several groups:
+
+**Paragraph-level categories** — markers that create block-level structure. A new paragraph-level marker implicitly closes the previous one:
+
+| Category | Examples | Description |
+|----------|----------|-------------|
+| `header` | `\h`, `\toc1`, `\toc2` | Book header metadata |
+| `title` | `\mt1`, `\mt2` | Main title of the book |
+| `introduction` | `\ip`, `\imt1`, `\io1` | Introductory material |
+| `sectionpara` | `\s1`, `\s2`, `\r`, `\mr` | Section headings and references |
+| `versepara` | `\p`, `\q1`, `\q2`, `\m`, `\pmo` | Prose and poetry paragraphs containing verse text |
+| `list` | `\li1`, `\li2`, `\lh` | List entries |
+| `otherpara` | `\rem`, `\lit`, `\pb` | Miscellaneous paragraph types |
+
+```usfm
+\s1 The Creation
+\p \v 1 In the beginning God created the heavens and the earth.
+\q1 \v 2 The earth was formless and void,
+\q2 and darkness was over the deep.
+```
+
+`\s1` (sectionpara) is implicitly closed when `\p` (versepara) begins. `\p` is implicitly closed when `\q1` begins.
+
+**Character-level categories** — markers for inline text styling and annotation. These appear *inside* paragraph content and are always explicitly closed with `\marker*`:
+
+| Category | Examples | Description |
+|----------|----------|-------------|
+| `char` | `\nd`, `\wj`, `\bk`, `\w`, `\it`, `\bd` | General character styles |
+| `footnotechar` | `\fr`, `\ft`, `\fq`, `\fqa` | Character styles within footnotes |
+| `crossreferencechar` | `\xo`, `\xt`, `\xq` | Character styles within cross-references |
+| `introchar` | `\ior`, `\iqt` | Character styles within introductions |
+| `listchar` | `\lik`, `\litl`, `\liv1` | Character styles within lists |
+
+```usfm
+\v 1 The \nd Lord\nd* said, \wj "Follow me."\wj*
+```
+
+`\nd` and `\wj` are character-level markers. They wrap inline spans of text and must be closed by `\nd*` and `\wj*`.
+
+**Note categories** — markers that introduce footnotes or cross-references. Notes contain their own character-level content:
+
+| Category | Examples | Description |
+|----------|----------|-------------|
+| `footnote` | `\f`, `\fe`, `\ef` | Footnotes and endnotes |
+| `crossreference` | `\x`, `\ex` | Cross-reference notes |
+
+```usfm
+\v 1 In the beginning\f + \fr 1:1 \ft Or "At the start"\f* God created...
+```
+
+`\f...\f*` wraps the entire footnote. Inside it, `\fr` and `\ft` are footnotechar markers that structure the note's content. Footnotechar markers are **implicitly closed** by the next footnotechar or by the parent note's end marker — they don't require `\fr*` or `\ft*`.
+
+**Other categories:**
+
+| Category | Examples | Description |
+|----------|----------|-------------|
+| `internal` | `\id`, `\c`, `\v`, `\tr`, `\ref`, `\fig` | Structural markers with special parsing rules |
+| `cell` | `\th1`, `\tc1`, `\tcr1` | Table cell markers |
+| `milestone` | `\qt-s`, `\qt-e`, `\ts-s` | Standalone position markers (not paired like char) |
+| `attribute` | `\ca`, `\va`, `\vp`, `\usfm` | Markers that set attributes on their parent |
+
+### Inline
+
+**Inline** refers to content that appears *within* a paragraph, verse, footnote, or other container — as opposed to content that starts a new structural block. The parser processes inline content through `parseInlineContent()`.
+
+Inline elements include:
+
+- **Text** — plain text between markers
+- **Character-level markers** — `\nd...\nd*`, `\wj...\wj*`, `\w...\w*`, etc.
+- **Notes** — `\f...\f*`, `\x...\x*`
+- **Milestones** — `\qt-s`, `\qt-e`
+- **Verses** — `\v` (when inside a paragraph)
+- **Optional breaks** — `//`
+
+```usfm
+\p \v 1 In the beginning, \nd God\nd* created the heavens\f + \fr 1:1 \ft A note\f* and the earth.
+```
+
+Everything after `\p` is inline content: the verse marker, text, the `\nd` character span, the footnote, and more text.
+
+A marker that is valid at the top level (like `\ref` in the `internal` category) may or may not be recognized in inline context. When the parser encounters a marker inline that it doesn't have an inline handler for, it reports an "Unknown marker" error. This is a parser limitation, not necessarily an invalid USFM file.
+
+### Paragraph-Level Marker
+
+A **paragraph-level marker** creates a block-level element in the document. Paragraph-level markers have **implicit closure** — when a new paragraph-level marker appears, the previous paragraph is automatically closed without needing an explicit end marker.
+
+```usfm
+\s1 The Beginning
+\p \v 1 First paragraph text.
+\p \v 2 Second paragraph text.
+\q1 \v 3 Poetry line one.
+\q2 Poetry line two.
+```
+
+Each of `\s1`, `\p`, `\q1`, and `\q2` implicitly closes the previous paragraph. The parser groups them under `PARA_CATEGORIES`: header, title, introduction, sectionpara, versepara, list, and otherpara.
+
+### Character-Level Marker
+
+A **character-level marker** creates an inline text span inside a paragraph or other container. Unlike paragraph markers, character-level markers are **explicitly closed** with an end marker (`\marker*`).
+
+```usfm
+\v 1 The \bk Book of Genesis\bk* begins with creation.
+\v 2 \w grace|lemma="grace"\w* was given freely.
+```
+
+`\bk...\bk*` wraps "Book of Genesis" as a book name. `\w...\w*` wraps "grace" as a word with linguistic attributes.
+
+Character-level markers can **nest** using the `+` prefix:
+
+```usfm
+\v 1 \wj The words of \+nd Jesus\+nd* the Lord.\wj*
+```
+
+`\+nd...\+nd*` is nested inside `\wj...\wj*`, producing a child char node inside the parent char node.
+
+The parser groups character-level markers under `CHAR_CATEGORIES`: char, introchar, listchar, footnotechar, and crossreferencechar.
+
+### Verse-Level Boundary
+
+A **verse-level boundary** is the point where one verse ends and the next begins, marked by `\v`. Verses are structural milestones, not containers in the USFM spec — but this parser models them as container nodes for practical convenience.
+
+```usfm
+\p \v 1 First verse text. \v 2 Second verse text.
+```
+
+The `\v 2` marker creates a verse-level boundary. The parser closes the current verse and starts a new one.
+
+This boundary matters because **character-level markers are expected to close within a single verse**. When a char marker spans across a verse boundary, the parser cannot model it as a single node:
+
+```usfm
+\v 17 Jesus said, \wj "I am the First and the Last,
+\v 18 the Living One."\wj*
+```
+
+Here `\wj` opens in verse 17 but `\wj*` closes in verse 18. The parser's `parseChar()` breaks at the `\v 18` boundary, so the closing `\wj*` appears orphaned. The USFM spec provides **milestone** variants (`\wj-s...\wj-e`) for this purpose, but many real-world files use the simpler paired form across verse boundaries.
+
+### Internal-Category Marker
+
+An **internal-category marker** is a structural marker that has unique, context-specific parsing rules rather than following the standard paragraph or character patterns. Internal markers are defined in the `internal` category in `grammar.ts`.
+
+| Marker | Role |
+|--------|------|
+| `\id` | Book identification — must be the first marker in a file |
+| `\c` | Chapter number |
+| `\v` | Verse number |
+| `\tr` | Table row |
+| `\ref` | Cross-reference link |
+| `\fig` | Figure/illustration |
+| `\esb` / `\esbe` | Sidebar start/end |
+| `\periph` | Peripheral content division |
+
+Each has a dedicated parsing method. For example, `\c` extracts a chapter number from the following text, while `\tr` opens a table row and expects cell markers.
+
+```usfm
+\id GEN English Standard Version
+\c 1
+\tr \th1 Name \th2 Age
+\tr \tc1 Adam \tc2 930
+```
+
+Because internal markers have specialized handlers, they are only recognized in the contexts where those handlers are wired up. A marker like `\ref` is handled at the top level but not yet in inline context, which is why `\ref` used inline (as in `\r (\ref John 1:1|JHN 1:1\ref*)`) produces parse errors.
+
+### Milestone
+
+A **milestone** is a standalone marker that marks a position in the text without wrapping content. Milestones come in start/end pairs using the `-s` and `-e` suffixes, or as standalone markers.
+
+```usfm
+\qt-s |who="God"\*In the beginning God created the heavens and the earth.\qt-e\*
+```
+
+`\qt-s` marks the start of a quotation by "God" and `\qt-e` marks the end. Unlike character markers, milestones are self-closing (each has its own `\*`) and don't need to nest within verse or paragraph boundaries — they can span freely across structural elements.
+
+### Default Attribute
+
+When a marker supports attributes via the `|` pipe syntax, it may define a **default attribute** — the attribute name that receives an unkeyed positional value.
+
+```usfm
+\w grace|grace\w*
+```
+
+This is equivalent to `\w grace|lemma="grace"\w*` because `\w`'s default attribute is `lemma`. The mapping is defined in `DEFAULT_ATTRIBUTES` in `grammar.ts`. Examples:
+
+| Marker | Default attribute | Example |
+|--------|------------------|---------|
+| `\w` | `lemma` | `\w grace\|grace\w*` → `lemma: "grace"` |
+| `\rb` | `gloss` | `\rb 漢字\|ルビ\rb*` → `gloss: "ルビ"` |
+| `\jmp` | `href` | `\jmp link\|#target\jmp*` → `href: "#target"` |
+| `\ref` | `loc` | `\ref Gen 1:1\|GEN 1:1\ref*` → `loc: "GEN 1:1"` |
+
+### Implicit Closure
+
+**Implicit closure** is when an element is automatically closed by the appearance of another element, without an explicit end marker. This applies to paragraph-level markers and footnote/crossref char markers.
+
+Paragraph example:
+```usfm
+\s1 Heading
+\p \v 1 Paragraph text.
+```
+`\s1` is implicitly closed when `\p` appears — there is no `\s1*`.
+
+Footnote char example:
+```usfm
+\f + \fr 1:1 \ft A footnote.\f*
+```
+`\fr` is implicitly closed when `\ft` appears — there is no `\fr*`. Both are implicitly closed when `\f*` ends the footnote.
+
 ## Development
 
 ### Prerequisites
