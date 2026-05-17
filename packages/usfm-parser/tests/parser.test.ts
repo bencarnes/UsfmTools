@@ -258,7 +258,7 @@ describe("Parser", () => {
       expect(textInChar.text).toContain("Lord");
     });
 
-    it("should parse word-level markup with attributes", () => {
+    it("should parse word-level markup with key-value attributes", () => {
       const input = `\\id GEN
 \\c 1
 \\p
@@ -278,6 +278,81 @@ describe("Parser", () => {
         (c) => c.type === "char" && (c as CharNode).marker === "w"
       ) as CharNode;
       expect(wNode).toBeDefined();
+      expect(wNode.attributes).toBeDefined();
+      expect(wNode.attributes!["lemma"]).toBe("grace");
+      expect(wNode.attributes!["strong"]).toBe("G5485");
+    });
+
+    it("should parse word-level markup with positional default attribute", () => {
+      const input = `\\id GEN
+\\c 1
+\\p
+\\v 1 \\w grace|grace\\w*`;
+      const result = parse(input);
+      const book = result.document.children[0] as BookNode;
+      const chapter = book.children.find(
+        (c) => c.type === "chapter"
+      ) as ChapterNode;
+      const para = chapter.children.find(
+        (c) => c.type === "paragraph"
+      ) as ParagraphNode;
+      const verse = para.children.find(
+        (c) => c.type === "verse"
+      ) as VerseNode;
+      const wNode = verse.children.find(
+        (c) => c.type === "char" && (c as CharNode).marker === "w"
+      ) as CharNode;
+      expect(wNode).toBeDefined();
+      expect(wNode.attributes).toBeDefined();
+      expect(wNode.attributes!["lemma"]).toBe("grace");
+    });
+
+    it("should map positional attribute to correct default key per marker", () => {
+      const input = `\\id GEN
+\\c 1
+\\p
+\\v 1 \\rb 漢字|ルビ\\rb*`;
+      const result = parse(input);
+      const book = result.document.children[0] as BookNode;
+      const chapter = book.children.find(
+        (c) => c.type === "chapter"
+      ) as ChapterNode;
+      const para = chapter.children.find(
+        (c) => c.type === "paragraph"
+      ) as ParagraphNode;
+      const verse = para.children.find(
+        (c) => c.type === "verse"
+      ) as VerseNode;
+      const rbNode = verse.children.find(
+        (c) => c.type === "char" && (c as CharNode).marker === "rb"
+      ) as CharNode;
+      expect(rbNode).toBeDefined();
+      expect(rbNode.attributes).toBeDefined();
+      expect(rbNode.attributes!["gloss"]).toBe("ルビ");
+    });
+
+    it("should use 'default' key when marker has no default attribute mapping", () => {
+      const input = `\\id GEN
+\\c 1
+\\p
+\\v 1 \\nd Lord|some value\\nd*`;
+      const result = parse(input);
+      const book = result.document.children[0] as BookNode;
+      const chapter = book.children.find(
+        (c) => c.type === "chapter"
+      ) as ChapterNode;
+      const para = chapter.children.find(
+        (c) => c.type === "paragraph"
+      ) as ParagraphNode;
+      const verse = para.children.find(
+        (c) => c.type === "verse"
+      ) as VerseNode;
+      const ndNode = verse.children.find(
+        (c) => c.type === "char" && (c as CharNode).marker === "nd"
+      ) as CharNode;
+      expect(ndNode).toBeDefined();
+      expect(ndNode.attributes).toBeDefined();
+      expect(ndNode.attributes!["default"]).toBe("some value");
     });
 
     it("should parse nested character markers", () => {
@@ -439,6 +514,55 @@ describe("Parser", () => {
     });
   });
 
+  describe("table row inline content", () => {
+    it("should preserve text content in table rows outside cells", () => {
+      const input = `\\id GEN
+\\c 1
+\\tr some text \\tc1 Cell content`;
+      const result = parse(input);
+      const book = result.document.children[0] as BookNode;
+      const chapter = book.children.find(
+        (c) => c.type === "chapter"
+      ) as ChapterNode;
+      const row = chapter.children.find(
+        (c) => c.type === "row"
+      ) as RowNode;
+      expect(row).toBeDefined();
+
+      const textNodes = row.children.filter(
+        (c) => c.type === "text"
+      ) as TextNode[];
+      expect(textNodes.length).toBeGreaterThan(0);
+      const text = textNodes.map((t) => t.text).join("");
+      expect(text).toContain("some text");
+    });
+  });
+
+  describe("header inline content", () => {
+    it("should parse char markers inside header lines", () => {
+      const input = `\\id GEN
+\\h The Book of \\bk Genesis\\bk*`;
+      const result = parse(input);
+      const book = result.document.children[0] as BookNode;
+      const header = book.children.find(
+        (c) => c.type === "paragraph" && (c as ParagraphNode).marker === "h"
+      ) as ParagraphNode;
+      expect(header).toBeDefined();
+
+      const charNode = header.children.find(
+        (c) => c.type === "char"
+      ) as CharNode;
+      expect(charNode).toBeDefined();
+      expect(charNode.marker).toBe("bk");
+
+      const charText = charNode.children.find(
+        (c) => c.type === "text"
+      ) as TextNode;
+      expect(charText).toBeDefined();
+      expect(charText.text).toContain("Genesis");
+    });
+  });
+
   describe("error handling", () => {
     it("should collect errors for unknown markers in non-strict mode", () => {
       const input = `\\id GEN
@@ -456,6 +580,30 @@ describe("Parser", () => {
 \\p
 \\v 1 \\zzz Unknown marker.`;
       expect(() => parse(input, { strict: true })).toThrow();
+    });
+
+    it("should report errors for stray end markers at top level", () => {
+      const input = `\\id GEN
+\\nd*`;
+      const result = parse(input);
+      const endMarkerErrors = result.errors.filter(
+        (e) => e.message.includes("Unexpected end marker")
+      );
+      expect(endMarkerErrors.length).toBeGreaterThan(0);
+      expect(endMarkerErrors[0].message).toContain("\\nd*");
+    });
+
+    it("should report errors for stray end markers in inline context", () => {
+      const input = `\\id GEN
+\\c 1
+\\p
+\\v 1 Text \\bk* orphaned end marker.`;
+      const result = parse(input);
+      const endMarkerErrors = result.errors.filter(
+        (e) => e.message.includes("Unexpected end marker")
+      );
+      expect(endMarkerErrors.length).toBeGreaterThan(0);
+      expect(endMarkerErrors[0].message).toContain("\\bk*");
     });
   });
 

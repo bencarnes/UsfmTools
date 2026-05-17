@@ -45,6 +45,26 @@ const book = result.document.children[0];
 // book.code === "GEN"
 ```
 
+### Attributes
+
+Character markers like `\w` support USFM attributes via the `|` syntax. Both key-value and positional (default) attributes are captured on the AST node:
+
+```typescript
+import { parse } from "@usfm-tools/parser";
+
+// Key-value attributes
+const r1 = parse('\\id GEN\n\\c 1\n\\p\n\\v 1 \\w grace|lemma="grace" strong="G5485"\\w*');
+const w1 = /* navigate to the \w CharNode */;
+// w1.attributes === { lemma: "grace", strong: "G5485" }
+
+// Positional (default) attribute — mapped via DEFAULT_ATTRIBUTES
+const r2 = parse('\\id GEN\n\\c 1\n\\p\n\\v 1 \\w grace|grace\\w*');
+const w2 = /* navigate to the \w CharNode */;
+// w2.attributes === { lemma: "grace" }  (because \w's default attribute is "lemma")
+```
+
+The default attribute name is determined by the marker. For example, `\w` maps to `lemma`, `\rb` maps to `gloss`, `\jmp` maps to `href`. If a marker has no defined default, the key `"default"` is used.
+
 ### Strict Mode
 
 By default the parser collects errors and continues parsing. In strict mode, it throws on the first error:
@@ -103,7 +123,7 @@ The parser produces a tree of typed nodes. Key node types:
 | `chapter`     | Chapter (`\c`)                               | `number`, `children`        |
 | `verse`       | Verse (`\v`)                                 | `number`, `children`        |
 | `paragraph`   | Paragraph-level element (`\p`, `\q1`, etc.)  | `marker`, `children`        |
-| `char`        | Character style (`\nd`, `\wj`, etc.)         | `marker`, `children`        |
+| `char`        | Character style (`\nd`, `\wj`, etc.)         | `marker`, `children`, `attributes?` |
 | `note`        | Footnote or cross-reference (`\f`, `\x`)     | `marker`, `caller`, `children` |
 | `table`       | Table container                              | `children`                  |
 | `row`         | Table row (`\tr`)                            | `children`                  |

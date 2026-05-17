@@ -27,9 +27,6 @@ import {
   isNoteMarker,
   isCellMarker,
   isMilestoneMarker,
-  PARA_CATEGORIES,
-  CHAR_CATEGORIES,
-  NOTE_CATEGORIES,
   DEFAULT_ATTRIBUTES,
 } from "./grammar.js";
 
@@ -131,7 +128,10 @@ export class Parser {
     }
 
     if (token.type === TokenType.EndMarker) {
-      // Stray end marker — skip
+      this.addError(
+        `Unexpected end marker '\\${token.value}*' with no matching opening marker`,
+        token.position,
+      );
       this.advance();
       return null;
     }
@@ -343,6 +343,13 @@ export class Parser {
         break;
       }
 
+      // Capture attributes on the char node
+      if (cur.type === TokenType.Attribute) {
+        this.applyAttributes(node, cur);
+        this.advance();
+        continue;
+      }
+
       // Also break on paragraph markers or other structure changes
       if (cur.type === TokenType.Marker) {
         if (isParaMarker(cur.value) || cur.value === "c" || cur.value === "id") break;
@@ -439,13 +446,16 @@ export class Parser {
         if (isParaMarker(cur.value) || cur.value === "c" || cur.value === "id") break;
       }
 
-      // Skip non-cell content in table rows
       if (cur.type === TokenType.Newline) {
         this.advance();
         continue;
       }
 
-      this.advance();
+      // Preserve non-cell inline content (text, char markers, etc.)
+      const child = this.parseInlineContent();
+      if (child) {
+        node.children.push(child);
+      }
     }
 
     return node;
@@ -600,7 +610,7 @@ export class Parser {
       children: [],
     };
 
-    // Consume text content on this line
+    // Consume content on this line (text, char styles, attributes, etc.)
     while (this.pos < this.tokens.length) {
       const cur = this.current();
       if (!cur) break;
@@ -608,17 +618,15 @@ export class Parser {
         this.advance();
         break;
       }
-      if (cur.type === TokenType.Marker || cur.type === TokenType.EndMarker) break;
-
-      if (cur.type === TokenType.Text) {
-        const textNode: TextNode = {
-          type: "text",
-          text: cur.value,
-          position: cur.position,
-        };
-        node.children.push(textNode);
+      // A new paragraph-level or structural marker ends this header line
+      if (cur.type === TokenType.Marker) {
+        if (isParaMarker(cur.value) || cur.value === "c" || cur.value === "id") break;
       }
-      this.advance();
+
+      const child = this.parseInlineContent();
+      if (child) {
+        node.children.push(child);
+      }
     }
 
     return node;
@@ -692,7 +700,10 @@ export class Parser {
     }
 
     if (cur.type === TokenType.EndMarker) {
-      // Stray end marker in inline context — skip
+      this.addError(
+        `Unexpected end marker '\\${cur.value}*' with no matching opening marker`,
+        cur.position,
+      );
       this.advance();
       return null;
     }
@@ -707,7 +718,11 @@ export class Parser {
     }
 
     if (cur.type === TokenType.Attribute) {
-      // Stray attribute — attach to previous context
+      // Attribute token not consumed by a char/note-char node — skip but warn
+      this.addError(
+        `Attribute data not attached to any marker`,
+        cur.position,
+      );
       this.advance();
       return null;
     }
@@ -755,6 +770,13 @@ export class Parser {
       if (cur.type === TokenType.EndMarker) {
         // End of parent note — don't consume
         break;
+      }
+
+      // Capture attributes on the note-char node
+      if (cur.type === TokenType.Attribute) {
+        this.applyAttributes(node, cur);
+        this.advance();
+        continue;
       }
 
       const child = this.parseInlineContent();
@@ -863,6 +885,27 @@ export class Parser {
     }
   }
 
+  /**
+   * Apply an Attribute token to a node. Handles both key-value attributes
+   * and positional (default) attributes using DEFAULT_ATTRIBUTES.
+   */
+  private applyAttributes(node: CharNode, token: Token): void {
+    if (!node.attributes) {
+      node.attributes = {};
+    }
+
+    if (token.attributes && Object.keys(token.attributes).length > 0) {
+      Object.assign(node.attributes, token.attributes);
+    } else if (token.value) {
+      const defaultKey = DEFAULT_ATTRIBUTES[node.marker];
+      if (defaultKey) {
+        node.attributes[defaultKey] = token.value;
+      } else {
+        node.attributes["default"] = token.value;
+      }
+    }
+  }
+
   private addError(message: string, position?: { line: number; column: number; offset: number }): void {
     const error: ParseError = { message, position };
     this.errors.push(error);
@@ -871,9 +914,3 @@ export class Parser {
     }
   }
 }
-
-// Suppress unused import warnings — these are used by the type system
-void PARA_CATEGORIES;
-void CHAR_CATEGORIES;
-void NOTE_CATEGORIES;
-void DEFAULT_ATTRIBUTES;
