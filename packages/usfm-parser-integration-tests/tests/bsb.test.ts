@@ -288,62 +288,23 @@ describe("BSB Integration Tests", () => {
   // -------------------------------------------------------------------------
 
   describe("error characterization", () => {
-    let allErrors: { file: string; message: string }[];
+    it("should parse all 66 BSB books with zero errors", () => {
+      let totalErrors = 0;
+      const sampleErrors: { file: string; message: string }[] = [];
 
-    it("should collect errors from all books", () => {
-      allErrors = [];
       for (const file of files) {
         const content = loadUsfm(file);
         const result = parse(content);
-        for (const e of result.errors) {
-          allErrors.push({ file, message: e.message });
+        totalErrors += result.errors.length;
+        for (const e of result.errors.slice(0, 3)) {
+          sampleErrors.push({ file, message: e.message });
         }
       }
-      expect(allErrors.length).toBeGreaterThan(0);
-    });
 
-    it("should have errors predominantly from \\ref (a known parser limitation)", () => {
-      const refUnknown = allErrors.filter((e) =>
-        e.message.includes("Unknown marker '\\ref'"),
-      );
-      const refStray = allErrors.filter((e) =>
-        e.message.includes("Unexpected end marker '\\ref*'"),
-      );
-      const refAttrib = allErrors.filter((e) =>
-        e.message.includes("Attribute data not attached"),
-      );
-
-      // \ref is a valid USFM 3.x marker used inline in BSB for cross-references
-      // (e.g. \ref John 1:1–5|JHN 1:1-5\ref*). Our parser currently treats it
-      // as unknown in inline context because it's classified as "internal" and
-      // only handled at the top level. Each \ref occurrence produces three errors:
-      // unknown marker, unattached attribute, and stray end marker.
-      expect(refUnknown.length).toBeGreaterThan(0);
-      expect(refStray.length).toBe(refUnknown.length);
-
-      // These three categories should account for the vast majority of errors
-      const refRelated = refUnknown.length + refStray.length + refAttrib.length;
-      expect(refRelated / allErrors.length).toBeGreaterThan(0.9);
-    });
-
-    it("should have no stray \\wj* errors (cross-verse spans are handled correctly)", () => {
-      const wjStray = allErrors.filter((e) =>
-        e.message.includes("Unexpected end marker '\\wj*'"),
-      );
-
-      // \wj (words of Jesus) spans across verse boundaries in BSB.
-      // Since verses are modeled as milestones (not containers), char markers
-      // like \wj can span freely across \v boundaries without breaking.
-      expect(wjStray).toHaveLength(0);
-    });
-
-    it("should have no error types other than \\ref limitations", () => {
-      const unexpectedErrors = allErrors.filter(
-        (e) =>
-          !e.message.includes("\\ref") &&
-          !e.message.includes("Attribute data not attached"),
-      );
-      expect(unexpectedErrors).toHaveLength(0);
+      if (sampleErrors.length > 0) {
+        console.log("Unexpected errors:", sampleErrors);
+      }
+      expect(totalErrors).toBe(0);
     });
   });
 });
