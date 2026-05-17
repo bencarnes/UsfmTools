@@ -27,15 +27,15 @@ Rather than validating every node in every book, the test samples specific books
 
 All parse errors across the full BSB are collected and analyzed. The tests verify that every error falls into one **known parser limitation** (not a USFM authoring error):
 
-#### `\ref` — inline reference marker (not yet supported in inline context)
+#### `\ref` — inline reference marker (parser limitation)
 
-The BSB uses `\ref...\ref*` inline within `\r` (parallel reference) headings and footnotes:
+The BSB uses `\ref...\ref*` inline within `\r` (parallel reference) headings and footnotes. This is valid USFM 3.x:
 
 ```
 \r (\ref John 1:1–5|JHN 1:1-5\ref*; \ref Hebrews 11:1–3|HEB 11:1-3\ref*)
 ```
 
-`\ref` is a valid USFM 3.x marker classified as `internal`, but the parser currently only handles it at the top level. In inline context it produces three errors per occurrence: unknown marker, unattached attribute data, and stray end marker.
+The parser classifies `\ref` under the `internal` category and only handles it at the top level. It does not yet have an inline handler, so `\ref` used inside paragraphs or footnotes produces three errors per occurrence: unknown marker, unattached attribute data, and stray end marker. This is a parser bug to be fixed — the BSB's usage is correct.
 
 #### Cross-verse character spans (resolved)
 
