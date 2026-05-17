@@ -10,6 +10,7 @@ import type {
   ParagraphNode,
   CharNode,
   NoteNode,
+  RefNode,
   RowNode,
   CellNode,
   MilestoneNode,
@@ -347,6 +348,52 @@ export class Parser {
     return node;
   }
 
+  private parseRef(): RefNode {
+    const token = this.current()!;
+    const position = token.position;
+    this.advance(); // skip \ref
+
+    const node: RefNode = {
+      type: "ref",
+      marker: "ref",
+      position,
+      children: [],
+    };
+
+    while (this.pos < this.tokens.length) {
+      const cur = this.current();
+      if (!cur) break;
+
+      if (cur.type === TokenType.EndMarker && cur.value === "ref") {
+        this.advance();
+        break;
+      }
+
+      if (cur.type === TokenType.Attribute) {
+        if (!node.attributes) node.attributes = {};
+        if (cur.attributes && Object.keys(cur.attributes).length > 0) {
+          Object.assign(node.attributes, cur.attributes);
+        } else if (cur.value) {
+          const defaultKey = DEFAULT_ATTRIBUTES["ref"] ?? "default";
+          node.attributes[defaultKey] = cur.value;
+        }
+        this.advance();
+        continue;
+      }
+
+      if (cur.type === TokenType.Marker) {
+        if (isParaMarker(cur.value) || cur.value === "c" || cur.value === "id") break;
+      }
+
+      const child = this.parseInlineContent();
+      if (child) {
+        node.children.push(child);
+      }
+    }
+
+    return node;
+  }
+
   private parseNote(): NoteNode {
     const token = this.current()!;
     const position = token.position;
@@ -657,6 +704,12 @@ export class Parser {
       }
 
       const cat = getMarkerCategory(marker);
+
+      // \ref is classified as "internal" but behaves as a paired char-like
+      // element in inline context (e.g. \ref John 1:1|JHN 1:1\ref*)
+      if (marker === "ref") {
+        return this.parseRef();
+      }
 
       // Handle footnote/crossref char markers before general char markers,
       // since they have implicit closure semantics
