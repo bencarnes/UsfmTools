@@ -108,8 +108,8 @@ export interface ChapterNode extends ParentNode {
   number: string;
 }
 
-/** Verse node */
-export interface VerseNode extends ParentNode {
+/** Verse milestone node — marks the start of a verse without containing children */
+export interface VerseNode extends UsfmNode {
   type: "verse";
   number: string;
 }

@@ -245,7 +245,6 @@ export class Parser {
         number = match[1];
         const remaining = match[2];
         if (remaining) {
-          // Replace the current text token with remainder
           this.tokens[this.pos] = {
             ...textToken,
             value: remaining,
@@ -258,30 +257,12 @@ export class Parser {
       }
     }
 
-    const node: VerseNode = {
+    return {
       type: "verse",
       marker: "v",
       number,
       position,
-      children: [],
     };
-
-    // Consume verse content until next verse, chapter, or paragraph marker
-    while (this.pos < this.tokens.length) {
-      const cur = this.current();
-      if (!cur) break;
-      if (cur.type === TokenType.Marker) {
-        if (cur.value === "v" || cur.value === "c" || cur.value === "id") break;
-        if (isParaMarker(cur.value)) break;
-      }
-
-      const child = this.parseInlineContent();
-      if (child) {
-        node.children.push(child);
-      }
-    }
-
-    return node;
   }
 
   private parseParagraph(): ParagraphNode {
@@ -333,7 +314,9 @@ export class Parser {
       children: [],
     };
 
-    // Consume content until the closing marker
+    // Consume content until the closing marker.
+    // Verse milestones (\v) are allowed inside char spans per the USFM spec,
+    // so we do NOT break on \v — it becomes a child milestone node.
     while (this.pos < this.tokens.length) {
       const cur = this.current();
       if (!cur) break;
@@ -350,7 +333,7 @@ export class Parser {
         continue;
       }
 
-      // Also break on paragraph markers or other structure changes
+      // Break on paragraph markers, chapters, or book id — these are structural boundaries
       if (cur.type === TokenType.Marker) {
         if (isParaMarker(cur.value) || cur.value === "c" || cur.value === "id") break;
       }

@@ -25,7 +25,7 @@ Rather than validating every node in every book, the test samples specific books
 
 ### 4. Error Characterization
 
-All parse errors across the full BSB are collected and analyzed. The tests verify that every error falls into one of two **known parser limitations** (not USFM authoring errors):
+All parse errors across the full BSB are collected and analyzed. The tests verify that every error falls into one **known parser limitation** (not a USFM authoring error):
 
 #### `\ref` — inline reference marker (not yet supported in inline context)
 
@@ -35,18 +35,11 @@ The BSB uses `\ref...\ref*` inline within `\r` (parallel reference) headings and
 \r (\ref John 1:1–5|JHN 1:1-5\ref*; \ref Hebrews 11:1–3|HEB 11:1-3\ref*)
 ```
 
-`\ref` is a valid USFM 3.x marker classified as `internal`, but the parser currently only handles it at the top level. In inline context it produces three errors per occurrence: unknown marker, unattached attribute data, and stray end marker. This accounts for over 90% of all errors.
+`\ref` is a valid USFM 3.x marker classified as `internal`, but the parser currently only handles it at the top level. In inline context it produces three errors per occurrence: unknown marker, unattached attribute data, and stray end marker.
 
-#### `\wj*` — cross-verse words of Jesus
+#### Cross-verse character spans (resolved)
 
-The BSB uses `\wj...\wj*` to mark the words of Jesus, sometimes spanning across verse boundaries:
-
-```
-\v 17 ... \wj "Do not be afraid. I am the First and the Last,
-\v 18 the Living One. I was dead, and behold, now I am alive forever and ever!"\wj*
-```
-
-The parser's `parseChar()` breaks at `\v` markers, so the closing `\wj*` appears orphaned. This is a parser limitation that will be addressed when cross-verse character span support is added.
+The BSB uses `\wj...\wj*` to mark the words of Jesus, sometimes spanning across verse boundaries. Since `\v` is modeled as a milestone (not a container), these cross-verse spans are handled correctly — `\wj` can contain verse milestones as children without breaking.
 
 ## Running
 

@@ -11,7 +11,36 @@ import type {
   MilestoneNode,
   RowNode,
   CellNode,
+  UsfmNode,
+  ParentNode,
 } from "../src/types.js";
+
+/**
+ * Collect children from a ParentNode that follow a specific verse milestone.
+ * Returns all sibling nodes after the verse marker until the next verse or end.
+ */
+function childrenAfterVerse(
+  parent: ParentNode,
+  verseNumber: string,
+): UsfmNode[] {
+  const children = parent.children;
+  let collecting = false;
+  const result: UsfmNode[] = [];
+  for (const child of children) {
+    if (child.type === "verse") {
+      if ((child as VerseNode).number === verseNumber) {
+        collecting = true;
+        continue;
+      } else if (collecting) {
+        break;
+      }
+    }
+    if (collecting) {
+      result.push(child);
+    }
+  }
+  return result;
+}
 
 describe("Parser", () => {
   describe("document structure", () => {
@@ -105,7 +134,7 @@ describe("Parser", () => {
   });
 
   describe("verses", () => {
-    it("should parse verse markers with text", () => {
+    it("should emit verse as a milestone node (no children)", () => {
       const input = `\\id GEN
 \\c 1
 \\p
@@ -123,8 +152,11 @@ describe("Parser", () => {
       ) as VerseNode;
       expect(verse).toBeDefined();
       expect(verse.number).toBe("1");
+      expect("children" in verse).toBe(false);
 
-      const textNodes = verse.children.filter(
+      // Text follows the verse milestone as a sibling in the paragraph
+      const afterVerse = childrenAfterVerse(para, "1");
+      const textNodes = afterVerse.filter(
         (c) => c.type === "text"
       ) as TextNode[];
       const fullText = textNodes.map((t) => t.text).join("");
@@ -150,7 +182,7 @@ describe("Parser", () => {
       expect(verse.number).toBe("1-2");
     });
 
-    it("should parse multiple verses in a paragraph", () => {
+    it("should parse multiple verses as sibling milestones in a paragraph", () => {
       const input = `\\id GEN
 \\c 1
 \\p
@@ -242,11 +274,9 @@ describe("Parser", () => {
       const para = chapter.children.find(
         (c) => c.type === "paragraph"
       ) as ParagraphNode;
-      const verse = para.children.find(
-        (c) => c.type === "verse"
-      ) as VerseNode;
 
-      const charNode = verse.children.find(
+      // \\nd is a sibling of the verse milestone in the paragraph
+      const charNode = para.children.find(
         (c) => c.type === "char"
       ) as CharNode;
       expect(charNode).toBeDefined();
@@ -271,10 +301,8 @@ describe("Parser", () => {
       const para = chapter.children.find(
         (c) => c.type === "paragraph"
       ) as ParagraphNode;
-      const verse = para.children.find(
-        (c) => c.type === "verse"
-      ) as VerseNode;
-      const wNode = verse.children.find(
+
+      const wNode = para.children.find(
         (c) => c.type === "char" && (c as CharNode).marker === "w"
       ) as CharNode;
       expect(wNode).toBeDefined();
@@ -296,10 +324,8 @@ describe("Parser", () => {
       const para = chapter.children.find(
         (c) => c.type === "paragraph"
       ) as ParagraphNode;
-      const verse = para.children.find(
-        (c) => c.type === "verse"
-      ) as VerseNode;
-      const wNode = verse.children.find(
+
+      const wNode = para.children.find(
         (c) => c.type === "char" && (c as CharNode).marker === "w"
       ) as CharNode;
       expect(wNode).toBeDefined();
@@ -320,10 +346,8 @@ describe("Parser", () => {
       const para = chapter.children.find(
         (c) => c.type === "paragraph"
       ) as ParagraphNode;
-      const verse = para.children.find(
-        (c) => c.type === "verse"
-      ) as VerseNode;
-      const rbNode = verse.children.find(
+
+      const rbNode = para.children.find(
         (c) => c.type === "char" && (c as CharNode).marker === "rb"
       ) as CharNode;
       expect(rbNode).toBeDefined();
@@ -344,10 +368,8 @@ describe("Parser", () => {
       const para = chapter.children.find(
         (c) => c.type === "paragraph"
       ) as ParagraphNode;
-      const verse = para.children.find(
-        (c) => c.type === "verse"
-      ) as VerseNode;
-      const ndNode = verse.children.find(
+
+      const ndNode = para.children.find(
         (c) => c.type === "char" && (c as CharNode).marker === "nd"
       ) as CharNode;
       expect(ndNode).toBeDefined();
@@ -368,11 +390,8 @@ describe("Parser", () => {
       const para = chapter.children.find(
         (c) => c.type === "paragraph"
       ) as ParagraphNode;
-      const verse = para.children.find(
-        (c) => c.type === "verse"
-      ) as VerseNode;
 
-      const wjNode = verse.children.find(
+      const wjNode = para.children.find(
         (c) => c.type === "char" && (c as CharNode).marker === "wj"
       ) as CharNode;
       expect(wjNode).toBeDefined();
@@ -381,6 +400,36 @@ describe("Parser", () => {
         (c) => c.type === "char" && (c as CharNode).marker === "nd"
       ) as CharNode;
       expect(nestedNd).toBeDefined();
+    });
+
+    it("should allow char markers to span across verse boundaries", () => {
+      const input = `\\id GEN
+\\c 1
+\\p
+\\v 1 Jesus said, \\wj "I am the First and the Last,
+\\v 2 the Living One."\\wj*`;
+      const result = parse(input);
+      expect(result.errors).toHaveLength(0);
+
+      const book = result.document.children[0] as BookNode;
+      const chapter = book.children.find(
+        (c) => c.type === "chapter"
+      ) as ChapterNode;
+      const para = chapter.children.find(
+        (c) => c.type === "paragraph"
+      ) as ParagraphNode;
+
+      const wjNode = para.children.find(
+        (c) => c.type === "char" && (c as CharNode).marker === "wj"
+      ) as CharNode;
+      expect(wjNode).toBeDefined();
+
+      // The \\wj span should contain a verse milestone as a child
+      const innerVerse = wjNode.children.find(
+        (c) => c.type === "verse"
+      ) as VerseNode;
+      expect(innerVerse).toBeDefined();
+      expect(innerVerse.number).toBe("2");
     });
   });
 
@@ -398,11 +447,9 @@ describe("Parser", () => {
       const para = chapter.children.find(
         (c) => c.type === "paragraph"
       ) as ParagraphNode;
-      const verse = para.children.find(
-        (c) => c.type === "verse"
-      ) as VerseNode;
 
-      const footnote = verse.children.find(
+      // Footnote is a sibling of the verse milestone in the paragraph
+      const footnote = para.children.find(
         (c) => c.type === "note"
       ) as NoteNode;
       expect(footnote).toBeDefined();
@@ -433,11 +480,8 @@ describe("Parser", () => {
       const para = chapter.children.find(
         (c) => c.type === "paragraph"
       ) as ParagraphNode;
-      const verse = para.children.find(
-        (c) => c.type === "verse"
-      ) as VerseNode;
 
-      const xref = verse.children.find(
+      const xref = para.children.find(
         (c) => c.type === "note"
       ) as NoteNode;
       expect(xref).toBeDefined();
@@ -486,11 +530,9 @@ describe("Parser", () => {
       const para = chapter.children.find(
         (c) => c.type === "paragraph"
       ) as ParagraphNode;
-      const verse = para.children.find(
-        (c) => c.type === "verse"
-      ) as VerseNode;
 
-      const milestones = verse.children.filter(
+      // Milestones are siblings of the verse milestone in the paragraph
+      const milestones = para.children.filter(
         (c) => c.type === "milestone"
       ) as MilestoneNode[];
       expect(milestones.length).toBeGreaterThanOrEqual(1);
@@ -644,13 +686,11 @@ describe("Parser", () => {
       expect(chapters[0].number).toBe("1");
       expect(chapters[1].number).toBe("2");
 
-      // Check verses in chapter 1
       const ch1Paras = chapters[0].children.filter(
         (c) => c.type === "paragraph"
       ) as ParagraphNode[];
       expect(ch1Paras.length).toBeGreaterThan(0);
 
-      // Verify section heading
       const sectionHeading = chapters[0].children.find(
         (c) => c.type === "paragraph" && (c as ParagraphNode).marker === "s1"
       ) as ParagraphNode;
