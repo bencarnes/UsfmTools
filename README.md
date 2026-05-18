@@ -47,6 +47,18 @@ This runs `npm install` and `npm run build` (when defined) for each package in o
 
 If **`usfm-model`** fails during the **DTS** step with **`Cannot find module '@usfm-tools/parser'`**, build **usfm-parser** first so `packages/usfm-parser/dist/` (including `index.d.ts`) exists. Running **`./build.sh`** from the repo root does that in the correct order. If you build by hand, run `npm run build` in `packages/usfm-parser`, then `npm install` and `npm run build` in `packages/usfm-model`.
 
+## Run usfm-controls
+
+**usfm-controls** is a **library** (React components), not a standalone server. The usual way to try it locally is **Storybook**, which hosts the `UsfmEditor` and related stories.
+
+1. From the repository root, run **`./build.sh`** once (or manually build **`packages/usfm-parser`** and **`packages/usfm-model`**). Storybook’s Vite setup resolves those packages from their **`dist/`** output; skipping this step often causes missing-module errors.
+2. **`cd packages/usfm-controls`**
+3. **`npm install`**
+4. **`npm run storybook`**
+5. Open **http://localhost:6006/** in a browser. If that port is busy, Storybook prompts for another port on the terminal.
+
+Other useful scripts in that package: **`npm run dev`** (watch mode rebuild of the library with tsup), **`npm run build-storybook`** (static Storybook build under `storybook-static/`), and the usual test, lint, and typecheck commands in the table below.
+
 ### Per-package commands
 
 Useful when you are developing a single area. Run these from the package directory (for example `packages/usfm-parser/`).
@@ -58,8 +70,6 @@ Useful when you are developing a single area. Run these from the package directo
 | Test | `npm test` |
 | Lint | `npm run lint` |
 | Typecheck | `npm run typecheck` |
-
-**usfm-controls** also provides `npm run storybook` for local UI development; Storybook expects the parser and model packages to be built first so Vite can resolve `@usfm-tools/parser` and `@usfm-tools/model`.
 
 ## Contributing
 
