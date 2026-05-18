@@ -43,6 +43,10 @@ From the repository root:
 
 This runs `npm install` and `npm run build` (when defined) for each package in order: parser, model, controls, then integration tests (install only).
 
+### Build troubleshooting
+
+If **`usfm-model`** fails during the **DTS** step with **`Cannot find module '@usfm-tools/parser'`**, build **usfm-parser** first so `packages/usfm-parser/dist/` (including `index.d.ts`) exists. Running **`./build.sh`** from the repo root does that in the correct order. If you build by hand, run `npm run build` in `packages/usfm-parser`, then `npm install` and `npm run build` in `packages/usfm-model`.
+
 ### Per-package commands
 
 Useful when you are developing a single area. Run these from the package directory (for example `packages/usfm-parser/`).
