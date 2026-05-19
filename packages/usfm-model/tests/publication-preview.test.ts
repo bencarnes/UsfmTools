@@ -33,4 +33,17 @@ describe("ViewModels.Publication", () => {
     expect(h.marker).toBe("s1");
     expect(h.segments.some((s) => s.kind === "text" && s.text.includes("Beginning"))).toBe(true);
   });
+
+  it("splits multi-verse paragraphs when versePerLine is enabled", () => {
+    const { document } = parse("\\id GEN\n\\c 1\n\\p\n\\v 1 First. \\v 2 Second.");
+    const merged = ViewModels.Publication.buildPreview(document);
+    const lineBlocks = merged.books[0]!.chapters[0]!.blocks.filter((b) => b.kind === "line");
+    expect(lineBlocks).toHaveLength(1);
+
+    const split = ViewModels.Publication.buildPreview(document, { versePerLine: true });
+    const lines = split.books[0]!.chapters[0]!.blocks.filter((b) => b.kind === "line");
+    expect(lines).toHaveLength(2);
+    expect((lines[0] as ViewModels.Publication.LineBlock).segments.some((s) => s.kind === "verse" && s.number === "1")).toBe(true);
+    expect((lines[1] as ViewModels.Publication.LineBlock).segments.some((s) => s.kind === "verse" && s.number === "2")).toBe(true);
+  });
 });

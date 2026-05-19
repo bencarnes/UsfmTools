@@ -1,6 +1,6 @@
 import type { DocumentNode } from "@usfm-tools/parser";
 import { PublicationViewModel } from "../view-models/publication-preview.js";
-import type { UsfmRenderTemplate } from "./types.js";
+import type { UsfmRenderOptions, UsfmRenderTemplate } from "./types.js";
 
 /**
  * Converts parsed USFM (or a pre-built publication view model) into HTML
@@ -9,15 +9,21 @@ import type { UsfmRenderTemplate } from "./types.js";
 export class UsfmRenderer {
   constructor(private readonly template: UsfmRenderTemplate) {}
 
-  renderDocument(document: DocumentNode): string {
-    const preview = PublicationViewModel.buildPreview(document);
+  renderDocument(document: DocumentNode, options?: UsfmRenderOptions): string {
+    const preview = PublicationViewModel.buildPreview(document, {
+      versePerLine: options?.versePerLine,
+    });
     return this.renderPreview(preview);
   }
 
-  renderPreview(preview: PublicationViewModel.PreviewDocument): string {
+  renderPreview(preview: PublicationViewModel.PreviewDocument, options?: UsfmRenderOptions): string {
+    let p = preview;
+    if (options?.versePerLine) {
+      p = PublicationViewModel.applyVersePerLine(preview);
+    }
     const t = this.template;
-    const booksHtml = preview.books.map((b) => this.renderBook(b)).join("");
-    const firstCode = preview.books[0]?.code;
+    const booksHtml = p.books.map((b) => this.renderBook(b)).join("");
+    const firstCode = p.books[0]?.code;
     return t.document(booksHtml, { idCode: firstCode || undefined });
   }
 

@@ -7,6 +7,7 @@ export {
   defaultPublicationTemplate,
   mergePublicationTemplate,
   type UsfmRenderTemplate,
+  type UsfmRenderOptions,
   ViewModels,
   PublicationViewModel,
 } from "@usfm-tools/model";

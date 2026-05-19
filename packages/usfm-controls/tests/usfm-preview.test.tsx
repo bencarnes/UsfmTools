@@ -16,4 +16,11 @@ describe("UsfmPreview", () => {
     const { container } = render(<UsfmPreview value={"\\id GEN\n\\c 1\n\\p\n\\v 1 \\zzz bad"} />);
     expect(container.querySelector(".usfm-preview-errors")).toBeTruthy();
   });
+
+  it("honors versePerLine for multi-verse paragraphs", () => {
+    const { container } = render(
+      <UsfmPreview value={"\\id GEN\n\\c 1\n\\p\n\\v 1 One. \\v 2 Two."} versePerLine />,
+    );
+    expect(container.querySelectorAll("p.usfm-line").length).toBe(2);
+  });
 });

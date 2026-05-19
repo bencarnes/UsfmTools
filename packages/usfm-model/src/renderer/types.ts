@@ -29,3 +29,12 @@ export interface UsfmRenderTemplate {
 
   unsupported(reason: string, marker?: string): string;
 }
+
+/** Options passed to {@link UsfmRenderer} render methods. */
+export type UsfmRenderOptions = {
+  /**
+   * When true, paragraphs that contain multiple verse milestones are expanded so
+   * each verse renders on its own preview line (see `PublicationViewModel.applyVersePerLine`).
+   */
+  versePerLine?: boolean;
+};

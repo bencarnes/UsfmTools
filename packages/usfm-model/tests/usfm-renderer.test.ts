@@ -32,4 +32,13 @@ describe("UsfmRenderer", () => {
     expect(html).toContain("usfm-nd");
     expect(html).toContain("Lord");
   });
+
+  it("renders one paragraph element per verse when versePerLine is true", () => {
+    const { document } = parse("\\id GEN\n\\c 1\n\\p\n\\v 1 A. \\v 2 B.");
+    const html = new UsfmRenderer(defaultPublicationTemplate()).renderDocument(document, {
+      versePerLine: true,
+    });
+    const matches = html.match(/class="usfm-line usfm-p/g);
+    expect(matches?.length).toBe(2);
+  });
 });
