@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { useArgs } from "@storybook/preview-api";
 import { useState } from "react";
 import { UsfmEditor } from "../usfm-editor/UsfmEditor.js";
 import { UsfmPreview } from "./UsfmPreview.js";
@@ -36,6 +37,8 @@ export const GenesisPreview: Story = {
     className: "max-w-prose border border-gray-200 rounded-md p-4 bg-white",
     versePerLine: false,
   },
+  /** Explicit render so all `args` (including Controls) are forwarded to the component. */
+  render: (args) => <UsfmPreview {...args} />,
 };
 
 export const WithEditor: Story = {
@@ -44,9 +47,15 @@ export const WithEditor: Story = {
     className: "",
     versePerLine: false,
   },
-  render: () => {
-    const [value, setValue] = useState(MULTI_VERSE_PARAGRAPH);
-    const [versePerLine, setVersePerLine] = useState(false);
+  render: function WithEditorRender() {
+    const [args, updateArgs] = useArgs<{
+      value?: string;
+      versePerLine?: boolean;
+      className?: string;
+    }>();
+    const [value, setValue] = useState(args?.value ?? MULTI_VERSE_PARAGRAPH);
+    const versePerLine = Boolean(args?.versePerLine);
+
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[min(90vh,720px)]">
         <div className="flex flex-col min-h-0">
@@ -60,7 +69,9 @@ export const WithEditor: Story = {
               <input
                 type="checkbox"
                 checked={versePerLine}
-                onChange={(e) => setVersePerLine(e.target.checked)}
+                onChange={(e) => {
+                  updateArgs({ versePerLine: e.target.checked });
+                }}
               />
               Verse per line
             </label>

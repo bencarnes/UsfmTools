@@ -170,7 +170,7 @@ Stories demonstrate the editor and preview with:
 - Psalm 1 (poetry formatting)
 - Empty state
 - Error state (unknown markers, stray end markers)
-- **UsfmPreview** (static sample with **versePerLine** control, **With Editor** with a checkbox toggle, and **Verse Per Line Compare** side-by-side)
+- **UsfmPreview** — **`GenesisPreview`** forwards all Controls (including **`versePerLine`**) via an explicit `render`; **With Editor** uses **`useArgs`** so the in-story checkbox and the Controls panel stay in sync with the preview; **Verse Per Line Compare** shows both modes side by side
 
 ### Project Structure
 

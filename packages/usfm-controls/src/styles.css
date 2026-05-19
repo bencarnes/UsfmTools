@@ -7,6 +7,11 @@
     font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
     max-width: 42rem;
   }
+  /* Inner HTML is outside React; be explicit so each verse line (<p>) stacks vertically. */
+  .usfm-preview-root .usfm-line {
+    display: block;
+    margin: 0 0 0.65em;
+  }
   .usfm-preview-root .usfm-line--poetry {
     margin-left: 1.5rem;
     text-indent: -0.5rem;
