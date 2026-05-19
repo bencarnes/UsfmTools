@@ -29,18 +29,18 @@ const result = parse(`\\id GEN
 
 View models reshape the AST for specific UI tasks. They live under the **`ViewModels`** object so additional families can be added later without colliding.
 
-- **`ViewModels.Publication`** — alias of **`PublicationViewModel`**: publication / “Bible app” reading layout (`buildPreview`, and types such as `PreviewDocument`).
+- **`ViewModels.Publication`** — alias of **`PublicationViewModel`**: publication / “Bible app” reading layout (`buildPreview`, `applyVersePerLine`, and types such as `PreviewDocument`).
 
 ```typescript
 import { ViewModels, parse } from "@usfm-tools/model";
 
 const { document } = parse(usfmText);
-const preview = ViewModels.Publication.buildPreview(document);
+const preview = ViewModels.Publication.buildPreview(document, { versePerLine: true });
 ```
 
 ### HTML rendering (`UsfmRenderer`)
 
-**`UsfmRenderer`** turns either a parser **`DocumentNode`** (via `renderDocument`) or a pre-built publication preview (via `renderPreview`) into HTML using a pluggable **`UsfmRenderTemplate`**. Override individual template methods (or pass a **`Partial<UsfmRenderTemplate>`** through **`mergePublicationTemplate`**) to change tags and class names. Always escape user text in **`escapeText`** when customizing.
+**`UsfmRenderer`** turns either a parser **`DocumentNode`** (via `renderDocument`) or a pre-built publication preview (via `renderPreview`) into HTML using a pluggable **`UsfmRenderTemplate`**. Both render methods accept optional **`UsfmRenderOptions`** (for example `{ versePerLine: true }`) so callers who already built a preview can still request verse-per-line expansion at render time. Override individual template methods (or pass a **`Partial<UsfmRenderTemplate>`** through **`mergePublicationTemplate`**) to change tags and class names. Always escape user text in **`escapeText`** when customizing.
 
 ```typescript
 import {
@@ -54,7 +54,9 @@ const template = mergePublicationTemplate(defaultPublicationTemplate(), {
   chapter: (num, inner) => `<section class="ch" data-n="${num}">${inner}</section>`,
 });
 
-const html = new UsfmRenderer(template).renderDocument(parse(src).document);
+const html = new UsfmRenderer(template).renderDocument(parse(src).document, {
+  versePerLine: true,
+});
 ```
 
 ## Development

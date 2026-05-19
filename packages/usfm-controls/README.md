@@ -60,10 +60,11 @@ function App() {
 | Prop | Type | Description |
 |------|------|-------------|
 | `value` | `string` | USFM source to render |
+| `versePerLine` | `boolean` | When true, split paragraphs that contain multiple `\\v` milestones so each verse appears on its own preview line (default `false`) |
 | `template` | `Partial<UsfmRenderTemplate>` | Optional template overrides (merge with default); memoize in the parent if it is stable across renders |
 | `className` | `string` | CSS class on the root wrapper |
 
-The package also **re-exports** `UsfmRenderer`, `defaultPublicationTemplate`, `mergePublicationTemplate`, `UsfmRenderTemplate`, `ViewModels`, and `PublicationViewModel` from **`@usfm-tools/model`** so you can configure rendering without a second import path.
+The package also **re-exports** `UsfmRenderer`, `defaultPublicationTemplate`, `mergePublicationTemplate`, `UsfmRenderTemplate`, **`UsfmRenderOptions`**, `ViewModels`, and `PublicationViewModel` from **`@usfm-tools/model`** so you can configure rendering without a second import path.
 
 ### UsfmEditor props
 
@@ -169,7 +170,7 @@ Stories demonstrate the editor and preview with:
 - Psalm 1 (poetry formatting)
 - Empty state
 - Error state (unknown markers, stray end markers)
-- **UsfmPreview** (static sample and **With Editor** — live source + publication HTML)
+- **UsfmPreview** (static sample with **versePerLine** control, **With Editor** with a checkbox toggle, and **Verse Per Line Compare** side-by-side)
 
 ### Project Structure
 

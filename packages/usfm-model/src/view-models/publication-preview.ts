@@ -89,8 +89,14 @@ export namespace PublicationViewModel {
 
   /**
    * Build a publication-oriented view model from a parser document tree.
+   *
+   * @param options.versePerLine — split {@link LineBlock} nodes that contain multiple
+   *   verse milestones so each verse renders as its own line in the preview.
    */
-  export function buildPreview(document: DocumentNode): PreviewDocument {
+  export function buildPreview(
+    document: DocumentNode,
+    options?: { versePerLine?: boolean },
+  ): PreviewDocument {
     const books: PreviewBook[] = [];
     for (const child of document.children) {
       if (child.type === "book") {
@@ -103,7 +109,105 @@ export namespace PublicationViewModel {
         });
       }
     }
-    return { books };
+    const preview: PreviewDocument = { books };
+    if (options?.versePerLine) {
+      return applyVersePerLine(preview);
+    }
+    return preview;
+  }
+
+  /**
+   * Returns a copy of the preview where each {@link LineBlock} that contained more than
+   * one verse milestone is expanded into multiple line blocks (one verse per line).
+   */
+  export function applyVersePerLine(preview: PreviewDocument): PreviewDocument {
+    return {
+      books: preview.books.map((book) => ({
+        ...book,
+        preambleBlocks: expandLineBlocksForVersePerLine(book.preambleBlocks),
+        chapters: book.chapters.map((ch) => ({
+          ...ch,
+          blocks: expandLineBlocksForVersePerLine(ch.blocks),
+        })),
+      })),
+    };
+  }
+}
+
+function expandLineBlocksForVersePerLine(
+  blocks: PublicationViewModel.PreviewBlock[],
+): PublicationViewModel.PreviewBlock[] {
+  const out: PublicationViewModel.PreviewBlock[] = [];
+  for (const b of blocks) {
+    if (b.kind === "line") {
+      out.push(...splitLineByVerses(b));
+    } else {
+      out.push(b);
+    }
+  }
+  return out;
+}
+
+function splitLineByVerses(block: PublicationViewModel.LineBlock): PublicationViewModel.LineBlock[] {
+  const segs = block.segments;
+  let verseSeenInCurrent = false;
+  const lines: PublicationViewModel.PublicationSegment[][] = [];
+  let buf: PublicationViewModel.PublicationSegment[] = [];
+
+  for (const s of segs) {
+    if (s.kind === "verse") {
+      if (verseSeenInCurrent) {
+        lines.push(buf.map(clonePublicationSegment));
+        buf = [];
+        verseSeenInCurrent = false;
+      }
+      buf.push(clonePublicationSegment(s));
+      verseSeenInCurrent = true;
+    } else {
+      buf.push(clonePublicationSegment(s));
+    }
+  }
+  if (buf.length) {
+    lines.push(buf);
+  }
+
+  if (lines.length <= 1) {
+    return [block];
+  }
+
+  return lines.map((segments) => ({
+    kind: "line" as const,
+    marker: block.marker,
+    flow: block.flow,
+    segments,
+  }));
+}
+
+function clonePublicationSegment(
+  s: PublicationViewModel.PublicationSegment,
+): PublicationViewModel.PublicationSegment {
+  switch (s.kind) {
+    case "styled":
+      return {
+        kind: "styled",
+        marker: s.marker,
+        children: s.children.map(clonePublicationSegment),
+      };
+    case "note":
+      return {
+        kind: "note",
+        marker: s.marker,
+        caller: s.caller,
+        children: s.children.map(clonePublicationSegment),
+      };
+    case "ref":
+      return { kind: "ref", children: s.children.map(clonePublicationSegment) };
+    case "text":
+      return { kind: "text", text: s.text };
+    case "verse":
+      return { kind: "verse", number: s.number };
+    default:
+      return s;
   }
 }
 

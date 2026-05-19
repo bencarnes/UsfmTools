@@ -28,4 +28,4 @@ export {
   defaultPublicationTemplate,
   mergePublicationTemplate,
 } from "./renderer/index.js";
-export type { UsfmRenderTemplate } from "./renderer/types.js";
+export type { UsfmRenderTemplate, UsfmRenderOptions } from "./renderer/types.js";
