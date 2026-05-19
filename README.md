@@ -23,8 +23,8 @@ flowchart TB
 | Package | Role |
 |--------|------|
 | **usfm-parser** | Parses USFM source into structured data; ships ESM and CJS bundles (`dist/`). |
-| **usfm-model** | Higher-level scripture-oriented helpers built on the parser. |
-| **usfm-controls** | React controls for editing USFM (syntax highlighting, diagnostics, autocomplete). Depends on the parser and model. |
+| **usfm-model** | View models (for example `ViewModels.Publication` / `PublicationViewModel`), HTML rendering via **`UsfmRenderer`** and pluggable templates, plus re-exports of **`parse`**. |
+| **usfm-controls** | React controls: **`UsfmEditor`** (CodeMirror), **`UsfmPreview`** (publication-style HTML), and the async USFM language service. Depends on the parser and model. |
 | **usfm-parser-integration-tests** | Longer-running checks against the parser; **no** `build` script, only `npm test`. |
 
 The **`Plan/`** directory holds Obsidian-style planning notes and is not part of the build.
@@ -57,7 +57,7 @@ If **`usfm-model`** fails during the **DTS** step with **`Cannot find module '@u
 4. **`npm run storybook`**
 5. Open **http://localhost:6006/** in a browser. If that port is busy, Storybook prompts for another port on the terminal.
 
-Other useful scripts in that package: **`npm run dev`** (watch mode rebuild of the library with tsup), **`npm run build-storybook`** (static Storybook build under `storybook-static/`), and the usual test, lint, and typecheck commands in the table below.
+Other useful scripts in that package: **`npm run dev`** (watch mode rebuild of the library with tsup), **`npm run build-storybook`** (static Storybook build under `storybook-static/`), and the usual test, lint, and typecheck commands in the table below. Stories include **Controls / UsfmPreview / With Editor** for a live editor plus preview pane.
 
 ### Per-package commands
 

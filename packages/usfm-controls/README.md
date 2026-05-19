@@ -8,6 +8,7 @@ React UI controls for editing USFM scripture text, built on [CodeMirror 6](https
 - **Error diagnostics** — red squiggles under parse errors with hover messages
 - **Autocomplete** — type `\` to get a filtered list of USFM markers with descriptions; navigate with arrows, accept with Tab
 - **Async language service** — LSP-inspired message protocol for clean separation between editor UI and language intelligence
+- **Publication preview** — **`UsfmPreview`** renders USFM as continuous reading text (similar to a Bible app) using **`UsfmRenderer`** from `@usfm-tools/model`; parsing and HTML output are memoized for fast updates next to the editor
 
 ## Installation
 
@@ -20,6 +21,7 @@ Peer dependencies: `react >= 18`, `react-dom >= 18`
 ## Usage
 
 ```tsx
+import { useState } from "react";
 import { UsfmEditor } from "@usfm-tools/controls";
 
 function App() {
@@ -35,7 +37,35 @@ function App() {
 }
 ```
 
-### Props
+### UsfmPreview
+
+Renders USFM as HTML for reading (not editing). Uses the parser and **`UsfmRenderer`** from **`@usfm-tools/model`**; override the **`UsfmRenderTemplate`** (partial merge) to change markup or CSS hooks.
+
+```tsx
+import { useState } from "react";
+import { UsfmEditor, UsfmPreview } from "@usfm-tools/controls";
+
+function App() {
+  const [content, setContent] = useState("\\id GEN\n\\c 1\n\\p\n\\v 1 In the beginning.");
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      <UsfmEditor value={content} onChange={setContent} className="h-[400px]" />
+      <UsfmPreview value={content} className="overflow-auto p-4 border rounded" />
+    </div>
+  );
+}
+```
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `value` | `string` | USFM source to render |
+| `template` | `Partial<UsfmRenderTemplate>` | Optional template overrides (merge with default); memoize in the parent if it is stable across renders |
+| `className` | `string` | CSS class on the root wrapper |
+
+The package also **re-exports** `UsfmRenderer`, `defaultPublicationTemplate`, `mergePublicationTemplate`, `UsfmRenderTemplate`, `ViewModels`, and `PublicationViewModel` from **`@usfm-tools/model`** so you can configure rendering without a second import path.
+
+### UsfmEditor props
 
 | Prop | Type | Description |
 |------|------|-------------|
@@ -47,23 +77,23 @@ function App() {
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  UsfmEditor (React component)                   │
+│  UsfmEditor / UsfmPreview (React)               │
 │  ┌───────────────────────────────────────────┐  │
-│  │  CodeMirror 6 (editing surface)           │  │
-│  │  - Decoration plugin (syntax colors)      │  │
-│  │  - Linter extension (red squiggles)       │  │
-│  │  - Autocomplete extension (marker menu)   │  │
+│  │  CodeMirror 6 (editor only)               │  │
 │  └───────────────────────────────────────────┘  │
-└───────────────────┬─────────────────────────────┘
-                    │ async messages
-┌───────────────────▼─────────────────────────────┐
-│  USFM Language Service                          │
-│  - classify(content) → token classifications    │
-│  - validate(content) → diagnostics              │
-│  - complete(content, pos) → completion items    │
-│                                                 │
-│  Uses: @usfm-tools/parser                       │
-└─────────────────────────────────────────────────┘
+└───────────────┬─────────────────┬───────────────┘
+                │                 │
+                │                 │ parse + UsfmRenderer
+                │                 ▼
+                │         ┌───────────────────────┐
+                │         │  @usfm-tools/model    │
+                │         │  view models + HTML   │
+                │         └───────────────────────┘
+                │ async messages
+┌───────────────▼─────────────────────────────────┐
+│  USFM Language Service (editor diagnostics)     │
+│  Uses: @usfm-tools/parser                         │
+└───────────────────────────────────────────────────┘
 ```
 
 ### Language Service Protocol
@@ -134,11 +164,12 @@ npm install
 npm run storybook
 ```
 
-Stories demonstrate the editor with:
+Stories demonstrate the editor and preview with:
 - Genesis 1 (prose + poetry + footnotes)
 - Psalm 1 (poetry formatting)
 - Empty state
 - Error state (unknown markers, stray end markers)
+- **UsfmPreview** (static sample and **With Editor** — live source + publication HTML)
 
 ### Project Structure
 
@@ -146,12 +177,16 @@ Stories demonstrate the editor with:
 packages/usfm-controls/
 ├── src/
 │   ├── index.ts                     # Public API exports
-│   ├── styles.css                   # Tailwind base
+│   ├── styles.css                   # Tailwind + default preview reading styles
 │   ├── components/
-│   │   └── usfm-editor/
-│   │       ├── UsfmEditor.tsx       # React component
-│   │       ├── UsfmEditor.stories.tsx
-│   │       ├── codemirror-usfm.ts   # CM6 extensions (highlight, lint, autocomplete)
+│   │   ├── usfm-editor/
+│   │   │   ├── UsfmEditor.tsx       # React component
+│   │   │   ├── UsfmEditor.stories.tsx
+│   │   │   ├── codemirror-usfm.ts   # CM6 extensions (highlight, lint, autocomplete)
+│   │   │   └── index.ts
+│   │   └── usfm-preview/
+│   │       ├── UsfmPreview.tsx      # Publication-style HTML preview
+│   │       ├── UsfmPreview.stories.tsx
 │   │       └── index.ts
 │   └── language-service/
 │       ├── index.ts                 # Service exports
@@ -161,7 +196,9 @@ packages/usfm-controls/
 │       ├── completions.ts           # Marker completions
 │       └── classifier.ts            # Token classification
 ├── tests/
-│   └── language-service.test.ts
+│   ├── language-service.test.ts
+│   └── usfm-preview.test.tsx
+├── vitest.config.ts                 # jsdom for React tests
 ├── .storybook/
 │   ├── main.ts
 │   └── preview.ts

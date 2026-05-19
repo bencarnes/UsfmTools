@@ -1,3 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .usfm-preview-root .usfm-document {
+    font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    max-width: 42rem;
+  }
+  .usfm-preview-root .usfm-line--poetry {
+    margin-left: 1.5rem;
+    text-indent: -0.5rem;
+  }
+  .usfm-preview-root .usfm-v {
+    font-weight: 600;
+    margin-right: 0.15em;
+  }
+  .usfm-preview-root .usfm-note {
+    font-size: 0.75em;
+    vertical-align: super;
+  }
+  .usfm-preview-root .usfm-note-body {
+    display: none;
+  }
+  .usfm-preview-root .usfm-preview-errors {
+    @apply text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-2;
+  }
+}
+
