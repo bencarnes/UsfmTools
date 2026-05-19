@@ -9,6 +9,13 @@ import {
 
 const defaultTmpl = defaultPublicationTemplate();
 
+/** Storybook (and URL state) may supply boolean controls as strings. */
+function normalizeVersePerLine(raw: unknown): boolean {
+  if (raw === true || raw === 1) return true;
+  if (typeof raw === "string" && raw.toLowerCase() === "true") return true;
+  return false;
+}
+
 export interface UsfmPreviewProps {
   /** Raw USFM source to render. */
   value: string;
@@ -30,7 +37,9 @@ export interface UsfmPreviewProps {
  * Uses {@link UsfmRenderer} under the hood; parsing and HTML generation are memoized
  * by `value`, `template`, and `versePerLine` for fast updates alongside {@link UsfmEditor}.
  */
-export function UsfmPreview({ value, template, versePerLine = false, className }: UsfmPreviewProps) {
+export function UsfmPreview({ value, template, versePerLine, className }: UsfmPreviewProps) {
+  const versePerLineOn = normalizeVersePerLine(versePerLine);
+
   const mergedTemplate = useMemo(() => {
     if (!template) return defaultTmpl;
     return mergePublicationTemplate(defaultTmpl, template);
@@ -39,13 +48,13 @@ export function UsfmPreview({ value, template, versePerLine = false, className }
   const html = useMemo(() => {
     const { document, errors } = parse(value);
     const renderer = new UsfmRenderer(mergedTemplate);
-    let body = renderer.renderDocument(document, { versePerLine });
+    let body = renderer.renderDocument(document, { versePerLine: versePerLineOn });
     if (errors.length > 0) {
       const parts = errors.map((e) => `<span>${mergedTemplate.escapeText(e.message)}</span>`);
       body = `<aside class="usfm-preview-errors" role="status">${parts.join(" ")}</aside>${body}`;
     }
     return body;
-  }, [value, mergedTemplate, versePerLine]);
+  }, [value, mergedTemplate, versePerLineOn]);
 
   return (
     <div

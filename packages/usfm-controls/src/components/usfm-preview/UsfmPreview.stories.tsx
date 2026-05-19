@@ -47,14 +47,11 @@ export const WithEditor: Story = {
     className: "",
     versePerLine: false,
   },
-  render: function WithEditorRender() {
-    const [args, updateArgs] = useArgs<{
-      value?: string;
-      versePerLine?: boolean;
-      className?: string;
-    }>();
-    const [value, setValue] = useState(args?.value ?? MULTI_VERSE_PARAGRAPH);
-    const versePerLine = Boolean(args?.versePerLine);
+  render: (args) => {
+    const [, updateArgs] = useArgs();
+    const [value, setValue] = useState(args.value ?? MULTI_VERSE_PARAGRAPH);
+    const rawVp = args.versePerLine as unknown;
+    const versePerLine = rawVp === true || rawVp === 1 || (typeof rawVp === "string" && rawVp.toLowerCase() === "true");
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[min(90vh,720px)]">
