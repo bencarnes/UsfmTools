@@ -11,3 +11,21 @@
 
 export { parse } from "@usfm-tools/parser";
 export type { ParseResult, DocumentNode } from "@usfm-tools/parser";
+
+export { PublicationViewModel } from "./view-models/publication-preview.js";
+import { PublicationViewModel } from "./view-models/publication-preview.js";
+
+/**
+ * Container for view-model namespaces. {@link PublicationViewModel} is the first;
+ * additional domains can be hung here as the package grows.
+ */
+export const ViewModels = {
+  Publication: PublicationViewModel,
+} as const;
+
+export {
+  UsfmRenderer,
+  defaultPublicationTemplate,
+  mergePublicationTemplate,
+} from "./renderer/index.js";
+export type { UsfmRenderTemplate } from "./renderer/types.js";

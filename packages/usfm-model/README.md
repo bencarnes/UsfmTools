@@ -4,14 +4,7 @@ Application-level model for [USFM](https://docs.usfm.bible/usfm/3.1.1/index.html
 
 ## Purpose
 
-The parser produces a low-level AST that faithfully represents the USFM markup structure. This package provides higher-level abstractions closer to what applications need — things like:
-
-- **Indexing** — look up content by book, chapter, and verse
-- **Querying** — extract verse ranges, search across books
-- **Rendering support** — structured data ready for UI rendering
-- **Cross-reference resolution** — follow `\ref` and `\x` links between passages
-
-This package is a work in progress. APIs will be added as needs arise.
+The parser produces a low-level AST that faithfully represents the USFM markup structure. This package provides higher-level abstractions closer to what applications need — including **view models** for UI-friendly projections and **HTML rendering** for publication-style reading views.
 
 ## Installation
 
@@ -21,7 +14,7 @@ npm install @usfm-tools/model
 
 ## Usage
 
-Currently re-exports the parser's `parse` function. Model-specific APIs will be added here as they are developed.
+### Parse (re-exported from the parser)
 
 ```typescript
 import { parse } from "@usfm-tools/model";
@@ -30,6 +23,38 @@ const result = parse(`\\id GEN
 \\c 1
 \\p
 \\v 1 In the beginning God created the heavens and the earth.`);
+```
+
+### View models
+
+View models reshape the AST for specific UI tasks. They live under the **`ViewModels`** object so additional families can be added later without colliding.
+
+- **`ViewModels.Publication`** — alias of **`PublicationViewModel`**: publication / “Bible app” reading layout (`buildPreview`, and types such as `PreviewDocument`).
+
+```typescript
+import { ViewModels, parse } from "@usfm-tools/model";
+
+const { document } = parse(usfmText);
+const preview = ViewModels.Publication.buildPreview(document);
+```
+
+### HTML rendering (`UsfmRenderer`)
+
+**`UsfmRenderer`** turns either a parser **`DocumentNode`** (via `renderDocument`) or a pre-built publication preview (via `renderPreview`) into HTML using a pluggable **`UsfmRenderTemplate`**. Override individual template methods (or pass a **`Partial<UsfmRenderTemplate>`** through **`mergePublicationTemplate`**) to change tags and class names. Always escape user text in **`escapeText`** when customizing.
+
+```typescript
+import {
+  UsfmRenderer,
+  defaultPublicationTemplate,
+  mergePublicationTemplate,
+  parse,
+} from "@usfm-tools/model";
+
+const template = mergePublicationTemplate(defaultPublicationTemplate(), {
+  chapter: (num, inner) => `<section class="ch" data-n="${num}">${inner}</section>`,
+});
+
+const html = new UsfmRenderer(template).renderDocument(parse(src).document);
 ```
 
 ## Development
@@ -64,9 +89,19 @@ npm install
 ```
 packages/usfm-model/
 ├── src/
-│   └── index.ts        # Public API (currently re-exports parser)
+│   ├── index.ts                    # Public API
+│   ├── view-models/
+│   │   └── publication-preview.ts  # PublicationViewModel + ViewModels.Publication alias
+│   └── renderer/
+│       ├── types.ts                # UsfmRenderTemplate interface
+│       ├── default-template.ts     # defaultPublicationTemplate()
+│       ├── merge-template.ts       # mergePublicationTemplate()
+│       ├── usfm-renderer.ts        # UsfmRenderer class
+│       └── index.ts
 ├── tests/
-│   └── model.test.ts   # Smoke test verifying parser integration
+│   ├── model.test.ts
+│   ├── publication-preview.test.ts
+│   └── usfm-renderer.test.ts
 ├── tsconfig.json
 ├── tsup.config.ts
 ├── eslint.config.js
@@ -75,13 +110,11 @@ packages/usfm-model/
 
 ## Architecture
 
-This package sits between the parser and the application:
-
 ```
-USFM text → @usfm-tools/parser (AST) → @usfm-tools/model (application model) → UI / export / etc.
+USFM text → @usfm-tools/parser (AST) → view models (e.g. PublicationViewModel) → UsfmRenderer + template → HTML
 ```
 
-The parser's AST is a faithful representation of the markup. The model transforms it into structures optimized for application use — for example, a verse-indexed map that allows `O(1)` lookup by reference, or a flat rendering list suitable for virtualized UI scrolling.
+The publication view model flattens the AST into blocks (headings, poetry/prose lines, tables, etc.) and inline **segments** (verse milestones, text, character styles, notes). **`UsfmRenderer`** walks that structure and delegates all markup to **`UsfmRenderTemplate`**.
 
 ## License
 
