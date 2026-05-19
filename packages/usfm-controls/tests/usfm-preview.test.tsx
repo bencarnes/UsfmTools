@@ -23,4 +23,14 @@ describe("UsfmPreview", () => {
     );
     expect(container.querySelectorAll("p.usfm-line").length).toBe(2);
   });
+
+  it("treats Storybook-style string 'true' as versePerLine on", () => {
+    const { container } = render(
+      <UsfmPreview
+        value={"\\id GEN\n\\c 1\n\\p\n\\v 1 One. \\v 2 Two."}
+        versePerLine={"true" as unknown as boolean}
+      />,
+    );
+    expect(container.querySelectorAll("p.usfm-line").length).toBe(2);
+  });
 });
