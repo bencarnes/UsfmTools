@@ -49,9 +49,28 @@ const OTHER_SAMPLE_FILES: readonly UsfmBookPickerFileInput[] = [
   },
 ];
 
+const HYMNAL_FILE: UsfmBookPickerFileInput = {
+  id: "hymnal",
+  usfm: `\\id HYM
+\\toc1 Hymnal
+\\c 1
+\\p
+`,
+};
+
+const NO_ID_SAMPLE: UsfmBookPickerFileInput = {
+  id: "music-supplement",
+  usfm: `\\toc1 Music supplement
+\\c 1
+\\p
+`,
+};
+
 const SAMPLE_FILES: readonly UsfmBookPickerFileInput[] = [
   ...OT_NT_FILES,
   ...OTHER_SAMPLE_FILES,
+  HYMNAL_FILE,
+  NO_ID_SAMPLE,
 ];
 
 const meta = {

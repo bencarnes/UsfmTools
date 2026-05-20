@@ -37,6 +37,7 @@ export {
 export type {
   StandardBookIdentifier,
   StandardBookCanonGroup,
+  UsfmBookPickerCanonGroup,
   UsfmBookPickerFileInput,
   UsfmBookPickerBook,
   UsfmBookPickerGroups,

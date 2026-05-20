@@ -1,5 +1,6 @@
 import type {
   BookNode,
+  DocumentNode,
   ParagraphNode,
   ParentNode,
   TextNode,
@@ -14,6 +15,8 @@ import {
   type StandardBookCanonGroup,
 } from "./standard-book-identifiers.js";
 
+export type UsfmBookPickerCanonGroup = StandardBookCanonGroup | "nonStandard";
+
 export interface UsfmBookPickerFileInput {
   /** Stable id for the file (e.g. path or key); not read from USFM. */
   readonly id: string;
@@ -22,19 +25,32 @@ export interface UsfmBookPickerFileInput {
 
 export interface UsfmBookPickerBook {
   readonly fileId: string;
-  /** Standard identifier code (uppercase). */
+  /**
+   * Identifier code from the first `\\id` line (uppercase first token), or an empty string
+   * when the file has no `\\id` or the `\\id` line has no code token.
+   */
   readonly code: string;
   /** Short label for buttons / list (see USFM book picker rules). */
   readonly displayLabel: string;
-  readonly canonGroup: StandardBookCanonGroup;
-  /** Sort key: position in the official standard book table. */
+  readonly canonGroup: UsfmBookPickerCanonGroup;
+  /**
+   * For standard books: index in the official USFM book table (sorting).
+   * For non-standard books: unused (order follows the input `files` array).
+   */
   readonly sortIndex: number;
 }
 
 export interface UsfmBookPickerGroups {
   readonly oldTestament: readonly UsfmBookPickerBook[];
   readonly newTestament: readonly UsfmBookPickerBook[];
+  /** Standard identifiers outside Old/New Testament (peripherals, deuterocanon, etc.). */
   readonly other: readonly UsfmBookPickerBook[];
+  /**
+   * Non-standard entries: a non-empty `\\id` code not in the USFM standard list, **or**
+   * a missing/empty `\\id` (including files with no `book` node but non-empty USFM).
+   * Order matches the input `files` array.
+   */
+  readonly nonStandard: readonly UsfmBookPickerBook[];
 }
 
 function isParent(n: UsfmNode): n is ParentNode {
@@ -60,7 +76,7 @@ function nodePlainText(n: UsfmNode): string {
   return "";
 }
 
-function extractTocFromBook(book: BookNode): {
+function extractTocFromParagraphChildren(children: readonly UsfmNode[]): {
   toc1?: string;
   toc2?: string;
   toc3?: string;
@@ -69,7 +85,7 @@ function extractTocFromBook(book: BookNode): {
   let toc2: string | undefined;
   let toc3: string | undefined;
 
-  for (const child of book.children) {
+  for (const child of children) {
     if (child.type !== "paragraph") continue;
     const p = child as ParagraphNode;
     if (p.marker === "toc1" && toc1 === undefined) {
@@ -85,6 +101,22 @@ function extractTocFromBook(book: BookNode): {
   }
 
   return { toc1, toc2, toc3 };
+}
+
+function extractTocFromBook(book: BookNode): {
+  toc1?: string;
+  toc2?: string;
+  toc3?: string;
+} {
+  return extractTocFromParagraphChildren(book.children);
+}
+
+function extractTocFromDocument(document: DocumentNode): {
+  toc1?: string;
+  toc2?: string;
+  toc3?: string;
+} {
+  return extractTocFromParagraphChildren(document.children);
 }
 
 function displayLabelForBook(
@@ -106,51 +138,95 @@ function displayLabelForBook(
   return code;
 }
 
+/** `\\toc1` → `\\toc2` → `\\toc3` → normalized `\\id` code → `fileId`. */
+function displayLabelNonStandard(
+  normalizedIdCode: string,
+  toc: { toc1?: string; toc2?: string; toc3?: string },
+  fileId: string,
+): string {
+  const t1 = toc.toc1?.trim();
+  if (t1) return t1;
+  const t2 = toc.toc2?.trim();
+  if (t2) return t2;
+  const t3 = toc.toc3?.trim();
+  if (t3) return t3;
+  if (normalizedIdCode) return normalizedIdCode;
+  return fileId;
+}
+
 /**
- * Parses each file's USFM, keeps only those with a valid standard `\id` code,
- * and groups/sorts books for the USFM book picker control. Only the **first**
- * `book` node in each document is considered (one canonical book per file).
+ * Parses each file's USFM and groups books for the USFM book picker control.
+ * Standard `\\id` codes are split into Old Testament, New Testament, and other;
+ * non-standard rows include unknown `\\id` codes, an empty/missing `\\id` line on
+ * the first book, or **no** `\\id` at all (non-empty USFM), in input order.
+ * Only the **first** `book` node is used when present; otherwise TOC markers are read
+ * from top-level paragraphs on the document.
  */
 export function buildUsfmBookPickerGroups(
   files: readonly UsfmBookPickerFileInput[],
 ): UsfmBookPickerGroups {
-  const picked: UsfmBookPickerBook[] = [];
+  const standardPicked: UsfmBookPickerBook[] = [];
+  const nonStandardList: UsfmBookPickerBook[] = [];
 
   for (const file of files) {
+    const trimmed = file.usfm.trim();
+    if (!trimmed) continue;
+
     const { document } = parse(file.usfm);
     const firstBook = document.children.find((c) => c.type === "book") as BookNode | undefined;
-    if (!firstBook) continue;
 
-    const rawCode = normalizeUsfmBookCode(firstBook.code);
-    if (!rawCode || !isStandardUsfmBookIdentifier(rawCode)) continue;
+    if (firstBook) {
+      const rawCode = normalizeUsfmBookCode(firstBook.code);
+      const toc = extractTocFromBook(firstBook);
 
-    const meta = getStandardUsfmBookIdentifier(rawCode)!;
-    const order = getStandardUsfmBookOrderIndex(rawCode);
-    if (order === undefined) continue;
+      if (rawCode && isStandardUsfmBookIdentifier(rawCode)) {
+        const meta = getStandardUsfmBookIdentifier(rawCode)!;
+        const order = getStandardUsfmBookOrderIndex(rawCode);
+        if (order === undefined) continue;
 
-    const toc = extractTocFromBook(firstBook);
-    const displayLabel = displayLabelForBook(meta.code, meta.canonGroup, toc);
+        const displayLabel = displayLabelForBook(meta.code, meta.canonGroup, toc);
 
-    picked.push({
-      fileId: file.id,
-      code: meta.code,
-      displayLabel,
-      canonGroup: meta.canonGroup,
-      sortIndex: order,
-    });
+        standardPicked.push({
+          fileId: file.id,
+          code: meta.code,
+          displayLabel,
+          canonGroup: meta.canonGroup,
+          sortIndex: order,
+        });
+      } else {
+        const displayLabel = displayLabelNonStandard(rawCode, toc, file.id);
+        nonStandardList.push({
+          fileId: file.id,
+          code: rawCode,
+          displayLabel,
+          canonGroup: "nonStandard",
+          sortIndex: 0,
+        });
+      }
+    } else {
+      const toc = extractTocFromDocument(document);
+      const displayLabel = displayLabelNonStandard("", toc, file.id);
+      nonStandardList.push({
+        fileId: file.id,
+        code: "",
+        displayLabel,
+        canonGroup: "nonStandard",
+        sortIndex: 0,
+      });
+    }
   }
 
-  picked.sort((a, b) => a.sortIndex - b.sortIndex);
+  standardPicked.sort((a, b) => a.sortIndex - b.sortIndex);
 
   const oldTestament: UsfmBookPickerBook[] = [];
   const newTestament: UsfmBookPickerBook[] = [];
   const other: UsfmBookPickerBook[] = [];
 
-  for (const b of picked) {
+  for (const b of standardPicked) {
     if (b.canonGroup === "ot") oldTestament.push(b);
     else if (b.canonGroup === "nt") newTestament.push(b);
     else other.push(b);
   }
 
-  return { oldTestament, newTestament, other };
+  return { oldTestament, newTestament, other, nonStandard: nonStandardList };
 }

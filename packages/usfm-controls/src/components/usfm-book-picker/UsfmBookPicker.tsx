@@ -7,6 +7,7 @@ import {
 
 export interface UsfmBookPickerSelectDetail {
   readonly fileId: string;
+  /** Empty when the file has no `\\id` or an empty `\\id` line. */
   readonly code: string;
 }
 
@@ -49,6 +50,17 @@ const bookButtonBase: CSSProperties = {
   background: "color-mix(in srgb, Canvas 96%, CanvasText 4%)",
 };
 
+function pickerButtonTitle(book: UsfmBookPickerBook): string {
+  return book.code || book.fileId;
+}
+
+function pickerButtonAriaLabel(book: UsfmBookPickerBook): string {
+  if (book.code) {
+    return `Open ${book.displayLabel} (${book.code})`;
+  }
+  return `Open ${book.displayLabel}`;
+}
+
 function BookGrid({
   books,
   onBookSelect,
@@ -63,8 +75,8 @@ function BookGrid({
           key={book.fileId}
           type="button"
           style={bookButtonBase}
-          title={book.code}
-          aria-label={`Open ${book.displayLabel} (${book.code})`}
+          title={pickerButtonTitle(book)}
+          aria-label={pickerButtonAriaLabel(book)}
           onClick={() => onBookSelect?.({ fileId: book.fileId, code: book.code })}
         >
           {book.displayLabel}
@@ -74,7 +86,8 @@ function BookGrid({
   );
 }
 
-function OtherList({
+/** Single-column vertical list (standard “other” books and non-standard `\\id` files). */
+function VerticalBookList({
   books,
   onBookSelect,
 }: {
@@ -104,8 +117,8 @@ function OtherList({
               fontFamily: "inherit",
               fontSize: "0.95rem",
             }}
-            title={book.code}
-            aria-label={`Open ${book.displayLabel} (${book.code})`}
+            title={pickerButtonTitle(book)}
+            aria-label={pickerButtonAriaLabel(book)}
             onClick={() => onBookSelect?.({ fileId: book.fileId, code: book.code })}
           >
             {book.displayLabel}
@@ -117,14 +130,16 @@ function OtherList({
 }
 
 /**
- * Picker for USFM books: reads `\id` and table-of-contents markers from supplied
- * file contents (no filesystem access), groups Old Testament / New Testament / other
- * standard identifiers, and notifies via `onBookSelect`.
+ * Picker for USFM books: reads `\\id` and table-of-contents markers from supplied
+ * file contents (no filesystem access), groups Old Testament, New Testament,
+ * other standard identifiers, non-standard entries (unknown or empty `\\id`, or no `\\id`),
+ * and notifies via `onBookSelect` ( **`code` may be an empty string** when there is no id token).
  */
 export function UsfmBookPicker({ files, onBookSelect, className }: UsfmBookPickerProps) {
   const groups = useMemo(() => buildUsfmBookPickerGroups(files), [files]);
 
   const showOther = groups.other.length > 0;
+  const showNonStandard = groups.nonStandard.length > 0;
 
   return (
     <div
@@ -137,7 +152,13 @@ export function UsfmBookPicker({ files, onBookSelect, className }: UsfmBookPicke
       {showOther ? (
         <>
           <hr style={dividerStyle} aria-hidden />
-          <OtherList books={groups.other} onBookSelect={onBookSelect} />
+          <VerticalBookList books={groups.other} onBookSelect={onBookSelect} />
+        </>
+      ) : null}
+      {showNonStandard ? (
+        <>
+          <hr style={dividerStyle} aria-hidden />
+          <VerticalBookList books={groups.nonStandard} onBookSelect={onBookSelect} />
         </>
       ) : null}
     </div>
