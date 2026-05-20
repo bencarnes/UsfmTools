@@ -23,9 +23,5 @@ export const ViewModels = {
   Publication: PublicationViewModel,
 } as const;
 
-export {
-  UsfmRenderer,
-  defaultPublicationTemplate,
-  mergePublicationTemplate,
-} from "./renderer/index.js";
-export type { UsfmRenderTemplate, UsfmRenderOptions } from "./renderer/types.js";
+export { renderPreviewHtml } from "./renderer/index.js";
+export type { RenderPreviewOptions } from "./renderer/index.js";
