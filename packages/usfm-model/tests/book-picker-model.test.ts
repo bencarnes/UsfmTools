@@ -39,8 +39,44 @@ describe("buildUsfmBookPickerGroups", () => {
     expect(groups.oldTestament).toHaveLength(0);
     expect(groups.newTestament).toHaveLength(0);
     expect(groups.other).toHaveLength(0);
-    expect(groups.nonStandard.map((b) => b.code)).toEqual(["ZZZ", "ABC"]);
-    expect(groups.nonStandard.map((b) => b.displayLabel)).toEqual(["Custom A", "Custom B"]);
+    expect(groups.nonStandard.map((b) => b.code)).toEqual(["ZZZ", "", "ABC"]);
+    expect(groups.nonStandard.map((b) => b.displayLabel)).toEqual(["Custom A", "y", "Custom B"]);
+  });
+
+  it("includes files with no \\id as non-standard using top-level \\toc and file id fallback", () => {
+    const groups = buildUsfmBookPickerGroups([
+      {
+        id: "hymn-file",
+        usfm: `\\toc1 Standalone hymnal
+\\c 1
+\\p
+`,
+      },
+    ]);
+    expect(groups.nonStandard).toHaveLength(1);
+    expect(groups.nonStandard[0]?.code).toBe("");
+    expect(groups.nonStandard[0]?.displayLabel).toBe("Standalone hymnal");
+  });
+
+  it("uses empty \\id code with book-level toc for non-standard", () => {
+    const groups = buildUsfmBookPickerGroups([
+      {
+        id: "blank-id",
+        usfm: `\\id
+\\toc1 From toc only
+\\c 1
+\\p
+`,
+      },
+    ]);
+    expect(groups.nonStandard[0]?.code).toBe("");
+    expect(groups.nonStandard[0]?.displayLabel).toBe("From toc only");
+  });
+
+  it("omits whitespace-only files", () => {
+    const groups = buildUsfmBookPickerGroups([{ id: "empty", usfm: "  \n\t  " }]);
+    expect(groups.nonStandard).toHaveLength(0);
+    expect(groups.oldTestament).toHaveLength(0);
   });
 
   it("uses \\toc1 then \\toc2 then \\toc3 for non-standard labels", () => {

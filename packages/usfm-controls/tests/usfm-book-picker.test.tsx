@@ -59,6 +59,25 @@ describe("UsfmBookPicker", () => {
     expect(onBookSelect).toHaveBeenCalledWith({ fileId: "myfile", code: "LUK" });
   });
 
+  it("renders non-standard file without \\id using aria label without code suffix", () => {
+    render(
+      <UsfmBookPicker files={[{ id: "supp", usfm: "\\toc1 Supplement\n\\c 1\n\\p\n" }]} />,
+    );
+    expect(screen.getByRole("button", { name: /^Open Supplement$/ })).toBeTruthy();
+  });
+
+  it("fires onBookSelect with empty code when there is no \\id", () => {
+    const onBookSelect = vi.fn();
+    render(
+      <UsfmBookPicker
+        files={[{ id: "z", usfm: "\\toc1 Zine\n\\c 1\n\\p\n" }]}
+        onBookSelect={onBookSelect}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Open Zine$/ }));
+    expect(onBookSelect).toHaveBeenCalledWith({ fileId: "z", code: "" });
+  });
+
   it("fires onBookSelect for non-standard ids", () => {
     const onBookSelect = vi.fn();
     render(

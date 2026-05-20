@@ -44,7 +44,7 @@ The USFM specification defines a fixed set of [book identifiers](https://ubsicap
 
 Helpers such as **`isStandardUsfmBookIdentifier`**, **`normalizeUsfmBookCode`**, and **`getStandardUsfmBookIdentifier`** support validation and metadata lookup.
 
-For UI that lists available books from in-memory USFM files, **`buildUsfmBookPickerGroups(files)`** parses each file’s USFM (via the bundled parser), reads the first `book` node’s `\\id` and `\\toc1` / `\\toc2` / `\\toc3`, and returns four collections: **`oldTestament`**, **`newTestament`**, and **`other`** (standard codes outside OT/NT), each sorted by the official table order, plus **`nonStandard`** (any non-empty `\\id` that is not in the standard list), in the same order as those files appear in **`files`**. Old/New Testament titles prefer `\\toc3` with code fallback; other standard books and non-standard files use `\\toc1`, then `\\toc2`, then `\\toc3`, then the code. The **`UsfmBookPicker`** React control in **`@usfm-tools/controls`** consumes this function.
+For UI that lists available books from in-memory USFM files, **`buildUsfmBookPickerGroups(files)`** parses each file’s USFM (via the bundled parser), reads `\\toc1` / `\\toc2` / `\\toc3`, and returns four collections: **`oldTestament`**, **`newTestament`**, and **`other`** (standard codes outside OT/NT), each sorted by the official table order, plus **`nonStandard`**. The latter includes files whose first `\\id` code is not in the standard list, files with a **missing or empty** `\\id` line on the first book, and files **with no `\\id` at all** (non-empty USFM): for those, TOC markers are read from **top-level** paragraphs on the document, and **`code`** is an empty string when there is no id token. Order within **`nonStandard`** follows the input **`files`** array. Old/New Testament titles prefer `\\toc3` with code fallback; other standard books and non-standard rows use `\\toc1`, then `\\toc2`, then `\\toc3`, then the `\\id` code, then the file **`id`** when no code and no toc text. The **`UsfmBookPicker`** React control in **`@usfm-tools/controls`** consumes this function.
 
 ```typescript
 import { buildUsfmBookPickerGroups } from "@usfm-tools/model";
@@ -52,6 +52,7 @@ import { buildUsfmBookPickerGroups } from "@usfm-tools/model";
 const { oldTestament, newTestament, other, nonStandard } = buildUsfmBookPickerGroups([
   { id: "file-gen", usfm: "\\id GEN\n\\toc3 Gen\n..." },
   { id: "file-hym", usfm: "\\id HYM\n\\toc1 Hymnal\n..." },
+  { id: "file-extra", usfm: "\\toc1 Music supplement\n\\c 1\n\\p\n" }, // no \\id → nonStandard, code ""
 ]);
 ```
 
