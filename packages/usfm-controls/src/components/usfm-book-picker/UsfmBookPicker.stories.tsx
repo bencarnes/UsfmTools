@@ -1,44 +1,57 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
-import type { UsfmBookPickerFileInput } from "@usfm-tools/model";
+import {
+  STANDARD_USFM_BOOK_IDENTIFIERS,
+  type UsfmBookPickerFileInput,
+} from "@usfm-tools/model";
 import { UsfmBookPicker } from "./UsfmBookPicker.js";
 
+function minimalOtNtUsfm(code: string): string {
+  return `\\id ${code}
+\\toc3 ${code}
+\\c 1
+\\p
+`;
+}
+
+const OT_NT_FILES: readonly UsfmBookPickerFileInput[] =
+  STANDARD_USFM_BOOK_IDENTIFIERS.filter(
+    (b) => b.canonGroup === "ot" || b.canonGroup === "nt",
+  ).map((b) => ({
+    id: b.code,
+    usfm: minimalOtNtUsfm(b.code),
+  }));
+
+const OTHER_SAMPLE_FILES: readonly UsfmBookPickerFileInput[] = [
+  {
+    id: "frt",
+    usfm: `\\id FRT
+\\toc1 Front Matter
+\\c 1
+\\p
+`,
+  },
+  {
+    id: "bak",
+    usfm: `\\id BAK
+\\toc1 Back Matter
+\\c 1
+\\p
+`,
+  },
+  {
+    id: "glo",
+    usfm: `\\id GLO
+\\toc1 Glossary
+\\c 1
+\\p
+`,
+  },
+];
+
 const SAMPLE_FILES: readonly UsfmBookPickerFileInput[] = [
-  {
-    id: "gen",
-    usfm: `\\id GEN
-\\toc3 Gen
-\\toc1 Genesis
-\\c 1
-\\p
-\\v 1 In the beginning.`,
-  },
-  {
-    id: "mat",
-    usfm: `\\id MAT
-\\toc3 Mat
-\\toc1 Matthew
-\\c 1
-\\p
-\\v 1 Book of the genealogy.`,
-  },
-  {
-    id: "tob",
-    usfm: `\\id TOB
-\\toc1 Tobit
-\\toc2 Tb
-\\toc3 Tbt
-\\c 1
-\\p
-\\v 1 This book tells the story.`,
-  },
-  {
-    id: "bad",
-    usfm: `\\id XYZ
-\\toc3 Bad
-\\c 1
-\\p`,
-  },
+  ...OT_NT_FILES,
+  ...OTHER_SAMPLE_FILES,
 ];
 
 const meta = {
@@ -59,7 +72,7 @@ export const Default: Story = {
   render: (args) => {
     const [last, setLast] = useState<string>("(none)");
     return (
-      <div className="max-w-2xl space-y-3">
+      <div className="max-w-6xl space-y-3">
         <UsfmBookPicker
           {...args}
           onBookSelect={(d) => setLast(`${d.code} → fileId ${d.fileId}`)}
