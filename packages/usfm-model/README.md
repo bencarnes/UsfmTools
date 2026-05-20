@@ -38,25 +38,14 @@ const { document } = parse(usfmText);
 const preview = ViewModels.Publication.buildPreview(document, { versePerLine: true });
 ```
 
-### HTML rendering (`UsfmRenderer`)
+### HTML rendering (`renderPreviewHtml`)
 
-**`UsfmRenderer`** turns either a parser **`DocumentNode`** (via `renderDocument`) or a pre-built publication preview (via `renderPreview`) into HTML using a pluggable **`UsfmRenderTemplate`**. Both render methods accept optional **`UsfmRenderOptions`** (for example `{ versePerLine: true }`) so callers who already built a preview can still request verse-per-line expansion at render time. Override individual template methods (or pass a **`Partial<UsfmRenderTemplate>`** through **`mergePublicationTemplate`**) to change tags and class names. Always escape user text in **`escapeText`** when customizing.
+**`renderPreviewHtml(usfm, options?)`** turns a USFM source string into publication-style HTML with a fixed, hardcoded markup. Parser errors (if any) are surfaced as an `<aside class="usfm-preview-errors">` banner at the top of the output. The optional **`RenderPreviewOptions`** currently supports `{ versePerLine: true }` to expand multi-verse paragraphs into one `<p>` per verse. Customize presentation by styling the emitted CSS class hooks (`usfm-document`, `usfm-book`, `usfm-chapter`, `usfm-line`, `usfm-line--prose`, `usfm-line--poetry`, `usfm-v`, `usfm-txt`, `usfm-nd`, `usfm-note`, `usfm-ref`, …) in your app's stylesheet.
 
 ```typescript
-import {
-  UsfmRenderer,
-  defaultPublicationTemplate,
-  mergePublicationTemplate,
-  parse,
-} from "@usfm-tools/model";
+import { renderPreviewHtml } from "@usfm-tools/model";
 
-const template = mergePublicationTemplate(defaultPublicationTemplate(), {
-  chapter: (num, inner) => `<section class="ch" data-n="${num}">${inner}</section>`,
-});
-
-const html = new UsfmRenderer(template).renderDocument(parse(src).document, {
-  versePerLine: true,
-});
+const html = renderPreviewHtml(src, { versePerLine: true });
 ```
 
 ## Development
@@ -95,15 +84,12 @@ packages/usfm-model/
 │   ├── view-models/
 │   │   └── publication-preview.ts  # PublicationViewModel + ViewModels.Publication alias
 │   └── renderer/
-│       ├── types.ts                # UsfmRenderTemplate interface
-│       ├── default-template.ts     # defaultPublicationTemplate()
-│       ├── merge-template.ts       # mergePublicationTemplate()
-│       ├── usfm-renderer.ts        # UsfmRenderer class
+│       ├── render-preview-html.ts  # renderPreviewHtml(usfm, options?)
 │       └── index.ts
 ├── tests/
 │   ├── model.test.ts
 │   ├── publication-preview.test.ts
-│   └── usfm-renderer.test.ts
+│   └── render-preview-html.test.ts
 ├── tsconfig.json
 ├── tsup.config.ts
 ├── eslint.config.js
@@ -113,10 +99,10 @@ packages/usfm-model/
 ## Architecture
 
 ```
-USFM text → @usfm-tools/parser (AST) → view models (e.g. PublicationViewModel) → UsfmRenderer + template → HTML
+USFM text → @usfm-tools/parser (AST) → view models (e.g. PublicationViewModel) → renderPreviewHtml → HTML
 ```
 
-The publication view model flattens the AST into blocks (headings, poetry/prose lines, tables, etc.) and inline **segments** (verse milestones, text, character styles, notes). **`UsfmRenderer`** walks that structure and delegates all markup to **`UsfmRenderTemplate`**.
+The publication view model flattens the AST into blocks (headings, poetry/prose lines, tables, etc.) and inline **segments** (verse milestones, text, character styles, notes). **`renderPreviewHtml`** walks that structure and emits HTML with a fixed set of `usfm-*` CSS class hooks — customize presentation through CSS rather than markup overrides.
 
 ## License
 

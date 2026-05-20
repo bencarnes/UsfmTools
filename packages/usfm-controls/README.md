@@ -8,7 +8,7 @@ React UI controls for editing USFM scripture text, built on [CodeMirror 6](https
 - **Error diagnostics** — red squiggles under parse errors with hover messages
 - **Autocomplete** — type `\` to get a filtered list of USFM markers with descriptions; navigate with arrows, accept with Tab
 - **Async language service** — LSP-inspired message protocol for clean separation between editor UI and language intelligence
-- **Publication preview** — **`UsfmPreview`** renders USFM as continuous reading text (similar to a Bible app) using **`UsfmRenderer`** from `@usfm-tools/model`; parsing and HTML output are memoized for fast updates next to the editor
+- **Publication preview** — **`UsfmPreview`** renders USFM as continuous reading text (similar to a Bible app) using **`renderPreviewHtml`** from `@usfm-tools/model`; HTML output is memoized for fast updates next to the editor
 
 ## Installation
 
@@ -39,7 +39,7 @@ function App() {
 
 ### UsfmPreview
 
-Renders USFM as HTML for reading (not editing). Uses the parser and **`UsfmRenderer`** from **`@usfm-tools/model`**; override the **`UsfmRenderTemplate`** (partial merge) to change markup or CSS hooks.
+Renders USFM as HTML for reading (not editing). Uses **`renderPreviewHtml`** from **`@usfm-tools/model`**, which emits a fixed set of `usfm-*` CSS class hooks — style them in your app's stylesheet to customize presentation.
 
 ```tsx
 import { useState } from "react";
@@ -61,10 +61,9 @@ function App() {
 |------|------|-------------|
 | `value` | `string` | USFM source to render |
 | `versePerLine` | `boolean` | When true, split paragraphs that contain multiple `\\v` milestones so each verse appears on its own preview line (default `false`) |
-| `template` | `Partial<UsfmRenderTemplate>` | Optional template overrides (merge with default); memoize in the parent if it is stable across renders |
 | `className` | `string` | CSS class on the root wrapper |
 
-The package also **re-exports** `UsfmRenderer`, `defaultPublicationTemplate`, `mergePublicationTemplate`, `UsfmRenderTemplate`, **`UsfmRenderOptions`**, `ViewModels`, and `PublicationViewModel` from **`@usfm-tools/model`** so you can configure rendering without a second import path.
+The package also **re-exports** `renderPreviewHtml`, **`RenderPreviewOptions`**, `ViewModels`, and `PublicationViewModel` from **`@usfm-tools/model`** so you can render USFM without a second import path.
 
 ### UsfmEditor props
 
@@ -84,7 +83,7 @@ The package also **re-exports** `UsfmRenderer`, `defaultPublicationTemplate`, `m
 │  └───────────────────────────────────────────┘  │
 └───────────────┬─────────────────┬───────────────┘
                 │                 │
-                │                 │ parse + UsfmRenderer
+                │                 │ renderPreviewHtml
                 │                 ▼
                 │         ┌───────────────────────┐
                 │         │  @usfm-tools/model    │
