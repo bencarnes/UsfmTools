@@ -23,8 +23,8 @@ flowchart TB
 | Package | Role |
 |--------|------|
 | **usfm-parser** | Parses USFM source into structured data; ships ESM and CJS bundles (`dist/`). |
-| **usfm-model** | View models (for example `ViewModels.Publication` / `PublicationViewModel`), publication-style HTML rendering via **`renderPreviewHtml`** (fixed markup; customize via CSS class hooks), plus re-exports of **`parse`**. |
-| **usfm-controls** | React controls: **`UsfmEditor`** (CodeMirror), **`UsfmPreview`** (publication-style HTML), and the async USFM language service. Depends on the parser and model. |
+| **usfm-model** | View models (for example `ViewModels.Publication` / `PublicationViewModel`), publication-style HTML rendering via **`renderPreviewHtml`**, standard USFM **book identifier** metadata and **`buildUsfmBookPickerGroups`** for book-list UI, plus re-exports of **`parse`**. |
+| **usfm-controls** | React controls: **`UsfmEditor`** (CodeMirror), **`UsfmPreview`** (publication-style HTML), **`UsfmBookPicker`** (responsive book grid from in-memory USFM files), and the async USFM language service. Depends on the parser and model. |
 | **usfm-parser-integration-tests** | Longer-running checks against the parser; **no** `build` script, only `npm test`. |
 
 The **`Plan/`** directory holds Obsidian-style planning notes and is not part of the build.

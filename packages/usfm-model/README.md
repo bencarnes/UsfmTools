@@ -38,6 +38,22 @@ const { document } = parse(usfmText);
 const preview = ViewModels.Publication.buildPreview(document, { versePerLine: true });
 ```
 
+### Standard book identifiers and book picker model
+
+The USFM specification defines a fixed set of [book identifiers](https://ubsicap.github.io/usfm/identification/books.html) (the three-character code after `\\id`). This package exposes that table as **`STANDARD_USFM_BOOK_IDENTIFIERS`** (in official table order, with each row’s **Number** field and a canon grouping: Old Testament, New Testament, or other).
+
+Helpers such as **`isStandardUsfmBookIdentifier`**, **`normalizeUsfmBookCode`**, and **`getStandardUsfmBookIdentifier`** support validation and metadata lookup.
+
+For UI that lists available books from in-memory USFM files, **`buildUsfmBookPickerGroups(files)`** parses each file’s USFM (via the bundled parser), keeps only files whose first `\\id` uses a standard code, derives display titles from `\\toc1` / `\\toc2` / `\\toc3` according to canon group, and returns three arrays (**`oldTestament`**, **`newTestament`**, **`other`**) sorted by the standard table order. The **`UsfmBookPicker`** React control in **`@usfm-tools/controls`** consumes this function.
+
+```typescript
+import { buildUsfmBookPickerGroups } from "@usfm-tools/model";
+
+const { oldTestament, newTestament, other } = buildUsfmBookPickerGroups([
+  { id: "file-gen", usfm: "\\id GEN\n\\toc3 Gen\n..." },
+]);
+```
+
 ### HTML rendering (`renderPreviewHtml`)
 
 **`renderPreviewHtml(usfm, options?)`** turns a USFM source string into publication-style HTML with a fixed, hardcoded markup. Parser errors (if any) are surfaced as an `<aside class="usfm-preview-errors">` banner at the top of the output. The optional **`RenderPreviewOptions`** currently supports `{ versePerLine: true }` to expand multi-verse paragraphs into one `<p>` per verse. Customize presentation by styling the emitted CSS class hooks (`usfm-document`, `usfm-book`, `usfm-chapter`, `usfm-line`, `usfm-line--prose`, `usfm-line--poetry`, `usfm-v`, `usfm-txt`, `usfm-nd`, `usfm-note`, `usfm-ref`, …) in your app's stylesheet.
@@ -81,6 +97,7 @@ npm install
 packages/usfm-model/
 ├── src/
 │   ├── index.ts                    # Public API
+│   ├── book-identifiers/           # Standard \\id codes + buildUsfmBookPickerGroups
 │   ├── view-models/
 │   │   └── publication-preview.ts  # PublicationViewModel + ViewModels.Publication alias
 │   └── renderer/
@@ -88,6 +105,7 @@ packages/usfm-model/
 │       └── index.ts
 ├── tests/
 │   ├── model.test.ts
+│   ├── book-picker-model.test.ts
 │   ├── publication-preview.test.ts
 │   └── render-preview-html.test.ts
 ├── tsconfig.json

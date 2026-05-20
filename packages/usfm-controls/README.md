@@ -9,6 +9,7 @@ React UI controls for editing USFM scripture text, built on [CodeMirror 6](https
 - **Autocomplete** — type `\` to get a filtered list of USFM markers with descriptions; navigate with arrows, accept with Tab
 - **Async language service** — LSP-inspired message protocol for clean separation between editor UI and language intelligence
 - **Publication preview** — **`UsfmPreview`** renders USFM as continuous reading text (similar to a Bible app) using **`renderPreviewHtml`** from `@usfm-tools/model`; HTML output is memoized for fast updates next to the editor
+- **Book picker** — **`UsfmBookPicker`** lists books from caller-supplied USFM strings (no filesystem access), using standard `\\id` codes and table-of-contents markers; selection is reported through **`onBookSelect`**
 
 ## Installation
 
@@ -63,7 +64,34 @@ function App() {
 | `versePerLine` | `boolean` | When true, split paragraphs that contain multiple `\\v` milestones so each verse appears on its own preview line (default `false`) |
 | `className` | `string` | CSS class on the root wrapper |
 
-The package also **re-exports** `renderPreviewHtml`, **`RenderPreviewOptions`**, `ViewModels`, and `PublicationViewModel` from **`@usfm-tools/model`** so you can render USFM without a second import path.
+### UsfmBookPicker
+
+Lists **standard** USFM books from an array of `{ id, usfm }` entries (your app supplies file contents and stable ids). The model’s **`buildUsfmBookPickerGroups`** parses each `usfm` string, reads `\\id` and `\\toc1` / `\\toc2` / `\\toc3`, and splits results into Old Testament, New Testament, and other identifiers (for example apocrypha or front matter). Invalid or non-standard `\\id` codes are omitted.
+
+```tsx
+import { UsfmBookPicker } from "@usfm-tools/controls";
+
+const files = [
+  { id: "path/to/GEN.usfm", usfm: "\\id GEN\n\\toc3 Gen\n..." },
+  { id: "path/to/MAT.usfm", usfm: "\\id MAT\n\\toc3 Mat\n..." },
+];
+
+<UsfmBookPicker
+  files={files}
+  onBookSelect={({ fileId, code }) => {
+    /* wire navigation or editor load */
+  }}
+  className="max-w-2xl border rounded-md p-3"
+/>;
+```
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `files` | `{ id: string; usfm: string }[]` | One entry per file; `id` is an application-defined key (path, URI, etc.); `usfm` is the file body |
+| `onBookSelect` | `(detail: { fileId: string; code: string }) => void` | Optional; called when the user activates a book (click or keyboard) |
+| `className` | `string` | CSS class on the root wrapper |
+
+The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml`, **`RenderPreviewOptions`**, `ViewModels`, `PublicationViewModel`, **`buildUsfmBookPickerGroups`**, **`UsfmBookPickerFileInput`**, **`UsfmBookPickerBook`**, and **`UsfmBookPickerGroups`**, so you can use the model without a second import path.
 
 ### UsfmEditor props
 
@@ -77,7 +105,7 @@ The package also **re-exports** `renderPreviewHtml`, **`RenderPreviewOptions`**,
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  UsfmEditor / UsfmPreview (React)               │
+│  UsfmEditor / UsfmPreview / UsfmBookPicker (React)               │
 │  ┌───────────────────────────────────────────┐  │
 │  │  CodeMirror 6 (editor only)               │  │
 │  └───────────────────────────────────────────┘  │
@@ -164,7 +192,7 @@ npm install
 npm run storybook
 ```
 
-Stories demonstrate the editor and preview with:
+Stories demonstrate the editor, preview, and book picker with:
 - Genesis 1 (prose + poetry + footnotes)
 - Psalm 1 (poetry formatting)
 - Empty state
@@ -187,6 +215,10 @@ packages/usfm-controls/
 │   │   └── usfm-preview/
 │   │       ├── UsfmPreview.tsx      # Publication-style HTML preview
 │   │       ├── UsfmPreview.stories.tsx
+│   │       └── index.ts
+│   │   └── usfm-book-picker/
+│   │       ├── UsfmBookPicker.tsx   # OT / NT / other book grid + list
+│   │       ├── UsfmBookPicker.stories.tsx
 │   │       └── index.ts
 │   └── language-service/
 │       ├── index.ts                 # Service exports

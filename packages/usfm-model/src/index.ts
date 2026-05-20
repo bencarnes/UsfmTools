@@ -25,3 +25,19 @@ export const ViewModels = {
 
 export { renderPreviewHtml } from "./renderer/index.js";
 export type { RenderPreviewOptions } from "./renderer/index.js";
+
+export {
+  STANDARD_USFM_BOOK_IDENTIFIERS,
+  normalizeUsfmBookCode,
+  isStandardUsfmBookIdentifier,
+  getStandardUsfmBookOrderIndex,
+  getStandardUsfmBookIdentifier,
+  buildUsfmBookPickerGroups,
+} from "./book-identifiers/index.js";
+export type {
+  StandardBookIdentifier,
+  StandardBookCanonGroup,
+  UsfmBookPickerFileInput,
+  UsfmBookPickerBook,
+  UsfmBookPickerGroups,
+} from "./book-identifiers/index.js";
