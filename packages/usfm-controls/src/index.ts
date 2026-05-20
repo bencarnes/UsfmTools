@@ -15,6 +15,7 @@ export {
 } from "@usfm-tools/model";
 export type {
   RenderPreviewOptions,
+  UsfmBookPickerCanonGroup,
   UsfmBookPickerFileInput,
   UsfmBookPickerBook,
   UsfmBookPickerGroups,

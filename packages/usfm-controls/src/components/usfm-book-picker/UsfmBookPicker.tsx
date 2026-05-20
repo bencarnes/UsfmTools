@@ -74,7 +74,8 @@ function BookGrid({
   );
 }
 
-function OtherList({
+/** Single-column vertical list (standard “other” books and non-standard `\\id` files). */
+function VerticalBookList({
   books,
   onBookSelect,
 }: {
@@ -117,14 +118,15 @@ function OtherList({
 }
 
 /**
- * Picker for USFM books: reads `\id` and table-of-contents markers from supplied
- * file contents (no filesystem access), groups Old Testament / New Testament / other
- * standard identifiers, and notifies via `onBookSelect`.
+ * Picker for USFM books: reads `\\id` and table-of-contents markers from supplied
+ * file contents (no filesystem access), groups Old Testament, New Testament,
+ * other standard identifiers, non-standard `\\id` codes, and notifies via `onBookSelect`.
  */
 export function UsfmBookPicker({ files, onBookSelect, className }: UsfmBookPickerProps) {
   const groups = useMemo(() => buildUsfmBookPickerGroups(files), [files]);
 
   const showOther = groups.other.length > 0;
+  const showNonStandard = groups.nonStandard.length > 0;
 
   return (
     <div
@@ -137,7 +139,13 @@ export function UsfmBookPicker({ files, onBookSelect, className }: UsfmBookPicke
       {showOther ? (
         <>
           <hr style={dividerStyle} aria-hidden />
-          <OtherList books={groups.other} onBookSelect={onBookSelect} />
+          <VerticalBookList books={groups.other} onBookSelect={onBookSelect} />
+        </>
+      ) : null}
+      {showNonStandard ? (
+        <>
+          <hr style={dividerStyle} aria-hidden />
+          <VerticalBookList books={groups.nonStandard} onBookSelect={onBookSelect} />
         </>
       ) : null}
     </div>

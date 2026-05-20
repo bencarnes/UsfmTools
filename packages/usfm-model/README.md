@@ -44,13 +44,14 @@ The USFM specification defines a fixed set of [book identifiers](https://ubsicap
 
 Helpers such as **`isStandardUsfmBookIdentifier`**, **`normalizeUsfmBookCode`**, and **`getStandardUsfmBookIdentifier`** support validation and metadata lookup.
 
-For UI that lists available books from in-memory USFM files, **`buildUsfmBookPickerGroups(files)`** parses each file’s USFM (via the bundled parser), keeps only files whose first `\\id` uses a standard code, derives display titles from `\\toc1` / `\\toc2` / `\\toc3` according to canon group, and returns three arrays (**`oldTestament`**, **`newTestament`**, **`other`**) sorted by the standard table order. The **`UsfmBookPicker`** React control in **`@usfm-tools/controls`** consumes this function.
+For UI that lists available books from in-memory USFM files, **`buildUsfmBookPickerGroups(files)`** parses each file’s USFM (via the bundled parser), reads the first `book` node’s `\\id` and `\\toc1` / `\\toc2` / `\\toc3`, and returns four collections: **`oldTestament`**, **`newTestament`**, and **`other`** (standard codes outside OT/NT), each sorted by the official table order, plus **`nonStandard`** (any non-empty `\\id` that is not in the standard list), in the same order as those files appear in **`files`**. Old/New Testament titles prefer `\\toc3` with code fallback; other standard books and non-standard files use `\\toc1`, then `\\toc2`, then `\\toc3`, then the code. The **`UsfmBookPicker`** React control in **`@usfm-tools/controls`** consumes this function.
 
 ```typescript
 import { buildUsfmBookPickerGroups } from "@usfm-tools/model";
 
-const { oldTestament, newTestament, other } = buildUsfmBookPickerGroups([
+const { oldTestament, newTestament, other, nonStandard } = buildUsfmBookPickerGroups([
   { id: "file-gen", usfm: "\\id GEN\n\\toc3 Gen\n..." },
+  { id: "file-hym", usfm: "\\id HYM\n\\toc1 Hymnal\n..." },
 ]);
 ```
 

@@ -11,6 +11,7 @@ export {
   buildUsfmBookPickerGroups,
 } from "./usfm-book-picker-model.js";
 export type {
+  UsfmBookPickerCanonGroup,
   UsfmBookPickerFileInput,
   UsfmBookPickerBook,
   UsfmBookPickerGroups,

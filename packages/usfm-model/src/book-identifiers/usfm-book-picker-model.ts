@@ -14,6 +14,8 @@ import {
   type StandardBookCanonGroup,
 } from "./standard-book-identifiers.js";
 
+export type UsfmBookPickerCanonGroup = StandardBookCanonGroup | "nonStandard";
+
 export interface UsfmBookPickerFileInput {
   /** Stable id for the file (e.g. path or key); not read from USFM. */
   readonly id: string;
@@ -22,19 +24,28 @@ export interface UsfmBookPickerFileInput {
 
 export interface UsfmBookPickerBook {
   readonly fileId: string;
-  /** Standard identifier code (uppercase). */
+  /** Identifier code from `\\id` (uppercase first token). */
   readonly code: string;
   /** Short label for buttons / list (see USFM book picker rules). */
   readonly displayLabel: string;
-  readonly canonGroup: StandardBookCanonGroup;
-  /** Sort key: position in the official standard book table. */
+  readonly canonGroup: UsfmBookPickerCanonGroup;
+  /**
+   * For standard books: index in the official USFM book table (sorting).
+   * For non-standard books: unused (order follows the input `files` array).
+   */
   readonly sortIndex: number;
 }
 
 export interface UsfmBookPickerGroups {
   readonly oldTestament: readonly UsfmBookPickerBook[];
   readonly newTestament: readonly UsfmBookPickerBook[];
+  /** Standard identifiers outside Old/New Testament (peripherals, deuterocanon, etc.). */
   readonly other: readonly UsfmBookPickerBook[];
+  /**
+   * Files whose first `\\id` code is not in the USFM standard book list.
+   * Order matches the order of those entries in the input `files` array.
+   */
+  readonly nonStandard: readonly UsfmBookPickerBook[];
 }
 
 function isParent(n: UsfmNode): n is ParentNode {
@@ -107,14 +118,16 @@ function displayLabelForBook(
 }
 
 /**
- * Parses each file's USFM, keeps only those with a valid standard `\id` code,
- * and groups/sorts books for the USFM book picker control. Only the **first**
- * `book` node in each document is considered (one canonical book per file).
+ * Parses each file's USFM and groups books for the USFM book picker control.
+ * Standard `\\id` codes are split into Old Testament, New Testament, and other;
+ * any other non-empty `\\id` appears in **nonStandard**, in input order.
+ * Only the **first** `book` node in each document is considered (one canonical book per file).
  */
 export function buildUsfmBookPickerGroups(
   files: readonly UsfmBookPickerFileInput[],
 ): UsfmBookPickerGroups {
-  const picked: UsfmBookPickerBook[] = [];
+  const standardPicked: UsfmBookPickerBook[] = [];
+  const nonStandardList: UsfmBookPickerBook[] = [];
 
   for (const file of files) {
     const { document } = parse(file.usfm);
@@ -122,35 +135,47 @@ export function buildUsfmBookPickerGroups(
     if (!firstBook) continue;
 
     const rawCode = normalizeUsfmBookCode(firstBook.code);
-    if (!rawCode || !isStandardUsfmBookIdentifier(rawCode)) continue;
-
-    const meta = getStandardUsfmBookIdentifier(rawCode)!;
-    const order = getStandardUsfmBookOrderIndex(rawCode);
-    if (order === undefined) continue;
+    if (!rawCode) continue;
 
     const toc = extractTocFromBook(firstBook);
-    const displayLabel = displayLabelForBook(meta.code, meta.canonGroup, toc);
 
-    picked.push({
-      fileId: file.id,
-      code: meta.code,
-      displayLabel,
-      canonGroup: meta.canonGroup,
-      sortIndex: order,
-    });
+    if (isStandardUsfmBookIdentifier(rawCode)) {
+      const meta = getStandardUsfmBookIdentifier(rawCode)!;
+      const order = getStandardUsfmBookOrderIndex(rawCode);
+      if (order === undefined) continue;
+
+      const displayLabel = displayLabelForBook(meta.code, meta.canonGroup, toc);
+
+      standardPicked.push({
+        fileId: file.id,
+        code: meta.code,
+        displayLabel,
+        canonGroup: meta.canonGroup,
+        sortIndex: order,
+      });
+    } else {
+      const displayLabel = displayLabelForBook(rawCode, "other", toc);
+      nonStandardList.push({
+        fileId: file.id,
+        code: rawCode,
+        displayLabel,
+        canonGroup: "nonStandard",
+        sortIndex: 0,
+      });
+    }
   }
 
-  picked.sort((a, b) => a.sortIndex - b.sortIndex);
+  standardPicked.sort((a, b) => a.sortIndex - b.sortIndex);
 
   const oldTestament: UsfmBookPickerBook[] = [];
   const newTestament: UsfmBookPickerBook[] = [];
   const other: UsfmBookPickerBook[] = [];
 
-  for (const b of picked) {
+  for (const b of standardPicked) {
     if (b.canonGroup === "ot") oldTestament.push(b);
     else if (b.canonGroup === "nt") newTestament.push(b);
     else other.push(b);
   }
 
-  return { oldTestament, newTestament, other };
+  return { oldTestament, newTestament, other, nonStandard: nonStandardList };
 }
