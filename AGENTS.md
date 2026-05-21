@@ -7,11 +7,12 @@ This repository ("UsfmTools") contains TypeScript tools for processing USFM (Uni
 ### Project Layout
 
 - `packages/usfm-parser/` — USFM parser library (TypeScript, bundled with tsup)
+- `packages/bible-edit/` — Tauri desktop shell (React + Vite + Tailwind) for a future Bible editor
 - `Plan/` — Obsidian-compatible planning documents
 
 ### Development Commands
 
-All commands run from `packages/usfm-parser/`:
+**Parser** — run from `packages/usfm-parser/`:
 
 | Task        | Command                 |
 |-------------|-------------------------|
@@ -21,9 +22,19 @@ All commands run from `packages/usfm-parser/`:
 | Lint        | `npm run lint`          |
 | Type-check  | `npm run typecheck`     |
 
+**bible-edit** — run from `packages/bible-edit/`:
+
+| Task        | Command                 |
+|-------------|-------------------------|
+| Install     | `npm install`           |
+| Frontend build | `npm run build`      |
+| Test        | `npm test`              |
+| Desktop dev | `npm run tauri dev`     |
+
 ### Notes
 
 - Node.js 20+ is required.
 - The parser package outputs both ESM (`dist/index.js`) and CJS (`dist/index.cjs`) bundles.
-- Tests use vitest; lint uses ESLint with typescript-eslint.
+- Parser tests use vitest; lint uses ESLint with typescript-eslint.
 - The parser has zero runtime dependencies — all deps are devDependencies.
+- `bible-edit` additionally needs Rust and [Tauri prerequisites](https://tauri.app/start/prerequisites/) for `npm run tauri dev` / `tauri build`.

@@ -13,6 +13,7 @@ flowchart TB
     model["usfm-model\n(indexing, queries on parse output)"]
     controls["usfm-controls\n(React + CodeMirror editor)"]
     integ["usfm-parser-integration-tests\n(vitest vs sample corpus)"]
+    bible["bible-edit\n(Tauri + React shell)"]
   end
   parser --> model
   parser --> controls
@@ -26,6 +27,7 @@ flowchart TB
 | **usfm-model** | View models (for example `ViewModels.Publication` / `PublicationViewModel`), publication-style HTML rendering via **`renderPreviewHtml`**, standard USFM **book identifier** metadata and **`buildUsfmBookPickerGroups`** (OT, NT, other standard, and non-standard entries including optional or missing `\\id`), **`listChapterNumbersFromBook`** for ordered `\\c` labels on a parsed book, plus re-exports of **`parse`**. |
 | **usfm-controls** | React controls: **`UsfmEditor`** (CodeMirror), **`UsfmPreview`** (publication-style HTML), **`UsfmBookPicker`** (OT/NT grids plus standard-other and non-standard book lists from in-memory USFM), **`ChapterPicker`** (equal-width chapter buttons for one parsed book), and the async USFM language service. Depends on the parser and model. |
 | **usfm-parser-integration-tests** | Longer-running checks against the parser; **no** `build` script, only `npm test`. |
+| **bible-edit** | Tauri + React + Tailwind desktop shell for a planned USFM Bible editor. See **`packages/bible-edit/README.md`** for build, run, tests, and design notes. |
 
 The **`Plan/`** directory holds Obsidian-style planning notes and is not part of the build.
 
@@ -41,7 +43,7 @@ From the repository root:
 ./build.sh
 ```
 
-This runs `npm install` and `npm run build` (when defined) for each package in order: parser, model, controls, then integration tests (install only).
+This runs `npm install` and `npm run build` (when defined) for each package in order: parser, model, controls, integration tests, then **bible-edit** (frontend `dist/` only; native Tauri bundles use `npm run tauri build` inside that package).
 
 ### Build troubleshooting
 

@@ -1,0 +1,8 @@
+# Cargo build output (binaries, deps, incremental)
+/target/
+
+# Tauri capability schema files (generated for editor hints)
+/gen/schemas
+
+# Rust / LLVM debug symbols on Windows (when emitted next to artifacts)
+*.pdb

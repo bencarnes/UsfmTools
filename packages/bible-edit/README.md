@@ -1,0 +1,68 @@
+# bible-edit
+
+Desktop shell for a future USFM Bible editor. This package is a [Tauri](https://tauri.app/) app using **React**, **TypeScript**, **Vite**, and **Tailwind CSS**.
+
+Today the UI is only a centered placeholder line of text. The actual Bible editor will be added in a later iteration.
+
+## Design
+
+**Goal.** `bible-edit` is intended to become a USFM Bible editor: load and edit scripture marked up in [USFM](https://ubsicap.github.io/usfm/), with a native desktop experience via Tauri.
+
+**Stack.**
+
+- **Tauri** hosts a small Rust process (`src-tauri/`) that owns the native window, packaging, and (later) file system or OS integration. The frontend is a Vite-built web UI loaded in a WebView.
+- **React** is the UI layer (`src/`). State, editor widgets, and layout will live here as the product grows.
+- **Tailwind CSS** (via `@tailwindcss/vite`) supplies utility-first styling so layout and theming stay colocated with components.
+- **Vite** bundles the React app for `tauri dev` / `tauri build` using the paths declared in `src-tauri/tauri.conf.json` (`devUrl`, `frontendDist`).
+
+**Current shape.** The Rust side is minimal (no custom commands yet). The React tree is a single root component that reads copy from `src/placeholder.ts` so tests and UI stay aligned. When the real editor lands, expect more crates (or modules) for file I/O and IPC, and a richer React tree (editor surface, toolbar, status).
+
+**Repository layout.** The app lives under `packages/bible-edit/` next to other UsfmTools packages. It does not yet depend on `usfm-parser` or other workspace packages; wiring those in will be part of editor implementation.
+
+## Prerequisites
+
+- **Node.js 20+** and npm
+- **Rust** (stable) and your platform’s [Tauri prerequisites](https://tauri.app/start/prerequisites/) (on Linux, WebKitGTK and related libraries for the WebView)
+
+## Build and run
+
+From the repository root:
+
+```bash
+cd packages/bible-edit
+npm install
+```
+
+**Frontend only (browser, no native shell):** useful for quick UI checks.
+
+```bash
+npm run dev
+```
+
+Then open the URL Vite prints (by default `http://localhost:1420`; this project pins port `1420` for Tauri).
+
+**Full desktop app (WebView + Rust):**
+
+```bash
+npm run tauri dev
+```
+
+**Production artifacts:**
+
+```bash
+npm run build          # Typecheck + Vite build → dist/
+npm run tauri build    # Native bundles (installer / app image per OS)
+```
+
+## Tests
+
+Unit tests use **Vitest** and **React Testing Library** (`jsdom`). They cover the placeholder string module and the root React component.
+
+```bash
+npm test           # single run (CI)
+npm run test:watch # watch mode while developing
+```
+
+## IDE
+
+[VS Code](https://code.visualstudio.com/) with the [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) and [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) extensions is a good default setup.
