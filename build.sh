@@ -57,6 +57,7 @@ build_package "packages/usfm-parser"
 build_package "packages/usfm-model"
 build_package "packages/usfm-controls"
 build_package "packages/usfm-parser-integration-tests"
+build_package "packages/bible-edit"
 
 echo ""
 echo "Done. Libraries emit dist/ under each package; run tests from individual packages as needed."
