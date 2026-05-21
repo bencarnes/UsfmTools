@@ -10,6 +10,7 @@ React UI controls for editing USFM scripture text, built on [CodeMirror 6](https
 - **Async language service** — LSP-inspired message protocol for clean separation between editor UI and language intelligence
 - **Publication preview** — **`UsfmPreview`** renders USFM as continuous reading text (similar to a Bible app) using **`renderPreviewHtml`** from `@usfm-tools/model`; HTML output is memoized for fast updates next to the editor
 - **Book picker** — **`UsfmBookPicker`** lists books from caller-supplied USFM strings (no filesystem access): standard `\\id` codes in Old Testament, New Testament, and other standard groups, plus a fourth list for non-standard `\\id` values; selection is reported through **`onBookSelect`**
+- **Chapter picker** — **`ChapterPicker`** lays out one book’s **`\\c`** markers as a wrapping row of equal-width buttons (labels are shown exactly as in the USFM, in source order); selection is reported through **`onChapterSelect`**
 
 ## Installation
 
@@ -92,7 +93,34 @@ const files = [
 | `onBookSelect` | `(detail: { fileId: string; code: string }) => void` | Optional; called when the user activates a book (click or keyboard). **`code`** is empty when the file has no `\\id` or an empty `\\id` line. |
 | `className` | `string` | CSS class on the root wrapper |
 
-The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml`, **`RenderPreviewOptions`**, `ViewModels`, `PublicationViewModel`, **`buildUsfmBookPickerGroups`**, **`UsfmBookPickerCanonGroup`**, **`UsfmBookPickerFileInput`**, **`UsfmBookPickerBook`**, and **`UsfmBookPickerGroups`**, so you can use the model without a second import path.
+### ChapterPicker
+
+Shows every **`\\c`** chapter on a single parsed **`BookNode`**: buttons use a **fixed width** sized for three monospace **digit** cells (plus padding), **`flex-wrap`** so they flow left-to-right and wrap, and the root is **`width: 100%`** so the control tracks its parent. Labels are the raw **`ChapterNode.number`** strings in **document order** (no sorting, deduplication, or locale-specific reformatting).
+
+```tsx
+import { ChapterPicker } from "@usfm-tools/controls";
+import { parse } from "@usfm-tools/model";
+
+const { document } = parse("\\id PSA\n\\c 1\n\\p\n\\v 1\n\\c 2\n\\p\n\\v 1");
+const book = document.children.find((n) => n.type === "book");
+if (!book || book.type !== "book") throw new Error("Expected \\id book");
+
+<ChapterPicker
+  book={book}
+  onChapterSelect={({ chapterNumber }) => {
+    /* load chapter text, scroll editor, etc. */
+  }}
+  className="border rounded-md p-2"
+/>;
+```
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `book` | `BookNode` | Parsed book from **`@usfm-tools/parser`** (same shape as children of a `DocumentNode` after **`parse`**) |
+| `onChapterSelect` | `(detail: { chapterNumber: string }) => void` | Optional; fired when the user activates a chapter button |
+| `className` | `string` | CSS class on the root wrapper |
+
+The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml`, **`RenderPreviewOptions`**, `ViewModels`, `PublicationViewModel`, **`buildUsfmBookPickerGroups`**, **`listChapterNumbersFromBook`**, **`UsfmBookPickerCanonGroup`**, **`UsfmBookPickerFileInput`**, **`UsfmBookPickerBook`**, and **`UsfmBookPickerGroups`**, so you can use the model without a second import path.
 
 ### UsfmEditor props
 
@@ -106,7 +134,7 @@ The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  UsfmEditor / UsfmPreview / UsfmBookPicker (React)               │
+│  UsfmEditor / UsfmPreview / UsfmBookPicker / ChapterPicker (React)               │
 │  ┌───────────────────────────────────────────┐  │
 │  │  CodeMirror 6 (editor only)               │  │
 │  └───────────────────────────────────────────┘  │
@@ -193,7 +221,7 @@ npm install
 npm run storybook
 ```
 
-Stories demonstrate the editor, preview, and book picker with:
+Stories demonstrate the editor, preview, book picker, and chapter picker with:
 - Genesis 1 (prose + poetry + footnotes)
 - Psalm 1 (poetry formatting)
 - Empty state
@@ -213,13 +241,17 @@ packages/usfm-controls/
 │   │   │   ├── UsfmEditor.stories.tsx
 │   │   │   ├── codemirror-usfm.ts   # CM6 extensions (highlight, lint, autocomplete)
 │   │   │   └── index.ts
-│   │   └── usfm-preview/
-│   │       ├── UsfmPreview.tsx      # Publication-style HTML preview
-│   │       ├── UsfmPreview.stories.tsx
-│   │       └── index.ts
-│   │   └── usfm-book-picker/
-│   │       ├── UsfmBookPicker.tsx   # OT / NT / other book grid + list
-│   │       ├── UsfmBookPicker.stories.tsx
+│   │   ├── usfm-preview/
+│   │   │   ├── UsfmPreview.tsx      # Publication-style HTML preview
+│   │   │   ├── UsfmPreview.stories.tsx
+│   │   │   └── index.ts
+│   │   ├── usfm-book-picker/
+│   │   │   ├── UsfmBookPicker.tsx   # OT / NT / other book grid + list
+│   │   │   ├── UsfmBookPicker.stories.tsx
+│   │   │   └── index.ts
+│   │   └── chapter-picker/
+│   │       ├── ChapterPicker.tsx    # Wrapping row of equal-width chapter buttons
+│   │       ├── ChapterPicker.stories.tsx
 │   │       └── index.ts
 │   └── language-service/
 │       ├── index.ts                 # Service exports
@@ -230,7 +262,9 @@ packages/usfm-controls/
 │       └── classifier.ts            # Token classification
 ├── tests/
 │   ├── language-service.test.ts
-│   └── usfm-preview.test.tsx
+│   ├── usfm-preview.test.tsx
+│   ├── usfm-book-picker.test.tsx
+│   └── chapter-picker.test.tsx
 ├── vitest.config.ts                 # jsdom for React tests
 ├── .storybook/
 │   ├── main.ts

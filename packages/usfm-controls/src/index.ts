@@ -7,11 +7,14 @@ export type {
   UsfmBookPickerProps,
   UsfmBookPickerSelectDetail,
 } from "./components/usfm-book-picker/index.js";
+export { ChapterPicker } from "./components/chapter-picker/index.js";
+export type { ChapterPickerProps, ChapterPickerSelectDetail } from "./components/chapter-picker/index.js";
 export {
   renderPreviewHtml,
   ViewModels,
   PublicationViewModel,
   buildUsfmBookPickerGroups,
+  listChapterNumbersFromBook,
 } from "@usfm-tools/model";
 export type {
   RenderPreviewOptions,

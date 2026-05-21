@@ -56,6 +56,18 @@ const { oldTestament, newTestament, other, nonStandard } = buildUsfmBookPickerGr
 ]);
 ```
 
+### Chapter numbers on a book (`listChapterNumbersFromBook`)
+
+**`listChapterNumbersFromBook(book)`** walks a parsed **`BookNode`** and returns every **`\\c`** chapter number string in **document order**. Values are taken verbatim from the AST (no sorting, deduplication, or numeric parsing), so non–Western Arabic numerals, gaps, or duplicate markers are preserved exactly as encoded. The **`ChapterPicker`** control in **`@usfm-tools/controls`** uses this helper.
+
+```typescript
+import { parse, listChapterNumbersFromBook } from "@usfm-tools/model";
+
+const { document } = parse("\\id PSA\n\\c 10\n\\p\n\\v 1\n\\c 2\n\\p\n\\v 1");
+const book = document.children.find((n) => n.type === "book")!;
+const chapters = listChapterNumbersFromBook(book); // ["10", "2"]
+```
+
 ### HTML rendering (`renderPreviewHtml`)
 
 **`renderPreviewHtml(usfm, options?)`** turns a USFM source string into publication-style HTML with a fixed, hardcoded markup. Parser errors (if any) are surfaced as an `<aside class="usfm-preview-errors">` banner at the top of the output. The optional **`RenderPreviewOptions`** currently supports `{ versePerLine: true }` to expand multi-verse paragraphs into one `<p>` per verse. Customize presentation by styling the emitted CSS class hooks (`usfm-document`, `usfm-book`, `usfm-chapter`, `usfm-line`, `usfm-line--prose`, `usfm-line--poetry`, `usfm-v`, `usfm-txt`, `usfm-nd`, `usfm-note`, `usfm-ref`, …) in your app's stylesheet.
