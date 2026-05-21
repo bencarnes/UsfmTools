@@ -42,3 +42,5 @@ export type {
   UsfmBookPickerBook,
   UsfmBookPickerGroups,
 } from "./book-identifiers/index.js";
+
+export { listChapterNumbersFromBook } from "./list-chapter-numbers-from-book.js";
