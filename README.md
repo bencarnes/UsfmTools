@@ -4,7 +4,7 @@ TypeScript libraries and UI for working with [USFM](https://ubsicap.github.io/us
 
 ## Architecture
 
-Packages live under `packages/` and are wired together with npm `file:` dependencies. Build this repository **bottom-up**: the parser is the foundation; the model and UI layers sit on top.
+Consumable libraries live under `packages/` and are wired together with npm `file:` dependencies. The **`bible-edit`** application is a Tauri desktop shell at the **repository root** (not under `packages/`), since it is an end-product app rather than a shared library package. Build this repository **bottom-up**: the parser is the foundation; the model and UI layers sit on top.
 
 ```mermaid
 flowchart TB
@@ -13,21 +13,21 @@ flowchart TB
     model["usfm-model\n(indexing, queries on parse output)"]
     controls["usfm-controls\n(React + CodeMirror editor)"]
     integ["usfm-parser-integration-tests\n(vitest vs sample corpus)"]
-    bible["bible-edit\n(Tauri + React shell)"]
   end
+  bible["bible-edit\n(Tauri app at repo root)"]
   parser --> model
   parser --> controls
   model --> controls
   parser --> integ
 ```
 
-| Package | Role |
+| Name | Role |
 |--------|------|
 | **usfm-parser** | Parses USFM source into structured data; ships ESM and CJS bundles (`dist/`). |
 | **usfm-model** | View models (for example `ViewModels.Publication` / `PublicationViewModel`), publication-style HTML rendering via **`renderPreviewHtml`**, standard USFM **book identifier** metadata and **`buildUsfmBookPickerGroups`** (OT, NT, other standard, and non-standard entries including optional or missing `\\id`), **`listChapterNumbersFromBook`** for ordered `\\c` labels on a parsed book, plus re-exports of **`parse`**. |
 | **usfm-controls** | React controls: **`UsfmEditor`** (CodeMirror), **`UsfmPreview`** (publication-style HTML), **`UsfmBookPicker`** (OT/NT grids plus standard-other and non-standard book lists from in-memory USFM), **`ChapterPicker`** (equal-width chapter buttons for one parsed book), and the async USFM language service. Depends on the parser and model. |
 | **usfm-parser-integration-tests** | Longer-running checks against the parser; **no** `build` script, only `npm test`. |
-| **bible-edit** | Tauri + React + Tailwind desktop shell for a planned USFM Bible editor. See **`packages/bible-edit/README.md`** for build, run, tests, and design notes. |
+| **bible-edit** | Tauri + React + Tailwind desktop shell for a planned USFM Bible editor (lives at repo root). See **`bible-edit/README.md`** for build, run, tests, and design notes. |
 
 The **`Plan/`** directory holds Obsidian-style planning notes and is not part of the build.
 
@@ -43,7 +43,7 @@ From the repository root:
 ./build.sh
 ```
 
-This runs `npm install` and `npm run build` (when defined) for each package in order: parser, model, controls, integration tests, then **bible-edit** (frontend `dist/` only; native Tauri bundles use `npm run tauri build` inside that package).
+This runs `npm install` and `npm run build` (when defined) in order: parser, model, controls, integration tests under `packages/`, then **`bible-edit/`** at the repository root (frontend `dist/` only; native Tauri bundles use `npm run tauri build` inside that directory).
 
 ### Build troubleshooting
 
@@ -82,7 +82,7 @@ Other useful scripts in that package: **`npm run dev`** (watch mode rebuild of t
 
 ### Per-package commands
 
-Useful when you are developing a single area. Run these from the package directory (for example `packages/usfm-parser/`).
+Useful when you are developing a single area. Run these from the package directory (for example `packages/usfm-parser/`), or from **`bible-edit/`** at the repository root for the desktop app.
 
 | Task | Command |
 |------|---------|

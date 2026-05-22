@@ -1,6 +1,6 @@
 # bible-edit
 
-Desktop shell for a future USFM Bible editor. This package is a [Tauri](https://tauri.app/) app using **React**, **TypeScript**, **Vite**, and **Tailwind CSS**.
+Desktop shell for a future USFM Bible editor. This **application** (not a consumable npm package under `packages/`) is a [Tauri](https://tauri.app/) app using **React**, **TypeScript**, **Vite**, and **Tailwind CSS**.
 
 Today the UI is only a centered placeholder line of text. The actual Bible editor will be added in a later iteration.
 
@@ -17,7 +17,7 @@ Today the UI is only a centered placeholder line of text. The actual Bible edito
 
 **Current shape.** The Rust side is minimal (no custom commands yet). The React tree is a single root component that reads copy from `src/placeholder.ts` so tests and UI stay aligned. When the real editor lands, expect more crates (or modules) for file I/O and IPC, and a richer React tree (editor surface, toolbar, status).
 
-**Repository layout.** The app lives under `packages/bible-edit/` next to other UsfmTools packages. It does not yet depend on `usfm-parser` or other workspace packages; wiring those in will be part of editor implementation.
+**Repository layout.** The app lives at **`bible-edit/`** in the UsfmTools repository root, alongside the `packages/` tree of shared libraries. It does not yet depend on `usfm-parser` or other workspace packages; wiring those in will be part of editor implementation.
 
 ## Prerequisites
 
@@ -29,7 +29,7 @@ Today the UI is only a centered placeholder line of text. The actual Bible edito
 From the repository root:
 
 ```bash
-cd packages/bible-edit
+cd bible-edit
 npm install
 ```
 

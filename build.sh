@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Install dependencies and run production builds for all publishable packages,
-# in dependency order. Run from the repository root: ./build.sh
+# Install dependencies and run production builds for packages under packages/
+# plus the bible-edit application at the repository root, in dependency order.
+# Run from the repository root: ./build.sh
 
 set -euo pipefail
 
@@ -51,13 +52,13 @@ build_package() {
   fi
 }
 
-echo "UsfmTools — install and build all packages"
+echo "UsfmTools — install and build packages (under packages/) and the bible-edit app (repo root)"
 
 build_package "packages/usfm-parser"
 build_package "packages/usfm-model"
 build_package "packages/usfm-controls"
 build_package "packages/usfm-parser-integration-tests"
-build_package "packages/bible-edit"
+build_package "bible-edit"
 
 echo ""
-echo "Done. Libraries emit dist/ under each package; run tests from individual packages as needed."
+echo "Done. Libraries emit dist/ under each packages/* path; bible-edit emits dist/ under bible-edit/. Run tests from individual packages or from bible-edit/ as needed."
