@@ -7,7 +7,7 @@ This repository ("UsfmTools") contains TypeScript tools for processing USFM (Uni
 ### Project Layout
 
 - `packages/usfm-parser/` — USFM parser library (TypeScript, bundled with tsup)
-- `packages/bible-edit/` — Tauri desktop shell (React + Vite + Tailwind) for a future Bible editor
+- `bible-edit/` — Tauri desktop application (React + Vite + Tailwind) at the repository root; end-product app, not a consumable package under `packages/`
 - `Plan/` — Obsidian-compatible planning documents
 
 ### Development Commands
@@ -22,7 +22,7 @@ This repository ("UsfmTools") contains TypeScript tools for processing USFM (Uni
 | Lint        | `npm run lint`          |
 | Type-check  | `npm run typecheck`     |
 
-**bible-edit** — run from `packages/bible-edit/`:
+**bible-edit** — run from `bible-edit/` (repository root):
 
 | Task        | Command                 |
 |-------------|-------------------------|
