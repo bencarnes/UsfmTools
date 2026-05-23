@@ -1,6 +1,9 @@
 /**
  * Split-pane scroll alignment between USFM source offsets and preview DOM.
  * Chapter and verse numbers are always treated as opaque strings (never parsed as integers).
+ *
+ * Sync modes: with `\c` markers, use chapter+verse; without chapters, use paragraph index
+ * only when both `\v` and `\p` milestones exist; otherwise do not sync.
  */
 
 export type ScrollSyncMode = "chapter-verse" | "paragraph" | "none";
@@ -10,8 +13,13 @@ export function scrollSyncModeFromMarkers(
   bookSourceSlice: string,
 ): ScrollSyncMode {
   if (hasChapterMarkers) return "chapter-verse";
+  if (!hasVerseMarker(bookSourceSlice)) return "none";
   if (hasParagraphMarker(bookSourceSlice)) return "paragraph";
   return "none";
+}
+
+function hasVerseMarker(bookSlice: string): boolean {
+  return /(?:^|\n)\\v(?=\s|$)/m.test(bookSlice);
 }
 
 function hasParagraphMarker(bookSlice: string): boolean {

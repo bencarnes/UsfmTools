@@ -13,8 +13,12 @@ describe("scrollSyncModeFromMarkers", () => {
     expect(scrollSyncModeFromMarkers(true, "\\p\n\\v 1")).toBe("chapter-verse");
   });
 
-  it("uses paragraph mode when there are no chapters but there are \\p markers", () => {
+  it("uses paragraph mode when there are no chapters but there are \\p and \\v markers", () => {
     expect(scrollSyncModeFromMarkers(false, "\\p\n\\v 1")).toBe("paragraph");
+  });
+
+  it("disables sync when there are no chapters and no verse markers (even with \\p)", () => {
+    expect(scrollSyncModeFromMarkers(false, "\\p\nHello")).toBe("none");
   });
 
   it("disables sync when there are no chapters and no \\p markers", () => {
