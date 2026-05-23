@@ -94,7 +94,7 @@ function renderSegments(segments: PublicationViewModel.PublicationSegment[]): st
     .map((s) => {
       switch (s.kind) {
         case "verse":
-          return `<sup class="usfm-v">${escapeText(s.number)}</sup>`;
+          return `<sup class="usfm-v" data-verse="${escapeText(s.number)}">${escapeText(s.number)}</sup>`;
         case "text":
           return `<span class="usfm-txt">${escapeText(s.text)}</span>`;
         case "styled":

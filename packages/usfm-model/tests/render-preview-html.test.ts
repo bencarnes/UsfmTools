@@ -16,9 +16,9 @@ describe("renderPreviewHtml", () => {
     expect(html).toContain("Lord");
   });
 
-  it("wraps verse numbers in <sup class=\"usfm-v\">", () => {
+  it("wraps verse numbers in <sup class=\"usfm-v\"> with a data-verse attribute", () => {
     const html = renderPreviewHtml("\\id GEN\n\\c 1\n\\p\n\\v 1 Hi");
-    expect(html).toContain('<sup class="usfm-v">1</sup>');
+    expect(html).toContain('<sup class="usfm-v" data-verse="1">1</sup>');
   });
 
   it("renders a single <p> for a multi-verse paragraph by default", () => {
