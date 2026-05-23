@@ -24,6 +24,7 @@ Today the UI is only a centered placeholder line of text. The actual Bible edito
 - **Node.js 20.19+ or 22.12+** (Vite 7 requirement). Node 22 LTS is recommended.
 - **npm 10+** (npm 11 recommended). The npm bundled with Node 22 (10.9.x) works; to upgrade to latest, `corepack install -g npm@latest` avoids the self-upgrade race that `npm install -g npm@latest` can trigger on system installs.
 - **Rust** (stable) and your platform's [Tauri prerequisites](https://tauri.app/start/prerequisites/).
+- **Rust 1.88+** for the native shell: `bible-edit/rust-toolchain.toml` pins **1.88** so [rustup](https://rustup.rs/) picks a toolchain that matches current **Tauri 2** crates. If your default Cargo is older (for example **1.83**), resolution can fail with `feature edition2024 is required` while reading manifests such as `serde_spanned` 1.1+ or `hashbrown` 0.17+. From `bible-edit/`, run `cargo --version` after `cd`—rustup should report **1.88.x**; otherwise run `rustup update` or `rustup toolchain install 1.88`.
 
 **Linux (Debian/Ubuntu) system packages.** Tauri's Rust build links against GTK and WebKitGTK; in particular, `gdk-sys` requires `gdk-3.0.pc` (from `libgtk-3-dev`), which is not always pulled in by `libwebkit2gtk-4.1-dev` alone. Install the full set:
 

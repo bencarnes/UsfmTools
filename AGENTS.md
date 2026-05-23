@@ -37,4 +37,4 @@ This repository ("UsfmTools") contains TypeScript tools for processing USFM (Uni
 - The parser package outputs both ESM (`dist/index.js`) and CJS (`dist/index.cjs`) bundles.
 - Parser tests use vitest; lint uses ESLint with typescript-eslint.
 - The parser has zero runtime dependencies — all deps are devDependencies.
-- `bible-edit` additionally needs Rust and [Tauri prerequisites](https://tauri.app/start/prerequisites/) for `npm run tauri dev` / `tauri build`.
+- `bible-edit` additionally needs Rust (**see `bible-edit/rust-toolchain.toml`**, currently **1.88+** for Tauri 2’s dependency graph) and [Tauri prerequisites](https://tauri.app/start/prerequisites/) for `npm run tauri dev` / `tauri build`. On Linux, install GTK/WebKit dev packages listed in `bible-edit/README.md` so `pkg-config` finds `gdk-3.0` and `webkit2gtk-4.1`.
