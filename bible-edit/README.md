@@ -21,8 +21,24 @@ Today the UI is only a centered placeholder line of text. The actual Bible edito
 
 ## Prerequisites
 
-- **Node.js 20+** and npm
-- **Rust** (stable) and your platform’s [Tauri prerequisites](https://tauri.app/start/prerequisites/) (on Linux, WebKitGTK and related libraries for the WebView)
+- **Node.js 20.19+ or 22.12+** (Vite 7 requirement). Node 22 LTS is recommended.
+- **npm 10+** (npm 11 recommended). The npm bundled with Node 22 (10.9.x) works; to upgrade to latest, `corepack install -g npm@latest` avoids the self-upgrade race that `npm install -g npm@latest` can trigger on system installs.
+- **Rust** (stable) and your platform's [Tauri prerequisites](https://tauri.app/start/prerequisites/).
+
+**Linux (Debian/Ubuntu) system packages.** Tauri's Rust build links against GTK and WebKitGTK; in particular, `gdk-sys` requires `gdk-3.0.pc` (from `libgtk-3-dev`), which is not always pulled in by `libwebkit2gtk-4.1-dev` alone. Install the full set:
+
+```bash
+sudo apt install -y \
+  libwebkit2gtk-4.1-dev \
+  libgtk-3-dev \
+  libxdo-dev \
+  libssl-dev \
+  libayatana-appindicator3-dev \
+  librsvg2-dev \
+  build-essential curl wget file
+```
+
+Verify with `pkg-config --modversion gdk-3.0 webkit2gtk-4.1`.
 
 ## Build and run
 
