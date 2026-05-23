@@ -44,3 +44,8 @@ export type {
 } from "./book-identifiers/index.js";
 
 export { listChapterNumbersFromBook } from "./list-chapter-numbers-from-book.js";
+export {
+  listChapterMarkersInBook,
+  chapterNumberAtOrBeforeSourceOffset,
+} from "./list-chapter-markers-in-book.js";
+export type { ChapterMarkerInBook } from "./list-chapter-markers-in-book.js";

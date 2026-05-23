@@ -95,6 +95,31 @@ const files = [
 
 ### ChapterPicker
 
+### BookEditPane
+
+**`BookEditPane`** is a full-book workspace: a top bar (title, chapter navigator, view mode) and a body that switches between **Edit**, **Preview**, and **Edit + Preview** (split with a draggable splitter). The editor and preview both receive the same controlled **`value`** / **`onChange`** pair, so **several panes can edit one file** when the parent shares state. Chapter navigation uses **`listChapterMarkersInBook`** from **`@usfm-tools/model`** for marker offsets and **`ChapterPicker`** inside a **Chapters** menu for jumps. In split mode, scrolling one side debounces (~120ms) and aligns the other to the **same chapter** (approximate co-viewing; line-level sync is not guaranteed). The navigator stays visible for front matter without **`\\c`** markers; arrows and the menu are inert when there are no chapters.
+
+```tsx
+import { useState } from "react";
+import { BookEditPane } from "@usfm-tools/controls";
+
+function App() {
+  const [usfm, setUsfm] = useState("\\id GEN\\n\\c 1\\n\\p\\n\\v 1 ...");
+  return <BookEditPane bookTitle="GEN" value={usfm} onChange={setUsfm} className="h-[600px]" />;
+}
+```
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `value` | `string` | Full USFM file body (controlled) |
+| `onChange` | `(value: string) => void` | Optional; same contract as **`UsfmEditor`** |
+| `bookTitle` | `string` | Label shown in the top bar |
+| `defaultViewMode` | `"edit" \| "preview" \| "split"` | Initial layout (default **`split`**) |
+| `versePerLine` | `boolean` | Passed through to **`UsfmPreview`** in preview / split |
+| `className` | `string` | Optional root wrapper class |
+
+### ChapterPicker
+
 Shows every **`\\c`** chapter on a single parsed **`BookNode`**: buttons use a **fixed width** sized for three monospace **digit** cells (plus padding), **`flex-wrap`** so they flow left-to-right and wrap, and the root is **`width: 100%`** so the control tracks its parent. Labels are the raw **`ChapterNode.number`** strings in **document order** (no sorting, deduplication, or locale-specific reformatting).
 
 ```tsx
@@ -120,7 +145,7 @@ if (!book || book.type !== "book") throw new Error("Expected \\id book");
 | `onChapterSelect` | `(detail: { chapterNumber: string }) => void` | Optional; fired when the user activates a chapter button |
 | `className` | `string` | CSS class on the root wrapper |
 
-The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml`, **`RenderPreviewOptions`**, `ViewModels`, `PublicationViewModel`, **`buildUsfmBookPickerGroups`**, **`listChapterNumbersFromBook`**, **`UsfmBookPickerCanonGroup`**, **`UsfmBookPickerFileInput`**, **`UsfmBookPickerBook`**, and **`UsfmBookPickerGroups`**, so you can use the model without a second import path.
+The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml`, **`RenderPreviewOptions`**, `ViewModels`, `PublicationViewModel`, **`buildUsfmBookPickerGroups`**, **`listChapterNumbersFromBook`**, **`listChapterMarkersInBook`**, **`chapterNumberAtOrBeforeSourceOffset`**, **`UsfmBookPickerCanonGroup`**, **`UsfmBookPickerFileInput`**, **`UsfmBookPickerBook`**, **`UsfmBookPickerGroups`**, and the type **`ChapterMarkerInBook`**, so you can use the model without a second import path.
 
 ### UsfmEditor props
 
@@ -129,12 +154,13 @@ The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml
 | `value` | `string` | USFM content to display |
 | `onChange` | `(value: string) => void` | Called when content changes |
 | `className` | `string` | CSS class for the container (use for height) |
+| `onViewportAnchorChange` | `(sourceOffset: number) => void` | Optional; debounced (~120ms) after scroll or selection moves the viewport — document offset near the top edge |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  UsfmEditor / UsfmPreview / UsfmBookPicker / ChapterPicker (React)               │
+│  UsfmEditor / UsfmPreview / UsfmBookPicker / ChapterPicker / BookEditPane (React) │
 │  ┌───────────────────────────────────────────┐  │
 │  │  CodeMirror 6 (editor only)               │  │
 │  └───────────────────────────────────────────┘  │
@@ -184,7 +210,7 @@ The service is currently synchronous (runs in the main thread via `createLanguag
 
 ## Design Considerations
 
-**Single-chapter default, multi-chapter future:** The editor currently works best with one chapter of USFM at a time. The async language service and CodeMirror's efficient rendering make it straightforward to scale to full-book editing in the future — the main enhancement needed would be incremental document sync in the protocol (sending diffs instead of full content on each keystroke).
+**Full-book editing:** **`BookEditPane`** targets entire files (multiple **`\\c`** markers). For very large books, callers may still prefer virtualization or worker-backed language features; the editor itself remains a single CodeMirror document. The language service protocol could later send diffs instead of full text on each keystroke.
 
 **Lightweight:** No VS Code / Monaco fork. CodeMirror 6 provides the editing primitives; the USFM-specific intelligence lives in our language service.
 
@@ -226,6 +252,7 @@ Stories demonstrate the editor, preview, book picker, and chapter picker with:
 - Psalm 1 (poetry formatting)
 - Empty state
 - Error state (unknown markers, stray end markers)
+- **BookEditPane** — **`FullBookSplit`** and **`TwoPanesSharedState`** use a shared `useState` USFM string; **`FrontMatterNoChapters`** shows the chapter bar when there are no `\\c` markers.
 - **UsfmPreview** — **`GenesisPreview`** uses `render: (args) => <UsfmPreview {...args} />` so Controls map to props; **`WithEditor`** must use that same **`args` parameter** (not a zero-arg render) so `versePerLine` updates when you toggle Controls or the checkbox (`useArgs` is only for pushing checkbox state back into Storybook). **Verse Per Line Compare** shows both modes side by side.
 
 ### Project Structure
@@ -249,6 +276,9 @@ packages/usfm-controls/
 │   │   │   ├── UsfmBookPicker.tsx   # OT / NT / other book grid + list
 │   │   │   ├── UsfmBookPicker.stories.tsx
 │   │   │   └── index.ts
+│   │   ├── book-edit-pane/
+│   │   │   ├── BookEditPane.tsx   # Full-book edit + preview + chapter bar
+│   │   │   └── BookEditPane.stories.tsx
 │   │   └── chapter-picker/
 │   │       ├── ChapterPicker.tsx    # Wrapping row of equal-width chapter buttons
 │   │       ├── ChapterPicker.stories.tsx
@@ -264,6 +294,8 @@ packages/usfm-controls/
 │   ├── language-service.test.ts
 │   ├── usfm-preview.test.tsx
 │   ├── usfm-book-picker.test.tsx
+│   ├── book-edit-pane.test.tsx
+│   ├── chapter-offset-helpers.test.ts
 │   └── chapter-picker.test.tsx
 ├── vitest.config.ts                 # jsdom for React tests
 ├── .storybook/
