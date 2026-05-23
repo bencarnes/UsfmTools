@@ -68,6 +68,19 @@ const book = document.children.find((n) => n.type === "book")!;
 const chapters = listChapterNumbersFromBook(book); // ["10", "2"]
 ```
 
+### Chapter markers with source offsets (`listChapterMarkersInBook`, `chapterNumberAtOrBeforeSourceOffset`)
+
+**`listChapterMarkersInBook(book)`** returns `{ number, markerOffset }[]` for each chapter child on a **`BookNode`** that has a parser **`position`** (the offset is the start of the `\\c` marker in the USFM source). **`chapterNumberAtOrBeforeSourceOffset(markers, sourceOffset)`** returns the chapter **number** for the last marker whose offset is still at or before **`sourceOffset`**, or **`null`** when the offset lies before the first chapter marker or the book has no chapters. Together these support full-file tools such as **`BookEditPane`** in **`@usfm-tools/controls`**.
+
+```typescript
+import { parse, listChapterMarkersInBook, chapterNumberAtOrBeforeSourceOffset } from "@usfm-tools/model";
+
+const { document } = parse("\\id GEN\\n\\c 1\\n\\p\\n\\v 1\\n\\c 2\\n\\p\\n\\v 1");
+const book = document.children.find((n) => n.type === "book")!;
+const markers = listChapterMarkersInBook(book as import("@usfm-tools/parser").BookNode);
+chapterNumberAtOrBeforeSourceOffset(markers, markers[1]!.markerOffset); // "2"
+```
+
 ### HTML rendering (`renderPreviewHtml`)
 
 **`renderPreviewHtml(usfm, options?)`** turns a USFM source string into publication-style HTML with a fixed, hardcoded markup. Parser errors (if any) are surfaced as an `<aside class="usfm-preview-errors">` banner at the top of the output. The optional **`RenderPreviewOptions`** currently supports `{ versePerLine: true }` to expand multi-verse paragraphs into one `<p>` per verse. Customize presentation by styling the emitted CSS class hooks (`usfm-document`, `usfm-book`, `usfm-chapter`, `usfm-line`, `usfm-line--prose`, `usfm-line--poetry`, `usfm-v`, `usfm-txt`, `usfm-nd`, `usfm-note`, `usfm-ref`, …) in your app's stylesheet.

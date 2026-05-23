@@ -1,5 +1,8 @@
 export { UsfmEditor } from "./components/usfm-editor/index.js";
 export type { UsfmEditorProps } from "./components/usfm-editor/index.js";
+export type { UsfmEditorHandle } from "./components/usfm-editor/index.js";
+export { BookEditPane } from "./components/book-edit-pane/index.js";
+export type { BookEditPaneProps, BookEditPaneViewMode } from "./components/book-edit-pane/index.js";
 export { UsfmPreview } from "./components/usfm-preview/index.js";
 export type { UsfmPreviewProps } from "./components/usfm-preview/index.js";
 export { UsfmBookPicker } from "./components/usfm-book-picker/index.js";
@@ -15,6 +18,8 @@ export {
   PublicationViewModel,
   buildUsfmBookPickerGroups,
   listChapterNumbersFromBook,
+  listChapterMarkersInBook,
+  chapterNumberAtOrBeforeSourceOffset,
 } from "@usfm-tools/model";
 export type {
   RenderPreviewOptions,
@@ -22,6 +27,7 @@ export type {
   UsfmBookPickerFileInput,
   UsfmBookPickerBook,
   UsfmBookPickerGroups,
+  ChapterMarkerInBook,
 } from "@usfm-tools/model";
 export {
   UsfmLanguageService,
