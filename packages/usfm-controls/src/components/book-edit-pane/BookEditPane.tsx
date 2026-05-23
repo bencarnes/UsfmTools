@@ -45,6 +45,11 @@ export interface BookEditPaneProps {
   readonly defaultViewMode?: BookEditPaneViewMode;
   readonly versePerLine?: boolean;
   readonly className?: string;
+  /**
+   * Initial on/off state for split-pane scroll sync when chapter markers exist.
+   * When there are no chapter markers, the switch stays disabled and sync does not run.
+   */
+  readonly defaultScrollSyncEnabled?: boolean;
 }
 
 const mono: CSSProperties = {
@@ -84,11 +89,13 @@ export function BookEditPane({
   defaultViewMode = "split",
   versePerLine,
   className,
+  defaultScrollSyncEnabled = true,
 }: BookEditPaneProps) {
   const [viewMode, setViewMode] = useState<BookEditPaneViewMode>(defaultViewMode);
   const [splitPct, setSplitPct] = useState(50);
   const [editorTopOffset, setEditorTopOffset] = useState(0);
   const [previewTopChapter, setPreviewTopChapter] = useState<string | null>(null);
+  const [scrollSyncEnabled, setScrollSyncEnabled] = useState(defaultScrollSyncEnabled);
 
   const editorRef = useRef<UsfmEditorHandle>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
@@ -128,6 +135,7 @@ export function BookEditPane({
       if (viewMode !== "split") return;
       const root = previewScrollRef.current;
       if (!root || syncLockRef.current) return;
+      if (!scrollSyncEnabled) return;
       const mode = scrollSyncModeFromMarkers(hasChapters);
       if (mode === "none") return;
       syncLockRef.current = true;
@@ -138,7 +146,7 @@ export function BookEditPane({
       scrollPreviewToAnchor(root, mode, { kind: "cv", chapterNumber, verseNumber });
       releaseSyncLockSoon();
     },
-    [viewMode, hasChapters, value, bookStartOffset, markers, releaseSyncLockSoon],
+    [viewMode, hasChapters, scrollSyncEnabled, value, bookStartOffset, markers, releaseSyncLockSoon],
   );
 
   const syncEditorToPreviewTop = useCallback(() => {
@@ -146,6 +154,7 @@ export function BookEditPane({
     const root = previewScrollRef.current;
     const ed = editorRef.current;
     if (!root || !ed || syncLockRef.current) return;
+    if (!scrollSyncEnabled) return;
     const mode = scrollSyncModeFromMarkers(hasChapters);
     if (mode === "none") return;
     const anchor = readTopVisibleScrollAnchor(root, mode);
@@ -159,7 +168,7 @@ export function BookEditPane({
     syncLockRef.current = true;
     ed.scrollSourceOffsetIntoView(targetOffset);
     releaseSyncLockSoon();
-  }, [viewMode, hasChapters, value, bookStartOffset, markers, releaseSyncLockSoon]);
+  }, [viewMode, hasChapters, scrollSyncEnabled, value, bookStartOffset, markers, releaseSyncLockSoon]);
 
   const onEditorViewportAnchor = useCallback(
     (offset: number) => {
@@ -369,6 +378,30 @@ export function BookEditPane({
             </div>
           </details>
         </div>
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={scrollSyncEnabled}
+          aria-label="Scroll sync between editor and preview"
+          disabled={!hasChapters}
+          title={
+            hasChapters
+              ? scrollSyncEnabled
+                ? "Split view: editor and preview scroll together"
+                : "Split view: scroll independently"
+              : "Add \\c chapter markers to enable scroll sync"
+          }
+          style={{
+            ...btnBase,
+            opacity: hasChapters ? 1 : 0.45,
+            cursor: hasChapters ? "pointer" : "not-allowed",
+            fontWeight: scrollSyncEnabled ? 600 : 400,
+          }}
+          onClick={() => setScrollSyncEnabled((v) => !v)}
+        >
+          Scroll sync: {scrollSyncEnabled ? "On" : "Off"}
+        </button>
 
         <div style={{ display: "flex", gap: "0.25rem" }} role="group" aria-label="View mode">
           {(
