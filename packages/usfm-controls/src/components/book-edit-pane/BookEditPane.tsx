@@ -28,12 +28,10 @@ import {
 } from "./preview-chapter-scroll.js";
 import {
   lastVerseNumberBeforeOffset,
-  paragraphIndexAtSourceOffset,
   readTopVisibleScrollAnchor,
   scrollPreviewToAnchor,
   scrollSyncModeFromMarkers,
   sourceOffsetForChapterVerse,
-  sourceOffsetForParagraphIndex,
 } from "./scroll-sync.js";
 
 export type BookEditPaneViewMode = "edit" | "preview" | "split";
@@ -119,8 +117,6 @@ export function BookEditPane({
     return typeof off === "number" ? off : 0;
   }, [firstBook]);
 
-  const bookSourceSlice = useMemo(() => value.slice(bookStartOffset), [value, bookStartOffset]);
-
   const releaseSyncLockSoon = useCallback(() => {
     window.setTimeout(() => {
       syncLockRef.current = false;
@@ -132,22 +128,17 @@ export function BookEditPane({
       if (viewMode !== "split") return;
       const root = previewScrollRef.current;
       if (!root || syncLockRef.current) return;
-      const mode = scrollSyncModeFromMarkers(hasChapters, bookSourceSlice);
+      const mode = scrollSyncModeFromMarkers(hasChapters);
       if (mode === "none") return;
       syncLockRef.current = true;
-      if (mode === "paragraph") {
-        const paragraphIndex = paragraphIndexAtSourceOffset(value, bookStartOffset, sourceOffset);
-        scrollPreviewToAnchor(root, mode, { kind: "para", paragraphIndex });
-      } else {
-        const mi = indexOfLastChapterMarkerAtOrBefore(markers, sourceOffset);
-        const chapterNumber = mi >= 0 ? markers[mi]!.number : null;
-        const chapterMarkerOffset = mi >= 0 ? markers[mi]!.markerOffset : bookStartOffset;
-        const verseNumber = lastVerseNumberBeforeOffset(value, chapterMarkerOffset, sourceOffset);
-        scrollPreviewToAnchor(root, mode, { kind: "cv", chapterNumber, verseNumber });
-      }
+      const mi = indexOfLastChapterMarkerAtOrBefore(markers, sourceOffset);
+      const chapterNumber = mi >= 0 ? markers[mi]!.number : null;
+      const chapterMarkerOffset = mi >= 0 ? markers[mi]!.markerOffset : bookStartOffset;
+      const verseNumber = lastVerseNumberBeforeOffset(value, chapterMarkerOffset, sourceOffset);
+      scrollPreviewToAnchor(root, mode, { kind: "cv", chapterNumber, verseNumber });
       releaseSyncLockSoon();
     },
-    [viewMode, hasChapters, bookSourceSlice, value, bookStartOffset, markers, releaseSyncLockSoon],
+    [viewMode, hasChapters, value, bookStartOffset, markers, releaseSyncLockSoon],
   );
 
   const syncEditorToPreviewTop = useCallback(() => {
@@ -155,25 +146,20 @@ export function BookEditPane({
     const root = previewScrollRef.current;
     const ed = editorRef.current;
     if (!root || !ed || syncLockRef.current) return;
-    const mode = scrollSyncModeFromMarkers(hasChapters, bookSourceSlice);
+    const mode = scrollSyncModeFromMarkers(hasChapters);
     if (mode === "none") return;
     const anchor = readTopVisibleScrollAnchor(root, mode);
     if (!anchor) return;
-    let targetOffset: number | null = null;
-    if (anchor.kind === "para") {
-      targetOffset = sourceOffsetForParagraphIndex(value, bookStartOffset, anchor.paragraphIndex);
-    } else {
-      const chapterMarkerBase =
-        anchor.chapterNumber == null
-          ? bookStartOffset
-          : (markerOffsetForChapterNumber(markers, anchor.chapterNumber) ?? bookStartOffset);
-      targetOffset = sourceOffsetForChapterVerse(value, markers, chapterMarkerBase, anchor.verseNumber);
-    }
+    const chapterMarkerBase =
+      anchor.chapterNumber == null
+        ? bookStartOffset
+        : (markerOffsetForChapterNumber(markers, anchor.chapterNumber) ?? bookStartOffset);
+    const targetOffset = sourceOffsetForChapterVerse(value, markers, chapterMarkerBase, anchor.verseNumber);
     if (targetOffset == null) return;
     syncLockRef.current = true;
     ed.scrollSourceOffsetIntoView(targetOffset);
     releaseSyncLockSoon();
-  }, [viewMode, hasChapters, bookSourceSlice, value, bookStartOffset, markers, releaseSyncLockSoon]);
+  }, [viewMode, hasChapters, value, bookStartOffset, markers, releaseSyncLockSoon]);
 
   const onEditorViewportAnchor = useCallback(
     (offset: number) => {

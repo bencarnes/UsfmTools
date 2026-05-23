@@ -2,76 +2,14 @@
  * Split-pane scroll alignment between USFM source offsets and preview DOM.
  * Chapter and verse numbers are always treated as opaque strings (never parsed as integers).
  *
- * Sync modes: with `\c` markers, use chapter+verse; without chapters, use paragraph index
- * only when both `\v` and `\p` milestones exist; otherwise do not sync.
+ * Synchronization runs only when the book has `\\c` chapter markers (chapter + verse anchors).
+ * Books without chapters do not sync scroll between editor and preview.
  */
 
-export type ScrollSyncMode = "chapter-verse" | "paragraph" | "none";
+export type ScrollSyncMode = "chapter-verse" | "none";
 
-export function scrollSyncModeFromMarkers(
-  hasChapterMarkers: boolean,
-  bookSourceSlice: string,
-): ScrollSyncMode {
-  if (hasChapterMarkers) return "chapter-verse";
-  if (!hasVerseMarker(bookSourceSlice)) return "none";
-  if (hasParagraphMarker(bookSourceSlice)) return "paragraph";
-  return "none";
-}
-
-function hasVerseMarker(bookSlice: string): boolean {
-  return /(?:^|\n)\\v(?=\s|$)/m.test(bookSlice);
-}
-
-function hasParagraphMarker(bookSlice: string): boolean {
-  return /(?:^|\n)\\p(?=\s|$)/m.test(bookSlice);
-}
-
-/** @internal */
-export function listParagraphMarkerOffsetsInRange(text: string, from: number, to: number): readonly number[] {
-  const slice = text.slice(from, to);
-  const out: number[] = [];
-  const re = /(^|\n)\\p(?=\s|$)/gm;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(slice)) !== null) {
-    const rel = m.index + (m[1] === "\n" ? 1 : 0);
-    out.push(from + rel);
-  }
-  return out;
-}
-
-/** 0-based paragraph index: which `\\p` block contains {@link offset}. */
-export function paragraphIndexAtSourceOffset(
-  fullText: string,
-  bookStart: number,
-  offset: number,
-): number {
-  const offs = listParagraphMarkerOffsetsInRange(fullText, bookStart, fullText.length);
-  if (offs.length === 0) return 0;
-  let lo = 0;
-  let hi = offs.length - 1;
-  let best = 0;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    const p = offs[mid]!;
-    if (p <= offset) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  return best;
-}
-
-export function sourceOffsetForParagraphIndex(
-  fullText: string,
-  bookStart: number,
-  paraIndex: number,
-): number | null {
-  const offs = listParagraphMarkerOffsetsInRange(fullText, bookStart, fullText.length);
-  if (offs.length === 0) return bookStart;
-  const clamped = Math.max(0, Math.min(paraIndex, offs.length - 1));
-  return offs[clamped] ?? bookStart;
+export function scrollSyncModeFromMarkers(hasChapterMarkers: boolean): ScrollSyncMode {
+  return hasChapterMarkers ? "chapter-verse" : "none";
 }
 
 /** Last `\\v` milestone number (verbatim) between {@link from} (inclusive) and {@link to} (exclusive). */
@@ -127,20 +65,14 @@ export type CvScrollAnchor = {
   readonly verseNumber: string | null;
 };
 
-export type ParaScrollAnchor = {
-  readonly kind: "para";
-  readonly paragraphIndex: number;
-};
+export type ScrollAnchor = CvScrollAnchor;
 
-export type ScrollAnchor = CvScrollAnchor | ParaScrollAnchor;
-
-export function scrollPreviewToAnchor(scrollRoot: HTMLElement | null, mode: ScrollSyncMode, anchor: ScrollAnchor): void {
+export function scrollPreviewToAnchor(
+  scrollRoot: HTMLElement | null,
+  mode: ScrollSyncMode,
+  anchor: ScrollAnchor,
+): void {
   if (!scrollRoot || mode === "none") return;
-  if (anchor.kind === "para") {
-    const el = scrollRoot.querySelector(`p.usfm-line[data-usfm-para-index="${String(anchor.paragraphIndex)}"]`);
-    scrollElementToTopOfContainer(scrollRoot, el);
-    return;
-  }
   const { chapterNumber, verseNumber } = anchor;
   if (chapterNumber == null) {
     if (verseNumber != null) {
@@ -184,20 +116,14 @@ function scrollElementToTopOfContainer(scrollRoot: HTMLElement, el: Element | nu
   scrollRoot.scrollTop = Math.max(0, elRect.top - rootRect.top + scrollRoot.scrollTop - 4);
 }
 
-export function readTopVisibleScrollAnchor(scrollRoot: HTMLElement | null, mode: ScrollSyncMode): ScrollAnchor | null {
+export function readTopVisibleScrollAnchor(
+  scrollRoot: HTMLElement | null,
+  mode: ScrollSyncMode,
+): ScrollAnchor | null {
   if (!scrollRoot || mode === "none") return null;
   const x = scrollRoot.getBoundingClientRect().left + scrollRoot.clientWidth / 2;
   const y = scrollRoot.getBoundingClientRect().top + 6;
   const stack = scrollRoot.ownerDocument.elementsFromPoint(x, y);
-  if (mode === "paragraph") {
-    const line = stack.find(
-      (n) => n instanceof HTMLElement && n.matches("p.usfm-line[data-usfm-para-index]"),
-    ) as HTMLElement | undefined;
-    if (!line) return null;
-    const raw = line.getAttribute("data-usfm-para-index");
-    if (raw == null) return null;
-    return { kind: "para", paragraphIndex: Number.parseInt(raw, 10) };
-  }
   const line = stack.find((n) => n instanceof HTMLElement && n.matches("p.usfm-line")) as HTMLElement | undefined;
   if (!line) return null;
   const verseEl = line.querySelector("sup.usfm-v[data-verse]") as HTMLElement | null;
