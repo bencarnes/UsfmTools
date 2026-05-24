@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   indexOfLastChapterMarkerAtOrBefore,
   markerOffsetForChapterNumber,
-} from "../src/components/book-edit-pane/chapter-offset-helpers.js";
+} from "../src/components/usfm-pane/chapter-offset-helpers.js";
 
 describe("chapter-offset-helpers", () => {
   const markers = [

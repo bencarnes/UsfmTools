@@ -93,19 +93,19 @@ const files = [
 | `onBookSelect` | `(detail: { fileId: string; code: string }) => void` | Optional; called when the user activates a book (click or keyboard). **`code`** is empty when the file has no `\\id` or an empty `\\id` line. |
 | `className` | `string` | CSS class on the root wrapper |
 
-### ChapterPicker
+### UsfmPane
 
-### BookEditPane
+**`UsfmPane`** is a full-book editor surface: a body that switches between **Edit**, **Preview**, and **Edit + Preview** (split with a draggable splitter). By default it includes an **inline toolbar** (chapter navigation, scroll sync toggle, view mode) above the body. When embedded in **`UsfmWorkspace`**, pass **`toolbarMount`** (a host element to the right of the tabs) and **`toolbarActive`** so only the selected tab’s controls render there, similar to VS Code.
 
-**`BookEditPane`** is a full-book workspace: a top bar (title, chapter navigator, view mode) and a body that switches between **Edit**, **Preview**, and **Edit + Preview** (split with a draggable splitter). The editor and preview both receive the same controlled **`value`** / **`onChange`** pair, so **several panes can edit one file** when the parent shares state. Chapter navigation uses **`listChapterMarkersInBook`** from **`@usfm-tools/model`** for marker offsets and **`ChapterPicker`** inside a **Chapters** menu for jumps. In split mode, scrolling one side debounces (~120ms) and aligns the other to the **same chapter** (approximate co-viewing; line-level sync is not guaranteed). The navigator stays visible for front matter without **`\\c`** markers; arrows and the menu are inert when there are no chapters.
+The editor and preview share the same controlled **`value`** / **`onChange`** pair, so **several panes can edit one file** when the parent shares state. Chapter navigation uses **`listChapterMarkersInBook`** from **`@usfm-tools/model`** for marker offsets and **`ChapterPicker`** inside a **Chapters** menu for jumps. In split mode, scrolling one side debounces (~120ms) and aligns the other to the **same chapter** (approximate co-viewing; line-level sync is not guaranteed). The navigator stays visible for front matter without **`\\c`** markers; arrows and the menu are inert when there are no chapters.
 
 ```tsx
 import { useState } from "react";
-import { BookEditPane } from "@usfm-tools/controls";
+import { UsfmPane } from "@usfm-tools/controls";
 
 function App() {
   const [usfm, setUsfm] = useState("\\id GEN\\n\\c 1\\n\\p\\n\\v 1 ...");
-  return <BookEditPane bookTitle="GEN" value={usfm} onChange={setUsfm} className="h-[600px]" />;
+  return <UsfmPane value={usfm} onChange={setUsfm} className="h-[600px]" />;
 }
 ```
 
@@ -113,9 +113,31 @@ function App() {
 |------|------|-------------|
 | `value` | `string` | Full USFM file body (controlled) |
 | `onChange` | `(value: string) => void` | Optional; same contract as **`UsfmEditor`** |
-| `bookTitle` | `string` | Label shown in the top bar |
+| `toolbarMount` | `HTMLElement \| null` | When set with **`toolbarActive`**, renders the chapter / sync / view toolbar into this node |
+| `toolbarActive` | `boolean` | When false, this pane does not occupy **`toolbarMount`** (inactive tab) |
 | `defaultViewMode` | `"edit" \| "preview" \| "split"` | Initial layout (default **`split`**) |
 | `versePerLine` | `boolean` | Passed through to **`UsfmPreview`** in preview / split |
+| `className` | `string` | Optional root wrapper class |
+
+### UsfmWorkspace
+
+**`UsfmWorkspace`** is a tabbed document layout (**TDI**) with **editor groups**: horizontal groups of tabs, each tab showing a **`UsfmPane`**. The active tab’s filename appears on the tab; chapter controls, scroll sync, and view mode sit in a host **to the right of the tab strip** (not inside the pane chrome). Tabs support horizontal scroll with arrow buttons, a tab-list **dropdown**, close (**×** vs a **circle** stub when **`dirty`** is true), and **drag-and-drop** onto another group’s tab strip or onto thin **split drop zones** at the edges / between groups to open a new group. A future file browser can open documents by pushing into this workspace state.
+
+```tsx
+import { UsfmWorkspace } from "@usfm-tools/controls";
+
+<UsfmWorkspace
+  initialTabs={[
+    { fileName: "GEN.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 ..." },
+    { fileName: "FRT.usfm", value: "\\id FRT\n\\p\n\\v 1 ...", groupIndex: 1 },
+  ]}
+  className="h-[720px]"
+/>;
+```
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `initialTabs` | `UsfmWorkspaceInitialTab[]` | Each entry supplies **`fileName`**, **`value`**, optional **`dirty`**, optional stable **`id`**, and optional **`groupIndex`** to start in side-by-side groups |
 | `className` | `string` | Optional root wrapper class |
 
 ### ChapterPicker
@@ -160,7 +182,7 @@ The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  UsfmEditor / UsfmPreview / UsfmBookPicker / ChapterPicker / BookEditPane (React) │
+│  UsfmEditor / UsfmPreview / UsfmBookPicker / ChapterPicker / UsfmPane / UsfmWorkspace (React) │
 │  ┌───────────────────────────────────────────┐  │
 │  │  CodeMirror 6 (editor only)               │  │
 │  └───────────────────────────────────────────┘  │
@@ -210,7 +232,7 @@ The service is currently synchronous (runs in the main thread via `createLanguag
 
 ## Design Considerations
 
-**Full-book editing:** **`BookEditPane`** targets entire files (multiple **`\\c`** markers). For very large books, callers may still prefer virtualization or worker-backed language features; the editor itself remains a single CodeMirror document. The language service protocol could later send diffs instead of full text on each keystroke.
+**Full-book editing:** **`UsfmPane`** targets entire files (multiple **`\\c`** markers). For very large books, callers may still prefer virtualization or worker-backed language features; the editor itself remains a single CodeMirror document. The language service protocol could later send diffs instead of full text on each keystroke.
 
 **Lightweight:** No VS Code / Monaco fork. CodeMirror 6 provides the editing primitives; the USFM-specific intelligence lives in our language service.
 
@@ -252,7 +274,8 @@ Stories demonstrate the editor, preview, book picker, and chapter picker with:
 - Psalm 1 (poetry formatting)
 - Empty state
 - Error state (unknown markers, stray end markers)
-- **BookEditPane** — **`FullBookSplit`** and **`TwoPanesSharedState`** use a shared `useState` USFM string; **`FrontMatterNoChapters`** shows the chapter bar when there are no `\\c` markers.
+- **UsfmPane** — **`FullBookSplit`** and **`TwoPanesSharedState`** use a shared `useState` USFM string; **`FrontMatterNoChapters`** shows the toolbar when there are no `\\c` markers.
+- **UsfmWorkspace** — **`SingleGroupTwoTabs`** and **`TwoEditorGroups`** demonstrate the TDI; drag a tab to a split zone to add a group.
 - **UsfmPreview** — **`GenesisPreview`** uses `render: (args) => <UsfmPreview {...args} />` so Controls map to props; **`WithEditor`** must use that same **`args` parameter** (not a zero-arg render) so `versePerLine` updates when you toggle Controls or the checkbox (`useArgs` is only for pushing checkbox state back into Storybook). **Verse Per Line Compare** shows both modes side by side.
 
 ### Project Structure
@@ -276,9 +299,12 @@ packages/usfm-controls/
 │   │   │   ├── UsfmBookPicker.tsx   # OT / NT / other book grid + list
 │   │   │   ├── UsfmBookPicker.stories.tsx
 │   │   │   └── index.ts
-│   │   ├── book-edit-pane/
-│   │   │   ├── BookEditPane.tsx   # Full-book edit + preview + chapter bar
-│   │   │   └── BookEditPane.stories.tsx
+│   │   ├── usfm-pane/
+│   │   │   ├── UsfmPane.tsx       # Full-book edit + preview + toolbar (inline or portaled)
+│   │   │   └── UsfmPane.stories.tsx
+│   │   ├── usfm-workspace/
+│   │   │   ├── UsfmWorkspace.tsx  # Tabbed editor groups + tab strip chrome
+│   │   │   └── UsfmWorkspace.stories.tsx
 │   │   └── chapter-picker/
 │   │       ├── ChapterPicker.tsx    # Wrapping row of equal-width chapter buttons
 │   │       ├── ChapterPicker.stories.tsx
@@ -294,7 +320,8 @@ packages/usfm-controls/
 │   ├── language-service.test.ts
 │   ├── usfm-preview.test.tsx
 │   ├── usfm-book-picker.test.tsx
-│   ├── book-edit-pane.test.tsx
+│   ├── usfm-pane.test.tsx
+│   ├── usfm-workspace.test.tsx
 │   ├── chapter-offset-helpers.test.ts
 │   └── chapter-picker.test.tsx
 ├── vitest.config.ts                 # jsdom for React tests
