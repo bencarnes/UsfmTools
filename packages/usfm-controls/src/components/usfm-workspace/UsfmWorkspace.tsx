@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from "react";
+import { useCallback, useRef, useState, type DragEvent } from "react";
 import { UsfmPane } from "../usfm-pane/UsfmPane.js";
 import type { UsfmWorkspaceEditorGroupState, UsfmWorkspaceProps, UsfmWorkspaceTabState } from "./workspace-model.js";
 
@@ -40,44 +40,6 @@ function TabStrip({
   onDropTabFromOtherGroup,
 }: TabStripProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [scrollState, setScrollState] = useState({ left: false, right: false });
-
-  const updateScrollHints = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    if (max <= 1) {
-      setScrollState({ left: false, right: false });
-      return;
-    }
-    setScrollState({
-      left: el.scrollLeft > 2,
-      right: el.scrollLeft < max - 2,
-    });
-  }, []);
-
-  useLayoutEffect(() => {
-    updateScrollHints();
-  }, [tabIds, updateScrollHints]);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (typeof ResizeObserver === "undefined") {
-      updateScrollHints();
-      return;
-    }
-    const ro = new ResizeObserver(() => updateScrollHints());
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [updateScrollHints]);
-
-  const scrollByDir = (dir: -1 | 1) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * 120, behavior: "smooth" });
-    window.requestAnimationFrame(updateScrollHints);
-  };
 
   const onDragStartTab = (e: DragEvent, tabId: string) => {
     e.dataTransfer.setData(TAB_DRAG_MIME, JSON.stringify({ tabId, fromGroupId: groupId }));
@@ -116,19 +78,9 @@ function TabStrip({
 
   return (
     <div className="flex min-w-0 flex-1 items-stretch gap-0.5">
-      <button
-        type="button"
-        className="shrink-0 border-0 bg-gray-100 px-1 text-gray-700 hover:bg-gray-200 disabled:opacity-30"
-        aria-label="Scroll tabs left"
-        disabled={!scrollState.left}
-        onClick={() => scrollByDir(-1)}
-      >
-        ◀
-      </button>
       <div
         ref={scrollRef}
         className="flex min-w-0 flex-1 flex-nowrap gap-0.5 overflow-x-auto overflow-y-hidden"
-        onScroll={updateScrollHints}
         onDragOver={onDragOverStrip}
         onDrop={onDropStrip}
       >
@@ -177,15 +129,6 @@ function TabStrip({
           );
         })}
       </div>
-      <button
-        type="button"
-        className="shrink-0 border-0 bg-gray-100 px-1 text-gray-700 hover:bg-gray-200 disabled:opacity-30"
-        aria-label="Scroll tabs right"
-        disabled={!scrollState.right}
-        onClick={() => scrollByDir(1)}
-      >
-        ▶
-      </button>
       <label className="sr-only" htmlFor={`${groupId}-tab-select`}>
         Open tab
       </label>
