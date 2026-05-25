@@ -4,4 +4,16 @@ export type {
   UsfmWorkspaceTabState,
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceInitialTab,
-} from "./UsfmWorkspace.js";
+  UsfmWorkspaceModel,
+} from "./workspace-model.js";
+export {
+  buildWorkspaceModelFromInitialTabs,
+  newWorkspaceId,
+  workspaceActivateTab,
+  workspaceAppendTab,
+  workspaceCloseTab,
+  workspaceMoveTabToGroup,
+  workspaceReorderTabInGroup,
+  workspaceSetTabValue,
+  workspaceSplitTabToNewGroup,
+} from "./workspace-model.js";

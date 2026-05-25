@@ -121,23 +121,57 @@ function App() {
 
 ### UsfmWorkspace
 
-**`UsfmWorkspace`** is a tabbed document layout (**TDI**) with **editor groups**: horizontal groups of tabs, each tab showing a **`UsfmPane`**. The active tab’s filename appears on the tab; chapter controls, scroll sync, and view mode sit in a host **to the right of the tab strip** (not inside the pane chrome). Tabs support horizontal scroll with arrow buttons, a tab-list **dropdown**, close (**×** vs a **circle** stub when **`dirty`** is true), and **drag-and-drop** onto another group’s tab strip or onto thin **split drop zones** at the edges / between groups to open a new group. A future file browser can open documents by pushing into this workspace state.
+**`UsfmWorkspace`** is a **fully controlled** tabbed document layout (**TDI**) with **editor groups**: you pass **`groups`**, **`tabsById`**, and callbacks for every user action. The UI shows horizontal groups of tabs (each tab is a **`UsfmPane`**), filenames on tabs, chapter / sync / view controls **to the right of the tab strip**, overflow scroll arrows, a tab **dropdown**, close (**×** vs **circle** when **`dirty`**), and **drag-and-drop** between strips plus **split drop zones** for new groups.
+
+Bootstrap layout with **`buildWorkspaceModelFromInitialTabs`** (optional **`groupIndex`** per tab), keep the result in React state, and wire handlers with the pure helpers (**`workspaceActivateTab`**, **`workspaceAppendTab`**, **`workspaceCloseTab`**, **`workspaceReorderTabInGroup`**, **`workspaceMoveTabToGroup`**, **`workspaceSplitTabToNewGroup`**, **`workspaceSetTabValue`**) so opening a file is just updating your model (for example **`workspaceAppendTab`**). You can also implement your own transitions; the helpers match the built-in Storybook behavior.
 
 ```tsx
-import { UsfmWorkspace } from "@usfm-tools/controls";
+import { useState } from "react";
+import {
+  UsfmWorkspace,
+  buildWorkspaceModelFromInitialTabs,
+  workspaceActivateTab,
+  workspaceAppendTab,
+  workspaceCloseTab,
+  workspaceMoveTabToGroup,
+  workspaceReorderTabInGroup,
+  workspaceSetTabValue,
+  workspaceSplitTabToNewGroup,
+} from "@usfm-tools/controls";
 
-<UsfmWorkspace
-  initialTabs={[
-    { fileName: "GEN.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 ..." },
-    { fileName: "FRT.usfm", value: "\\id FRT\n\\p\n\\v 1 ...", groupIndex: 1 },
-  ]}
-  className="h-[720px]"
-/>;
+function App() {
+  const [model, setModel] = useState(() =>
+    buildWorkspaceModelFromInitialTabs([{ fileName: "GEN.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 ..." }]),
+  );
+
+  return (
+    <UsfmWorkspace
+      groups={model.groups}
+      tabsById={model.tabsById}
+      onActivateTab={(groupId, tabId) => setModel((m) => workspaceActivateTab(m, groupId, tabId))}
+      onUpdateTabValue={(tabId, value) => setModel((m) => workspaceSetTabValue(m, tabId, value))}
+      onCloseTab={(groupId, tabId) => setModel((m) => workspaceCloseTab(m, groupId, tabId))}
+      onReorderTabInGroup={(groupId, tabId, toIndex) =>
+        setModel((m) => workspaceReorderTabInGroup(m, groupId, tabId, toIndex))
+      }
+      onMoveTabToGroup={(d) => setModel((m) => workspaceMoveTabToGroup(m, d))}
+      onSplitTabToNewGroup={(d) => setModel((m) => workspaceSplitTabToNewGroup(m, d))}
+      className="h-[720px]"
+    />
+  );
+}
 ```
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `initialTabs` | `UsfmWorkspaceInitialTab[]` | Each entry supplies **`fileName`**, **`value`**, optional **`dirty`**, optional stable **`id`**, and optional **`groupIndex`** to start in side-by-side groups |
+| `groups` | `UsfmWorkspaceEditorGroupState[]` | Each group’s **`id`**, ordered **`tabIds`**, and **`activeTabId`** |
+| `tabsById` | `Record<string, UsfmWorkspaceTabState>` | Tab id → **`fileName`**, **`value`**, **`dirty`** |
+| `onActivateTab` | `(groupId, tabId) => void` | User selected a tab |
+| `onUpdateTabValue` | `(tabId, value) => void` | Editor content changed |
+| `onCloseTab` | `(groupId, tabId) => void` | User closed a tab |
+| `onReorderTabInGroup` | `(groupId, tabId, toIndex) => void` | Reorder within the same strip |
+| `onMoveTabToGroup` | `(detail) => void` | Move tab to another group’s strip (**`toGroupId`**, **`insertIndex`**, **`fromGroupId`**) |
+| `onSplitTabToNewGroup` | `(detail) => void` | Drag onto a split zone (**`insertGroupIndex`**) |
 | `className` | `string` | Optional root wrapper class |
 
 ### ChapterPicker
@@ -275,7 +309,7 @@ Stories demonstrate the editor, preview, book picker, and chapter picker with:
 - Empty state
 - Error state (unknown markers, stray end markers)
 - **UsfmPane** — **`FullBookSplit`** and **`TwoPanesSharedState`** use a shared `useState` USFM string; **`FrontMatterNoChapters`** shows the toolbar when there are no `\\c` markers.
-- **UsfmWorkspace** — **`SingleGroupTwoTabs`** and **`TwoEditorGroups`** demonstrate the TDI; drag a tab to a split zone to add a group.
+- **UsfmWorkspace** — **`SingleGroupTwoTabs`**, **`TwoEditorGroups`**, and **`OpenFileDemo`** (append tab). Shared long USFM lives under **`src/fixtures/`** for Storybook.
 - **UsfmPreview** — **`GenesisPreview`** uses `render: (args) => <UsfmPreview {...args} />` so Controls map to props; **`WithEditor`** must use that same **`args` parameter** (not a zero-arg render) so `versePerLine` updates when you toggle Controls or the checkbox (`useArgs` is only for pushing checkbox state back into Storybook). **Verse Per Line Compare** shows both modes side by side.
 
 ### Project Structure
@@ -283,6 +317,8 @@ Stories demonstrate the editor, preview, book picker, and chapter picker with:
 ```
 packages/usfm-controls/
 ├── src/
+│   ├── fixtures/
+│   │   └── sample-bsb-genesis-usfm.ts  # Long sample USFM for Storybook (not part of the published entry)
 │   ├── index.ts                     # Public API exports
 │   ├── styles.css                   # Tailwind + default preview reading styles
 │   ├── components/
@@ -303,8 +339,10 @@ packages/usfm-controls/
 │   │   │   ├── UsfmPane.tsx       # Full-book edit + preview + toolbar (inline or portaled)
 │   │   │   └── UsfmPane.stories.tsx
 │   │   ├── usfm-workspace/
-│   │   │   ├── UsfmWorkspace.tsx  # Tabbed editor groups + tab strip chrome
-│   │   │   └── UsfmWorkspace.stories.tsx
+│   │   │   ├── UsfmWorkspace.tsx    # Tabbed editor groups + tab strip chrome
+│   │   │   ├── workspace-model.ts # Controlled props + immutable state helpers
+│   │   │   ├── UsfmWorkspace.stories.tsx
+│   │   │   └── index.ts
 │   │   └── chapter-picker/
 │   │       ├── ChapterPicker.tsx    # Wrapping row of equal-width chapter buttons
 │   │       ├── ChapterPicker.stories.tsx

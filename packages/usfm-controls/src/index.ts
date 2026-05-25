@@ -9,6 +9,18 @@ export type {
   UsfmWorkspaceTabState,
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceInitialTab,
+  UsfmWorkspaceModel,
+} from "./components/usfm-workspace/index.js";
+export {
+  buildWorkspaceModelFromInitialTabs,
+  newWorkspaceId,
+  workspaceActivateTab,
+  workspaceAppendTab,
+  workspaceCloseTab,
+  workspaceMoveTabToGroup,
+  workspaceReorderTabInGroup,
+  workspaceSetTabValue,
+  workspaceSplitTabToNewGroup,
 } from "./components/usfm-workspace/index.js";
 export { UsfmPreview } from "./components/usfm-preview/index.js";
 export type { UsfmPreviewProps } from "./components/usfm-preview/index.js";

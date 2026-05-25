@@ -1,56 +1,8 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type DragEvent,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent } from "react";
 import { UsfmPane } from "../usfm-pane/UsfmPane.js";
+import type { UsfmWorkspaceEditorGroupState, UsfmWorkspaceProps, UsfmWorkspaceTabState } from "./workspace-model.js";
 
 const TAB_DRAG_MIME = "application/vnd.usfmtools.workspace-tab+json";
-
-export interface UsfmWorkspaceTabState {
-  readonly id: string;
-  readonly fileName: string;
-  readonly value: string;
-  /**
-   * Stub for future save integration. When true, the tab close affordance uses a circle (dirty)
-   * instead of an × (clean), similar to VS Code.
-   */
-  readonly dirty: boolean;
-}
-
-export interface UsfmWorkspaceEditorGroupState {
-  readonly id: string;
-  readonly tabIds: readonly string[];
-  readonly activeTabId: string | null;
-}
-
-export interface UsfmWorkspaceInitialTab {
-  /** Stable id for tests; generated when omitted. */
-  readonly id?: string;
-  readonly fileName: string;
-  readonly value: string;
-  readonly dirty?: boolean;
-  /**
-   * Tabs with the same index start in the same editor group. Groups are ordered by ascending
-   * `groupIndex` (missing counts as `0`).
-   */
-  readonly groupIndex?: number;
-}
-
-export interface UsfmWorkspaceProps {
-  readonly initialTabs: readonly UsfmWorkspaceInitialTab[];
-  readonly className?: string;
-}
-
-function newId(prefix: string): string {
-  const c = globalThis.crypto;
-  if (c && "randomUUID" in c) return `${prefix}-${c.randomUUID()}`;
-  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
-}
 
 function parseTabDrag(dt: DataTransfer): { tabId: string; fromGroupId: string } | null {
   const raw = dt.getData(TAB_DRAG_MIME);
@@ -64,69 +16,6 @@ function parseTabDrag(dt: DataTransfer): { tabId: string; fromGroupId: string } 
   } catch {
     return null;
   }
-}
-
-function removeTabFromGroup(tabIds: readonly string[], tabId: string): string[] {
-  return tabIds.filter((t) => t !== tabId);
-}
-
-function insertTabAt(tabIds: readonly string[], tabId: string, index: number): string[] {
-  const filtered = tabIds.filter((t) => t !== tabId);
-  const i = Math.max(0, Math.min(index, filtered.length));
-  const next = [...filtered];
-  next.splice(i, 0, tabId);
-  return next;
-}
-
-function buildInitialWorkspace(initialTabs: readonly UsfmWorkspaceInitialTab[]): {
-  groups: { id: string; tabIds: string[]; activeTabId: string | null }[];
-  tabsById: Record<string, UsfmWorkspaceTabState>;
-} {
-  const tabsById: Record<string, UsfmWorkspaceTabState> = {};
-  const groupBuckets = new Map<number, string[]>();
-
-  for (const t of initialTabs) {
-    const id = t.id ?? newId("tab");
-    const gi = t.groupIndex ?? 0;
-    tabsById[id] = { id, fileName: t.fileName, value: t.value, dirty: t.dirty ?? false };
-    if (!groupBuckets.has(gi)) groupBuckets.set(gi, []);
-    groupBuckets.get(gi)!.push(id);
-  }
-
-  const sortedKeys = [...groupBuckets.keys()].sort((a, b) => a - b);
-  const groups = sortedKeys.map((gk) => {
-    const ids = groupBuckets.get(gk)!;
-    return {
-      id: newId("group"),
-      tabIds: ids,
-      activeTabId: ids[0] ?? null,
-    };
-  });
-
-  if (groups.length === 0) {
-    const id = newId("tab");
-    tabsById[id] = { id, fileName: "Untitled.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 ", dirty: false };
-    return {
-      groups: [{ id: newId("group"), tabIds: [id], activeTabId: id }],
-      tabsById,
-    };
-  }
-
-  return { groups, tabsById };
-}
-
-type Group = { id: string; tabIds: string[]; activeTabId: string | null };
-
-type WorkspaceModel = { groups: Group[]; tabsById: Record<string, UsfmWorkspaceTabState> };
-
-function pruneTabs(groups: Group[], tabsById: Record<string, UsfmWorkspaceTabState>) {
-  const used = new Set<string>();
-  for (const g of groups) for (const t of g.tabIds) used.add(t);
-  const next = { ...tabsById };
-  for (const k of Object.keys(next)) {
-    if (!used.has(k)) delete next[k];
-  }
-  return next;
 }
 
 interface TabStripProps {
@@ -360,7 +249,7 @@ function SplitDropZone({ edge, targetGroupIndex, onSplitDrop }: SplitDropZonePro
 
 interface EditorGroupPanelProps {
   readonly group: UsfmWorkspaceEditorGroupState;
-  readonly tabsById: Record<string, UsfmWorkspaceTabState>;
+  readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
   readonly onActivateTab: (groupId: string, tabId: string) => void;
   readonly onCloseTab: (groupId: string, tabId: string) => void;
   readonly onUpdateValue: (tabId: string, value: string) => void;
@@ -434,130 +323,31 @@ function EditorGroupPanel({
   );
 }
 
-export function UsfmWorkspace({ initialTabs, className }: UsfmWorkspaceProps) {
-  const built = useMemo(() => buildInitialWorkspace(initialTabs), [initialTabs]);
-  const [model, setModel] = useState<WorkspaceModel>(() => built);
-
-  const onActivateTab = useCallback((groupId: string, tabId: string) => {
-    setModel((m) => ({
-      ...m,
-      groups: m.groups.map((g) => (g.id === groupId ? { ...g, activeTabId: tabId } : g)),
-    }));
-  }, []);
-
-  const onUpdateValue = useCallback((tabId: string, value: string) => {
-    setModel((m) => {
-      const cur = m.tabsById[tabId];
-      if (!cur || cur.value === value) return m;
-      return {
-        ...m,
-        tabsById: { ...m.tabsById, [tabId]: { ...cur, value } },
-      };
-    });
-  }, []);
-
-  const onCloseTab = useCallback((groupId: string, tabId: string) => {
-    setModel((m) => {
-      const gi = m.groups.findIndex((g) => g.id === groupId);
-      if (gi < 0) return m;
-      const g = m.groups[gi]!;
-      const nextIds = removeTabFromGroup(g.tabIds, tabId);
-      let nextActive = g.activeTabId;
-      if (nextActive === tabId) nextActive = nextIds[0] ?? null;
-
-      let nextGroups = m.groups.map((gr, idx) =>
-        idx === gi ? { ...gr, tabIds: nextIds, activeTabId: nextActive } : gr,
-      );
-
-      if (nextIds.length === 0 && nextGroups.length > 1) {
-        nextGroups = nextGroups.filter((_, idx) => idx !== gi);
-      } else if (nextIds.length === 0 && nextGroups.length === 1) {
-        const id = newId("tab");
-        const blank: UsfmWorkspaceTabState = {
-          id,
-          fileName: "Untitled.usfm",
-          value: "\\id GEN\n\\c 1\n\\p\n\\v 1 ",
-          dirty: false,
-        };
-        nextGroups = [{ ...nextGroups[0]!, tabIds: [id], activeTabId: id }];
-        const tabsById = pruneTabs(nextGroups, { ...m.tabsById, [id]: blank });
-        return { groups: nextGroups, tabsById };
-      }
-
-      const tabsById = pruneTabs(nextGroups, m.tabsById);
-      return { groups: nextGroups, tabsById };
-    });
-  }, []);
-
-  const onMoveTabWithinGroup = useCallback((groupId: string, tabId: string, toIndex: number) => {
-    setModel((m) => ({
-      ...m,
-      groups: m.groups.map((g) =>
-        g.id === groupId ? { ...g, tabIds: insertTabAt(g.tabIds, tabId, toIndex) } : g,
-      ),
-    }));
-  }, []);
-
+export function UsfmWorkspace({
+  groups,
+  tabsById,
+  onActivateTab,
+  onUpdateTabValue,
+  onCloseTab,
+  onReorderTabInGroup,
+  onMoveTabToGroup,
+  onSplitTabToNewGroup,
+  className,
+}: UsfmWorkspaceProps) {
   const onDropTabFromOtherGroup = useCallback(
     (targetGroupId: string, tabId: string, fromGroupId: string, insertIndex: number) => {
       if (fromGroupId === targetGroupId) return;
-      setModel((m) => {
-        const fromI = m.groups.findIndex((g) => g.id === fromGroupId);
-        const toI = m.groups.findIndex((g) => g.id === targetGroupId);
-        if (fromI < 0 || toI < 0) return m;
-
-        const fromG = m.groups[fromI]!;
-        const toG = m.groups[toI]!;
-        const fromNextIds = removeTabFromGroup(fromG.tabIds, tabId);
-        let fromActive = fromG.activeTabId;
-        if (fromActive === tabId) fromActive = fromNextIds[0] ?? null;
-
-        const toNextIds = insertTabAt(toG.tabIds, tabId, insertIndex);
-
-        let nextGroups = m.groups.map((g, idx) => {
-          if (idx === fromI) return { ...g, tabIds: fromNextIds, activeTabId: fromActive };
-          if (idx === toI) return { ...g, tabIds: toNextIds, activeTabId: tabId };
-          return g;
-        });
-
-        nextGroups = nextGroups.filter((gr) => gr.tabIds.length > 0);
-        const tabsById = pruneTabs(nextGroups, m.tabsById);
-        return { groups: nextGroups, tabsById };
-      });
+      onMoveTabToGroup({ tabId, fromGroupId, toGroupId: targetGroupId, insertIndex });
     },
-    [],
+    [onMoveTabToGroup],
   );
 
-  const onSplitDrop = useCallback((tabId: string, fromGroupId: string, insertGroupIndex: number) => {
-    setModel((m) => {
-      const fromI = m.groups.findIndex((g) => g.id === fromGroupId);
-      if (fromI < 0) return m;
-      const fromG = m.groups[fromI]!;
-      if (!fromG.tabIds.includes(tabId)) return m;
-
-      const fromNextIds = removeTabFromGroup(fromG.tabIds, tabId);
-      let fromActive = fromG.activeTabId;
-      if (fromActive === tabId) fromActive = fromNextIds[0] ?? null;
-
-      let nextGroups = m.groups.map((g, idx) =>
-        idx === fromI ? { ...g, tabIds: fromNextIds, activeTabId: fromActive } : g,
-      );
-
-      nextGroups = nextGroups.filter((gr) => gr.tabIds.length > 0);
-
-      const newGroup: Group = {
-        id: newId("group"),
-        tabIds: [tabId],
-        activeTabId: tabId,
-      };
-
-      const clamped = Math.max(0, Math.min(insertGroupIndex, nextGroups.length));
-      nextGroups = [...nextGroups.slice(0, clamped), newGroup, ...nextGroups.slice(clamped)];
-
-      const tabsById = pruneTabs(nextGroups, m.tabsById);
-      return { groups: nextGroups, tabsById };
-    });
-  }, []);
+  const onSplitDrop = useCallback(
+    (tabId: string, fromGroupId: string, insertGroupIndex: number) => {
+      onSplitTabToNewGroup({ tabId, fromGroupId, insertGroupIndex });
+    },
+    [onSplitTabToNewGroup],
+  );
 
   return (
     <div
@@ -566,15 +356,15 @@ export function UsfmWorkspace({ initialTabs, className }: UsfmWorkspaceProps) {
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-row">
         <SplitDropZone edge="before" targetGroupIndex={0} onSplitDrop={onSplitDrop} />
-        {model.groups.map((g, idx) => (
+        {groups.map((g, idx) => (
           <div key={g.id} className="flex min-h-0 min-w-0 flex-1 flex-row">
             <EditorGroupPanel
               group={g}
-              tabsById={model.tabsById}
+              tabsById={tabsById}
               onActivateTab={onActivateTab}
               onCloseTab={onCloseTab}
-              onUpdateValue={onUpdateValue}
-              onMoveTabWithinGroup={onMoveTabWithinGroup}
+              onUpdateValue={onUpdateTabValue}
+              onMoveTabWithinGroup={onReorderTabInGroup}
               onDropTabFromOtherGroup={onDropTabFromOtherGroup}
             />
             <SplitDropZone edge="after" targetGroupIndex={idx} onSplitDrop={onSplitDrop} />
