@@ -33,6 +33,18 @@ function parseTabDrag(dt: DataTransfer): { tabId: string; fromGroupId: string } 
   }
 }
 
+/**
+ * Whether the drag operation carries workspace tab payload. Chromium leaves
+ * `getData(customMime)` empty during `dragover` / `dragenter`; `types` still lists the MIME.
+ */
+function isTabDragTransfer(dt: DataTransfer): boolean {
+  if (parseTabDrag(dt)) return true;
+  for (let i = 0; i < dt.types.length; i++) {
+    if (dt.types[i] === TAB_DRAG_MIME) return true;
+  }
+  return false;
+}
+
 interface TabStripProps {
   readonly groupId: string;
   readonly tabIds: readonly string[];
@@ -62,7 +74,7 @@ function TabStrip({
   };
 
   const onDragOverStrip = (e: DragEvent) => {
-    if (!parseTabDrag(e.dataTransfer)) return;
+    if (!isTabDragTransfer(e.dataTransfer)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
   };
@@ -110,6 +122,11 @@ function TabStrip({
                 active ? "border-gray-400 bg-white" : "border-transparent bg-gray-100 text-gray-700"
               }`}
               data-workspace-tab-id={tid}
+              onDragOver={(e) => {
+                if (!isTabDragTransfer(e.dataTransfer)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+              }}
             >
               <button
                 type="button"
@@ -182,11 +199,11 @@ function SplitDropZone({ edge, targetGroupIndex, onSplitDrop }: SplitDropZonePro
     <div
       className={`relative shrink-0 ${hover ? "w-2 bg-blue-200/80" : "w-1 bg-transparent hover:bg-blue-100"}`}
       onDragEnter={(e) => {
-        if (parseTabDrag(e.dataTransfer)) setHover(true);
+        if (isTabDragTransfer(e.dataTransfer)) setHover(true);
       }}
       onDragLeave={() => setHover(false)}
       onDragOver={(e) => {
-        if (!parseTabDrag(e.dataTransfer)) return;
+        if (!isTabDragTransfer(e.dataTransfer)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
         setHover(true);
@@ -267,11 +284,11 @@ function InterGroupResizableGap({
     <div
       className={`relative z-10 flex shrink-0 flex-col ${dropHover ? "w-2 bg-blue-200/70" : "w-1.5 bg-gray-200"}`}
       onDragEnter={(e) => {
-        if (parseTabDrag(e.dataTransfer)) setDropHover(true);
+        if (isTabDragTransfer(e.dataTransfer)) setDropHover(true);
       }}
       onDragLeave={() => setDropHover(false)}
       onDragOver={(e) => {
-        if (!parseTabDrag(e.dataTransfer)) return;
+        if (!isTabDragTransfer(e.dataTransfer)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
         setDropHover(true);

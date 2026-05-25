@@ -102,6 +102,21 @@ describe("UsfmWorkspace", () => {
     expect(screen.getByRole("tab", { name: /B\.usfm/i }).getAttribute("aria-selected")).toBe("true");
   });
 
+  it("workspaceReorderTabInGroup reorders tabs within one group", () => {
+    const m0 = buildWorkspaceModelFromInitialTabs([
+      { id: "a", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
+      { id: "b", fileName: "B.usfm", value: "\\id EXO\n\\c 1\n\\p\n\\v 1 B" },
+      { id: "c", fileName: "C.usfm", value: "\\id LEV\n\\c 1\n\\p\n\\v 1 C" },
+    ]);
+    const gid = m0.groups[0]!.id;
+    const toFront = workspaceReorderTabInGroup(m0, gid, "c", 0);
+    expect(toFront.groups[0]!.tabIds).toEqual(["c", "a", "b"]);
+    const toEnd = workspaceReorderTabInGroup(toFront, gid, "c", 3);
+    expect(toEnd.groups[0]!.tabIds).toEqual(["a", "b", "c"]);
+    const bFirst = workspaceReorderTabInGroup(toEnd, gid, "b", 0);
+    expect(bFirst.groups[0]!.tabIds).toEqual(["b", "a", "c"]);
+  });
+
   it("workspaceAppendTab adds a tab to a group", () => {
     const m0 = buildWorkspaceModelFromInitialTabs([
       { id: "a1", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
