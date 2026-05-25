@@ -121,7 +121,7 @@ function App() {
 
 ### UsfmWorkspace
 
-**`UsfmWorkspace`** is a **fully controlled** tabbed document layout (**TDI**) with **editor groups**: you pass **`groups`**, **`tabsById`**, and callbacks for every user action. The UI shows horizontal groups of tabs (each tab is a **`UsfmPane`**), filenames on tabs, chapter / sync / view controls **to the right of the tab strip**, a scrollable tab strip (wheel / trackpad), a tab **dropdown**, close (**×** vs **circle** when **`dirty`**), and **drag-and-drop** between strips plus **split drop zones** for new groups.
+**`UsfmWorkspace`** is a **fully controlled** tabbed document layout (**TDI**) with **editor groups**: you pass **`groups`**, **`tabsById`**, and callbacks for every user action. The UI shows horizontal groups of tabs (each tab is a **`UsfmPane`**), filenames on tabs, chapter / sync / view controls **to the right of the tab strip**, a scrollable tab strip (wheel / trackpad), a tab **dropdown**, close (**×** vs **circle** when **`dirty`**), **drag-and-drop** between strips plus **split drop zones** for new groups, and a **draggable vertical splitter** between adjacent groups to change their relative width.
 
 Bootstrap layout with **`buildWorkspaceModelFromInitialTabs`** (optional **`groupIndex`** per tab), keep the result in React state, and wire handlers with the pure helpers (**`workspaceActivateTab`**, **`workspaceAppendTab`**, **`workspaceCloseTab`**, **`workspaceReorderTabInGroup`**, **`workspaceMoveTabToGroup`**, **`workspaceSplitTabToNewGroup`**, **`workspaceSetTabValue`**) so opening a file is just updating your model (for example **`workspaceAppendTab`**). You can also implement your own transitions; the helpers match the built-in Storybook behavior.
 
