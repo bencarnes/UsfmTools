@@ -121,9 +121,9 @@ function App() {
 
 ### UsfmWorkspace
 
-**`UsfmWorkspace`** is a **fully controlled** tabbed document layout (**TDI**) with **editor groups**: you pass **`groups`**, **`tabsById`**, and callbacks for every user action. The UI shows horizontal groups of tabs (each tab is a **`UsfmPane`**), filenames on tabs, chapter / sync / view controls **to the right of the tab strip**, a scrollable tab strip (wheel / trackpad), a tab **dropdown**, close (**×** vs **circle** when **`dirty`**), **drag-and-drop** to **reorder tabs within a strip** or move them **between strips**, **split drop zones** for new groups, and a **draggable vertical splitter** between adjacent groups to change their relative width.
+**`UsfmWorkspace`** is a **fully controlled** tabbed document layout (**TDI**) with **editor rows** and **editor groups** per row: you pass **`rows`** (each row is a horizontal strip of groups), **`tabsById`**, and callbacks for every user action. The UI shows **`UsfmPane`** per tab, filenames on tabs, chapter / sync / view controls **to the right of the tab strip** (via **`UsfmPane`**’s **`toolbarMount`**), optional **split** toolbar buttons (new group **to the right** or **below**, moving the **active** tab), a scrollable tab strip, a tab **dropdown**, close (**×** vs **circle** when **`dirty`**), **drag-and-drop** to reorder tabs or move them between groups, **split drop zones**, horizontal splitters between groups in a row, and vertical splitters between rows.
 
-Bootstrap layout with **`buildWorkspaceModelFromInitialTabs`** (optional **`groupIndex`** per tab), keep the result in React state, and wire handlers with the pure helpers (**`workspaceActivateTab`**, **`workspaceAppendTab`**, **`workspaceCloseTab`**, **`workspaceReorderTabInGroup`**, **`workspaceMoveTabToGroup`**, **`workspaceSplitTabToNewGroup`**, **`workspaceSetTabValue`**) so opening a file is just updating your model (for example **`workspaceAppendTab`**). You can also implement your own transitions; the helpers match the built-in Storybook behavior.
+Bootstrap layout with **`buildWorkspaceModelFromInitialTabs`** (optional **`groupIndex`** per tab — groups in one initial row), keep the result in React state, and wire handlers with the pure helpers (**`workspaceActivateTab`**, **`workspaceAppendTab`**, **`workspaceCloseTab`**, **`workspaceReorderTabInGroup`**, **`workspaceMoveTabToGroup`**, **`workspaceSplitTabToNewGroup`**, **`workspaceSplitCurrentTabToNewGroupRight`**, **`workspaceSplitCurrentTabToNewGroupBelow`**, **`workspaceSetTabValue`**, **`workspaceFlattenGroups`**) so opening a file is just updating your model (for example **`workspaceAppendTab`**). You can also implement your own transitions; the helpers match the built-in Storybook behavior.
 
 ```tsx
 import { useState } from "react";
@@ -136,6 +136,8 @@ import {
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
   workspaceSetTabValue,
+  workspaceSplitCurrentTabToNewGroupBelow,
+  workspaceSplitCurrentTabToNewGroupRight,
   workspaceSplitTabToNewGroup,
 } from "@usfm-tools/controls";
 
@@ -146,7 +148,7 @@ function App() {
 
   return (
     <UsfmWorkspace
-      groups={model.groups}
+      rows={model.rows}
       tabsById={model.tabsById}
       onActivateTab={(groupId, tabId) => setModel((m) => workspaceActivateTab(m, groupId, tabId))}
       onUpdateTabValue={(tabId, value) => setModel((m) => workspaceSetTabValue(m, tabId, value))}
@@ -156,6 +158,12 @@ function App() {
       }
       onMoveTabToGroup={(d) => setModel((m) => workspaceMoveTabToGroup(m, d))}
       onSplitTabToNewGroup={(d) => setModel((m) => workspaceSplitTabToNewGroup(m, d))}
+      onSplitCurrentTabRight={(groupId, tabId) =>
+        setModel((m) => workspaceSplitCurrentTabToNewGroupRight(m, groupId, tabId))
+      }
+      onSplitCurrentTabBelow={(groupId, tabId) =>
+        setModel((m) => workspaceSplitCurrentTabToNewGroupBelow(m, groupId, tabId))
+      }
       className="h-[720px]"
     />
   );
@@ -164,14 +172,16 @@ function App() {
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `groups` | `UsfmWorkspaceEditorGroupState[]` | Each group’s **`id`**, ordered **`tabIds`**, and **`activeTabId`** |
+| `rows` | `UsfmWorkspaceEditorRowState[]` | Each row’s stable **`id`** and ordered **`groups`** (each group: **`id`**, **`tabIds`**, **`activeTabId`**) |
 | `tabsById` | `Record<string, UsfmWorkspaceTabState>` | Tab id → **`fileName`**, **`value`**, **`dirty`** |
 | `onActivateTab` | `(groupId, tabId) => void` | User selected a tab |
 | `onUpdateTabValue` | `(tabId, value) => void` | Editor content changed |
 | `onCloseTab` | `(groupId, tabId) => void` | User closed a tab |
 | `onReorderTabInGroup` | `(groupId, tabId, toIndex) => void` | Reorder within the same strip |
 | `onMoveTabToGroup` | `(detail) => void` | Move tab to another group’s strip (**`toGroupId`**, **`insertIndex`**, **`fromGroupId`**) |
-| `onSplitTabToNewGroup` | `(detail) => void` | Drag onto a split zone (**`insertGroupIndex`**) |
+| `onSplitTabToNewGroup` | `(detail) => void` | Drag onto a split zone — **`targetRowId`**, **`beforeGroupId`** (`null` = append at end of row) |
+| `onSplitCurrentTabRight` | `(groupId, tabId) => void` | Optional; enables the “split right” toolbar control |
+| `onSplitCurrentTabBelow` | `(groupId, tabId) => void` | Optional; enables the “split below” toolbar control |
 | `className` | `string` | Optional root wrapper class |
 
 ### ChapterPicker

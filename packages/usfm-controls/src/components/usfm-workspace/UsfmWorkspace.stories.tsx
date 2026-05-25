@@ -10,6 +10,8 @@ import {
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
   workspaceSetTabValue,
+  workspaceSplitCurrentTabToNewGroupBelow,
+  workspaceSplitCurrentTabToNewGroupRight,
   workspaceSplitTabToNewGroup,
   type UsfmWorkspaceInitialTab,
   type UsfmWorkspaceModel,
@@ -32,7 +34,7 @@ function ControlledWorkspace({ initialTabs }: { readonly initialTabs: readonly U
 
   return (
     <UsfmWorkspace
-      groups={model.groups}
+      rows={model.rows}
       tabsById={model.tabsById}
       onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
       onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
@@ -42,6 +44,12 @@ function ControlledWorkspace({ initialTabs }: { readonly initialTabs: readonly U
       }
       onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
       onSplitTabToNewGroup={(d) => setModel((p) => workspaceSplitTabToNewGroup(p, d))}
+      onSplitCurrentTabRight={(groupId, tabId) =>
+        setModel((p) => workspaceSplitCurrentTabToNewGroupRight(p, groupId, tabId))
+      }
+      onSplitCurrentTabBelow={(groupId, tabId) =>
+        setModel((p) => workspaceSplitCurrentTabToNewGroupBelow(p, groupId, tabId))
+      }
     />
   );
 }
@@ -86,7 +94,7 @@ export const OpenFileDemo: Story = {
 
     const openLeviticus = () => {
       setModel((p) => {
-        const gid = p.groups[0]?.id;
+        const gid = p.rows[0]?.groups[0]?.id;
         if (!gid) return p;
         return workspaceAppendTab(p, {
           groupId: gid,
@@ -106,7 +114,7 @@ export const OpenFileDemo: Story = {
         </button>
         <div className="min-h-0 flex-1">
           <UsfmWorkspace
-            groups={model.groups}
+            rows={model.rows}
             tabsById={model.tabsById}
             onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
             onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
@@ -116,6 +124,12 @@ export const OpenFileDemo: Story = {
             }
             onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
             onSplitTabToNewGroup={(d) => setModel((p) => workspaceSplitTabToNewGroup(p, d))}
+            onSplitCurrentTabRight={(groupId, tabId) =>
+              setModel((p) => workspaceSplitCurrentTabToNewGroupRight(p, groupId, tabId))
+            }
+            onSplitCurrentTabBelow={(groupId, tabId) =>
+              setModel((p) => workspaceSplitCurrentTabToNewGroupBelow(p, groupId, tabId))
+            }
           />
         </div>
       </div>

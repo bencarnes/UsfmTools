@@ -3,6 +3,7 @@ export type {
   UsfmWorkspaceProps,
   UsfmWorkspaceTabState,
   UsfmWorkspaceEditorGroupState,
+  UsfmWorkspaceEditorRowState,
   UsfmWorkspaceInitialTab,
   UsfmWorkspaceModel,
 } from "./workspace-model.js";
@@ -12,8 +13,11 @@ export {
   workspaceActivateTab,
   workspaceAppendTab,
   workspaceCloseTab,
+  workspaceFlattenGroups,
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
   workspaceSetTabValue,
+  workspaceSplitCurrentTabToNewGroupBelow,
+  workspaceSplitCurrentTabToNewGroupRight,
   workspaceSplitTabToNewGroup,
 } from "./workspace-model.js";
