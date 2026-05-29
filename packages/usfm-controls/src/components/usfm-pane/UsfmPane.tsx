@@ -435,7 +435,9 @@ export function UsfmPane({
 
   return (
     <div
-      className={`flex flex-col min-h-[280px] h-full border border-gray-300 rounded-md overflow-hidden bg-white ${className ?? ""}`}
+      className={`flex h-full flex-col overflow-hidden bg-white border border-gray-300 rounded-md ${
+        useExternalToolbar ? "min-h-0" : "min-h-[280px]"
+      } ${className ?? ""}`}
     >
       {showToolbarInline ? (
         <header

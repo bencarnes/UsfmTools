@@ -445,8 +445,8 @@ function EditorGroupPanel({
   const showSplitControls = Boolean(onSplitCurrentTabRight || onSplitCurrentTabBelow);
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col">
-      <div className="flex min-h-[2.25rem] shrink-0 items-stretch border-b border-gray-300 bg-gray-50">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+      <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch border-b border-gray-300 bg-gray-50">
         <TabStrip
           groupId={group.id}
           tabIds={group.tabIds}
@@ -499,7 +499,7 @@ function EditorGroupPanel({
           ) : null}
         </div>
       </div>
-      <div className="relative grid min-h-0 flex-1 grid-cols-1 grid-rows-1">
+      <div className="relative z-0 grid min-h-0 flex-1 grid-cols-1 grid-rows-1 overflow-hidden">
         {group.tabIds.map((tid) => {
           const tab = tabsById[tid];
           if (!tab) return null;
@@ -595,7 +595,7 @@ function WorkspaceRow({
       {row.groups.map((g, idx) => (
         <Fragment key={g.id}>
           <div
-            className="flex min-h-0 min-w-[8rem] flex-col"
+            className="flex min-h-0 min-w-[8rem] flex-col overflow-hidden"
             style={{
               flexGrow: columnFractions[idx] ?? 1,
               flexShrink: 1,
@@ -693,7 +693,7 @@ export function UsfmWorkspace({
         {rows.map((row, ri) => (
           <Fragment key={row.id}>
             <div
-              className="flex min-h-0 min-w-0 flex-col"
+              className="flex min-h-0 min-w-0 flex-col overflow-hidden"
               style={{
                 flexGrow: rowFractions[ri] ?? 1,
                 flexShrink: 1,
