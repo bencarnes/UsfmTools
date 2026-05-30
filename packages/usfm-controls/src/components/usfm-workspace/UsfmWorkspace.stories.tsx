@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { SAMPLE_BSB_GENESIS_USFM, SAMPLE_EXO_SNIPPET_USFM } from "../../fixtures/sample-bsb-genesis-usfm.js";
 import { TabGroupLayoutSelector } from "../tab-group-layout-selector/TabGroupLayoutSelector.js";
 import {
@@ -17,43 +17,64 @@ import {
 } from "./workspace-model.js";
 import { UsfmWorkspace } from "./UsfmWorkspace.js";
 
+/** Fixed editor-panel height in stories (typical main content area in the desktop app). */
+const STORY_WORKSPACE_HEIGHT = "640px";
+
 const meta: Meta<typeof UsfmWorkspace> = {
   title: "Controls/UsfmWorkspace",
   component: UsfmWorkspace,
   parameters: {
-    layout: "fullscreen",
+    layout: "padded",
   },
 };
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+function StoryChrome({ toolbar, workspace }: { readonly toolbar: ReactNode; readonly workspace: ReactNode }) {
+  return (
+    <div className="box-border flex w-full max-w-[1200px] flex-col gap-2">
+      {toolbar}
+      <div className="w-full overflow-hidden rounded border border-gray-300" style={{ height: STORY_WORKSPACE_HEIGHT }}>
+        {workspace}
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceFromModel({ model, setModel }: { readonly model: UsfmWorkspaceModel; readonly setModel: (fn: (p: UsfmWorkspaceModel) => UsfmWorkspaceModel) => void }) {
+  return (
+    <UsfmWorkspace
+      gridRows={model.gridRows}
+      gridCols={model.gridCols}
+      slots={model.slots}
+      tabsById={model.tabsById}
+      className="h-full min-h-0"
+      onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
+      onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
+      onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
+      onReorderTabInGroup={(groupId, tabId, toIndex) =>
+        setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
+      }
+      onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
+    />
+  );
+}
+
 function ControlledWorkspace({ initialTabs }: { readonly initialTabs: readonly UsfmWorkspaceInitialTab[] }) {
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs(initialTabs));
 
   return (
-    <div className="flex h-[min(90vh,720px)] flex-col gap-2 p-4 box-border">
-      <TabGroupLayoutSelector
-        gridRows={model.gridRows}
-        gridCols={model.gridCols}
-        onChange={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
-      />
-      <div className="min-h-0 flex-1">
-        <UsfmWorkspace
+    <StoryChrome
+      toolbar={
+        <TabGroupLayoutSelector
           gridRows={model.gridRows}
           gridCols={model.gridCols}
-          slots={model.slots}
-          tabsById={model.tabsById}
-          onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
-          onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
-          onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
-          onReorderTabInGroup={(groupId, tabId, toIndex) =>
-            setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
-          }
-          onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
+          onChange={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
         />
-      </div>
-    </div>
+      }
+      workspace={<WorkspaceFromModel model={model} setModel={setModel} />}
+    />
   );
 }
 
@@ -103,37 +124,25 @@ export const OpenFileDemo: Story = {
     };
 
     return (
-      <div className="flex h-[min(90vh,720px)] flex-col gap-2 p-4 box-border">
-        <div className="flex items-center gap-2">
-          <TabGroupLayoutSelector
-            gridRows={model.gridRows}
-            gridCols={model.gridCols}
-            onChange={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
-          />
-          <button
-            type="button"
-            className="rounded border border-gray-400 bg-white px-3 py-1 text-sm hover:bg-gray-50"
-            onClick={openLeviticus}
-          >
-            Open LEV.usfm (append tab)
-          </button>
-        </div>
-        <div className="min-h-0 flex-1">
-          <UsfmWorkspace
-            gridRows={model.gridRows}
-            gridCols={model.gridCols}
-            slots={model.slots}
-            tabsById={model.tabsById}
-            onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
-            onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
-            onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
-            onReorderTabInGroup={(groupId, tabId, toIndex) =>
-              setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
-            }
-            onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
-          />
-        </div>
-      </div>
+      <StoryChrome
+        toolbar={
+          <div className="flex items-center gap-2">
+            <TabGroupLayoutSelector
+              gridRows={model.gridRows}
+              gridCols={model.gridCols}
+              onChange={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
+            />
+            <button
+              type="button"
+              className="rounded border border-gray-400 bg-white px-3 py-1 text-sm hover:bg-gray-50"
+              onClick={openLeviticus}
+            >
+              Open LEV.usfm (append tab)
+            </button>
+          </div>
+        }
+        workspace={<WorkspaceFromModel model={model} setModel={setModel} />}
+      />
     );
   },
 };
