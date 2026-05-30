@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
 import { SAMPLE_BSB_GENESIS_USFM, SAMPLE_EXO_SNIPPET_USFM } from "../../fixtures/sample-bsb-genesis-usfm.js";
+import { TabGroupLayoutSelector } from "../tab-group-layout-selector/TabGroupLayoutSelector.js";
 import {
   buildWorkspaceModelFromInitialTabs,
   newWorkspaceId,
@@ -9,10 +10,8 @@ import {
   workspaceCloseTab,
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
+  workspaceSetGridLayout,
   workspaceSetTabValue,
-  workspaceSplitCurrentTabToNewGroupBelow,
-  workspaceSplitCurrentTabToNewGroupRight,
-  workspaceSplitTabToNewGroup,
   type UsfmWorkspaceInitialTab,
   type UsfmWorkspaceModel,
 } from "./workspace-model.js";
@@ -33,50 +32,50 @@ function ControlledWorkspace({ initialTabs }: { readonly initialTabs: readonly U
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs(initialTabs));
 
   return (
-    <UsfmWorkspace
-      rows={model.rows}
-      tabsById={model.tabsById}
-      onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
-      onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
-      onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
-      onReorderTabInGroup={(groupId, tabId, toIndex) =>
-        setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
-      }
-      onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
-      onSplitTabToNewGroup={(d) => setModel((p) => workspaceSplitTabToNewGroup(p, d))}
-      onSplitCurrentTabRight={(groupId, tabId) =>
-        setModel((p) => workspaceSplitCurrentTabToNewGroupRight(p, groupId, tabId))
-      }
-      onSplitCurrentTabBelow={(groupId, tabId) =>
-        setModel((p) => workspaceSplitCurrentTabToNewGroupBelow(p, groupId, tabId))
-      }
-    />
+    <div className="flex h-[min(90vh,720px)] flex-col gap-2 p-4 box-border">
+      <TabGroupLayoutSelector
+        gridRows={model.gridRows}
+        gridCols={model.gridCols}
+        onChange={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
+      />
+      <div className="min-h-0 flex-1">
+        <UsfmWorkspace
+          gridRows={model.gridRows}
+          gridCols={model.gridCols}
+          slots={model.slots}
+          tabsById={model.tabsById}
+          onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
+          onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
+          onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
+          onReorderTabInGroup={(groupId, tabId, toIndex) =>
+            setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
+          }
+          onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
+        />
+      </div>
+    </div>
   );
 }
 
 export const SingleGroupTwoTabs: Story = {
   render: () => (
-    <div className="h-[min(90vh,720px)] p-4 box-border">
-      <ControlledWorkspace
-        initialTabs={[
-          { fileName: "GEN.usfm", value: SAMPLE_BSB_GENESIS_USFM },
-          { fileName: "EXO.usfm", value: SAMPLE_EXO_SNIPPET_USFM, dirty: true },
-        ]}
-      />
-    </div>
+    <ControlledWorkspace
+      initialTabs={[
+        { fileName: "GEN.usfm", value: SAMPLE_BSB_GENESIS_USFM },
+        { fileName: "EXO.usfm", value: SAMPLE_EXO_SNIPPET_USFM, dirty: true },
+      ]}
+    />
   ),
 };
 
 export const TwoEditorGroups: Story = {
   render: () => (
-    <div className="h-[min(90vh,720px)] p-4 box-border">
-      <ControlledWorkspace
-        initialTabs={[
-          { fileName: "GEN.usfm", value: SAMPLE_BSB_GENESIS_USFM, groupIndex: 0 },
-          { fileName: "EXO.usfm", value: SAMPLE_EXO_SNIPPET_USFM, groupIndex: 1 },
-        ]}
-      />
-    </div>
+    <ControlledWorkspace
+      initialTabs={[
+        { fileName: "GEN.usfm", value: SAMPLE_BSB_GENESIS_USFM, groupIndex: 0 },
+        { fileName: "EXO.usfm", value: SAMPLE_EXO_SNIPPET_USFM, groupIndex: 1 },
+      ]}
+    />
   ),
 };
 
@@ -94,7 +93,7 @@ export const OpenFileDemo: Story = {
 
     const openLeviticus = () => {
       setModel((p) => {
-        const gid = p.rows[0]?.groups[0]?.id;
+        const gid = p.slots[0]?.id;
         if (!gid) return p;
         return workspaceAppendTab(p, {
           groupId: gid,
@@ -105,16 +104,25 @@ export const OpenFileDemo: Story = {
 
     return (
       <div className="flex h-[min(90vh,720px)] flex-col gap-2 p-4 box-border">
-        <button
-          type="button"
-          className="self-start rounded border border-gray-400 bg-white px-3 py-1 text-sm hover:bg-gray-50"
-          onClick={openLeviticus}
-        >
-          Open LEV.usfm (append tab)
-        </button>
+        <div className="flex items-center gap-2">
+          <TabGroupLayoutSelector
+            gridRows={model.gridRows}
+            gridCols={model.gridCols}
+            onChange={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
+          />
+          <button
+            type="button"
+            className="rounded border border-gray-400 bg-white px-3 py-1 text-sm hover:bg-gray-50"
+            onClick={openLeviticus}
+          >
+            Open LEV.usfm (append tab)
+          </button>
+        </div>
         <div className="min-h-0 flex-1">
           <UsfmWorkspace
-            rows={model.rows}
+            gridRows={model.gridRows}
+            gridCols={model.gridCols}
+            slots={model.slots}
             tabsById={model.tabsById}
             onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
             onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
@@ -123,13 +131,6 @@ export const OpenFileDemo: Story = {
               setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
             }
             onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
-            onSplitTabToNewGroup={(d) => setModel((p) => workspaceSplitTabToNewGroup(p, d))}
-            onSplitCurrentTabRight={(groupId, tabId) =>
-              setModel((p) => workspaceSplitCurrentTabToNewGroupRight(p, groupId, tabId))
-            }
-            onSplitCurrentTabBelow={(groupId, tabId) =>
-              setModel((p) => workspaceSplitCurrentTabToNewGroupBelow(p, groupId, tabId))
-            }
           />
         </div>
       </div>

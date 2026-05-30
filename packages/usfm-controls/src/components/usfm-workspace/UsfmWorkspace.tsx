@@ -1,30 +1,12 @@
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type DragEvent,
-  type MouseEvent as ReactMouseEvent,
-  type RefObject,
-  type SetStateAction,
-} from "react";
+import { useCallback, useRef, useState, type DragEvent } from "react";
 import { UsfmPane } from "../usfm-pane/UsfmPane.js";
 import type {
   UsfmWorkspaceEditorGroupState,
-  UsfmWorkspaceEditorRowState,
   UsfmWorkspaceProps,
   UsfmWorkspaceTabState,
 } from "./workspace-model.js";
 
 const TAB_DRAG_MIME = "application/vnd.usfmtools.workspace-tab+json";
-
-/** Minimum share of total width for each editor group while dragging a split. */
-const MIN_GROUP_FRAC = 0.1;
-/** Minimum share of total height for each row while dragging a vertical split. */
-const MIN_ROW_FRAC = 0.08;
 
 function parseTabDrag(dt: DataTransfer): { tabId: string; fromGroupId: string } | null {
   const raw = dt.getData(TAB_DRAG_MIME);
@@ -40,34 +22,12 @@ function parseTabDrag(dt: DataTransfer): { tabId: string; fromGroupId: string } 
   }
 }
 
-/**
- * Whether the drag operation carries workspace tab payload. Chromium leaves
- * `getData(customMime)` empty during `dragover` / `dragenter`; `types` still lists the MIME.
- */
 function isTabDragTransfer(dt: DataTransfer): boolean {
   if (parseTabDrag(dt)) return true;
   for (let i = 0; i < dt.types.length; i++) {
     if (dt.types[i] === TAB_DRAG_MIME) return true;
   }
   return false;
-}
-
-function IconSplitGroupRight() {
-  return (
-    <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden className="block">
-      <rect x="1.25" y="1" width="15.5" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
-      <line x1="9" y1="2.25" x2="9" y2="11.75" stroke="currentColor" strokeWidth="1.2" strokeLinecap="square" />
-    </svg>
-  );
-}
-
-function IconSplitGroupBelow() {
-  return (
-    <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden className="block">
-      <rect x="1.25" y="1" width="15.5" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.2" />
-      <line x1="2.25" y1="7" x2="15.75" y2="7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="square" />
-    </svg>
-  );
 }
 
 interface TabStripProps {
@@ -212,23 +172,19 @@ function TabStrip({
   );
 }
 
-interface SplitDropZoneProps {
-  readonly rowId: string;
-  /** Insert the new group before this group id; `null` means append at the end of the row. */
-  readonly beforeGroupId: string | null;
-  readonly onSplitDrop: (
-    tabId: string,
-    fromGroupId: string,
-    targetRowId: string,
-    beforeGroupId: string | null,
-  ) => void;
+interface EmptySlotDropTargetProps {
+  readonly groupId: string;
+  readonly onDropTab: (tabId: string, fromGroupId: string) => void;
 }
 
-function SplitDropZone({ rowId, beforeGroupId, onSplitDrop }: SplitDropZoneProps) {
+function EmptySlotDropTarget({ groupId, onDropTab }: EmptySlotDropTargetProps) {
   const [hover, setHover] = useState(false);
+
   return (
     <div
-      className={`relative shrink-0 ${hover ? "w-2 bg-blue-200/80" : "w-1 bg-transparent hover:bg-blue-100"}`}
+      className={`flex min-h-0 flex-1 flex-col items-center justify-center border border-dashed text-sm ${
+        hover ? "border-blue-400 bg-blue-50/60 text-blue-800" : "border-gray-300 bg-gray-50/80 text-gray-500"
+      }`}
       onDragEnter={(e) => {
         if (isTabDragTransfer(e.dataTransfer)) setHover(true);
       }}
@@ -242,173 +198,14 @@ function SplitDropZone({ rowId, beforeGroupId, onSplitDrop }: SplitDropZoneProps
       onDrop={(e) => {
         const p = parseTabDrag(e.dataTransfer);
         setHover(false);
-        if (!p) return;
+        if (!p || p.fromGroupId === groupId) return;
         e.preventDefault();
-        onSplitDrop(p.tabId, p.fromGroupId, rowId, beforeGroupId);
+        onDropTab(p.tabId, p.fromGroupId);
       }}
-      title="Drag tab here for a new editor group"
-      aria-label="New editor group drop zone"
-    />
-  );
-}
-
-interface InterGroupResizableGapProps {
-  readonly boundaryIndex: number;
-  readonly rowId: string;
-  readonly beforeGroupId: string;
-  readonly layoutRef: RefObject<HTMLDivElement | null>;
-  readonly fractions: readonly number[];
-  readonly setFractions: Dispatch<SetStateAction<number[]>>;
-  readonly onSplitDrop: (
-    tabId: string,
-    fromGroupId: string,
-    targetRowId: string,
-    beforeGroupId: string | null,
-  ) => void;
-}
-
-function InterGroupResizableGap({
-  boundaryIndex,
-  rowId,
-  beforeGroupId,
-  layoutRef,
-  fractions,
-  setFractions,
-  onSplitDrop,
-}: InterGroupResizableGapProps) {
-  const [dropHover, setDropHover] = useState(false);
-  const dragRef = useRef<{ startX: number; startFrac: number[] } | null>(null);
-
-  const onResizeMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const host = layoutRef.current;
-    if (!host) return;
-    const startX = e.clientX;
-    const startFrac = [...fractions];
-    dragRef.current = { startX, startFrac };
-
-    const onMove = (ev: MouseEvent) => {
-      const drag = dragRef.current;
-      if (!drag) return;
-      const hostNow = layoutRef.current;
-      const widthNow = hostNow?.getBoundingClientRect().width || 1;
-      const t = (ev.clientX - drag.startX) / widthNow;
-      const i = boundaryIndex;
-      const pairSum = drag.startFrac[i]! + drag.startFrac[i + 1]!;
-      let na = drag.startFrac[i]! + t;
-      let nb = pairSum - na;
-      na = Math.max(MIN_GROUP_FRAC, Math.min(pairSum - MIN_GROUP_FRAC, na));
-      nb = pairSum - na;
-      setFractions((prev) => {
-        const next = [...prev];
-        next[i] = na;
-        next[i + 1] = nb;
-        return next;
-      });
-    };
-
-    const onUp = () => {
-      dragRef.current = null;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
-
-  return (
-    <div
-      className={`relative z-10 flex shrink-0 flex-col ${dropHover ? "w-2 bg-blue-200/70" : "w-1.5 bg-gray-200"}`}
-      onDragEnter={(e) => {
-        if (isTabDragTransfer(e.dataTransfer)) setDropHover(true);
-      }}
-      onDragLeave={() => setDropHover(false)}
-      onDragOver={(e) => {
-        if (!isTabDragTransfer(e.dataTransfer)) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setDropHover(true);
-      }}
-      onDrop={(e) => {
-        const p = parseTabDrag(e.dataTransfer);
-        setDropHover(false);
-        if (!p) return;
-        e.preventDefault();
-        onSplitDrop(p.tabId, p.fromGroupId, rowId, beforeGroupId);
-      }}
+      data-testid={`workspace-empty-slot-${groupId}`}
+      aria-label="Empty tab group — drop a tab here"
     >
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize editor groups"
-        tabIndex={0}
-        className="min-h-0 flex-1 cursor-col-resize border-l border-gray-300 hover:bg-gray-400"
-        onMouseDown={onResizeMouseDown}
-      />
-    </div>
-  );
-}
-
-interface InterRowResizableGapProps {
-  readonly boundaryIndex: number;
-  readonly layoutRef: RefObject<HTMLDivElement | null>;
-  readonly rowFractions: readonly number[];
-  readonly setRowFractions: Dispatch<SetStateAction<number[]>>;
-}
-
-function InterRowResizableGap({ boundaryIndex, layoutRef, rowFractions, setRowFractions }: InterRowResizableGapProps) {
-  const dragRef = useRef<{ startY: number; startFrac: number[] } | null>(null);
-
-  const onResizeMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const host = layoutRef.current;
-    if (!host) return;
-    const startY = e.clientY;
-    const startFrac = [...rowFractions];
-    dragRef.current = { startY, startFrac };
-
-    const onMove = (ev: MouseEvent) => {
-      const drag = dragRef.current;
-      if (!drag) return;
-      const heightNow = layoutRef.current?.getBoundingClientRect().height || 1;
-      const t = (ev.clientY - drag.startY) / heightNow;
-      const i = boundaryIndex;
-      const pairSum = drag.startFrac[i]! + drag.startFrac[i + 1]!;
-      let na = drag.startFrac[i]! + t;
-      let nb = pairSum - na;
-      na = Math.max(MIN_ROW_FRAC, Math.min(pairSum - MIN_ROW_FRAC, na));
-      nb = pairSum - na;
-      setRowFractions((prev) => {
-        const next = [...prev];
-        next[i] = na;
-        next[i + 1] = nb;
-        return next;
-      });
-    };
-
-    const onUp = () => {
-      dragRef.current = null;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
-
-  return (
-    <div className="relative z-10 flex h-1.5 shrink-0 flex-row bg-gray-200">
-      <div
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label="Resize editor rows"
-        tabIndex={0}
-        className="min-w-0 flex-1 cursor-ns-resize border-t border-gray-300 hover:bg-gray-400"
-        onMouseDown={onResizeMouseDown}
-      />
+      Drop a tab here
     </div>
   );
 }
@@ -426,8 +223,6 @@ interface EditorGroupPanelProps {
     fromGroupId: string,
     insertIndex: number,
   ) => void;
-  readonly onSplitCurrentTabRight?: (groupId: string, tabId: string) => void;
-  readonly onSplitCurrentTabBelow?: (groupId: string, tabId: string) => void;
 }
 
 function EditorGroupPanel({
@@ -438,14 +233,23 @@ function EditorGroupPanel({
   onUpdateValue,
   onMoveTabWithinGroup,
   onDropTabFromOtherGroup,
-  onSplitCurrentTabRight,
-  onSplitCurrentTabBelow,
 }: EditorGroupPanelProps) {
   const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
-  const showSplitControls = Boolean(onSplitCurrentTabRight || onSplitCurrentTabBelow);
+  const isEmpty = group.tabIds.length === 0;
+
+  if (isEmpty) {
+    return (
+      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white">
+        <EmptySlotDropTarget
+          groupId={group.id}
+          onDropTab={(tabId, fromGroupId) => onDropTabFromOtherGroup(group.id, tabId, fromGroupId, 0)}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white">
       <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch border-b border-gray-300 bg-gray-50">
         <TabStrip
           groupId={group.id}
@@ -462,42 +266,7 @@ function EditorGroupPanel({
         <div
           ref={setToolbarEl}
           className="flex shrink-0 items-center gap-1 border-l border-gray-200 bg-gray-50 px-1.5"
-        >
-          {showSplitControls ? (
-            <>
-              {onSplitCurrentTabRight ? (
-                <button
-                  type="button"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-100"
-                  aria-label="Move tab to a new editor group on the right"
-                  title="New editor group to the right"
-                  disabled={!group.activeTabId}
-                  onClick={() => {
-                    const tid = group.activeTabId;
-                    if (tid) onSplitCurrentTabRight(group.id, tid);
-                  }}
-                >
-                  <IconSplitGroupRight />
-                </button>
-              ) : null}
-              {onSplitCurrentTabBelow ? (
-                <button
-                  type="button"
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-transparent text-gray-600 hover:border-gray-300 hover:bg-gray-100"
-                  aria-label="Move tab to a new editor group below"
-                  title="New editor group below"
-                  disabled={!group.activeTabId}
-                  onClick={() => {
-                    const tid = group.activeTabId;
-                    if (tid) onSplitCurrentTabBelow(group.id, tid);
-                  }}
-                >
-                  <IconSplitGroupBelow />
-                </button>
-              ) : null}
-            </>
-          ) : null}
-        </div>
+        />
       </div>
       <div className="relative z-0 grid min-h-0 flex-1 grid-cols-1 grid-rows-1 overflow-hidden">
         {group.tabIds.map((tid) => {
@@ -529,56 +298,19 @@ function EditorGroupPanel({
   );
 }
 
-interface WorkspaceRowProps {
-  readonly row: UsfmWorkspaceEditorRowState;
-  readonly rowIndex: number;
-  readonly columnFractions: readonly number[];
-  readonly setColumnFractions: Dispatch<SetStateAction<number[][]>>;
-  readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
-  readonly onActivateTab: UsfmWorkspaceProps["onActivateTab"];
-  readonly onCloseTab: UsfmWorkspaceProps["onCloseTab"];
-  readonly onUpdateTabValue: UsfmWorkspaceProps["onUpdateTabValue"];
-  readonly onReorderTabInGroup: UsfmWorkspaceProps["onReorderTabInGroup"];
-  readonly onMoveTabToGroup: UsfmWorkspaceProps["onMoveTabToGroup"];
-  readonly onSplitDrop: (
-    tabId: string,
-    fromGroupId: string,
-    targetRowId: string,
-    beforeGroupId: string | null,
-  ) => void;
-  readonly onSplitCurrentTabRight?: UsfmWorkspaceProps["onSplitCurrentTabRight"];
-  readonly onSplitCurrentTabBelow?: UsfmWorkspaceProps["onSplitCurrentTabBelow"];
-}
-
-function WorkspaceRow({
-  row,
-  rowIndex,
-  columnFractions,
-  setColumnFractions,
+export function UsfmWorkspace({
+  gridRows,
+  gridCols,
+  slots,
   tabsById,
   onActivateTab,
-  onCloseTab,
   onUpdateTabValue,
+  onCloseTab,
   onReorderTabInGroup,
   onMoveTabToGroup,
-  onSplitDrop,
-  onSplitCurrentTabRight,
-  onSplitCurrentTabBelow,
-}: WorkspaceRowProps) {
-  const layoutRef = useRef<HTMLDivElement | null>(null);
-
-  const setFractionsForRow = useCallback(
-    (action: SetStateAction<number[]>) => {
-      setColumnFractions((prev) => {
-        const next = [...prev];
-        const cur = next[rowIndex] ?? [];
-        const resolved = typeof action === "function" ? action([...cur]) : action;
-        next[rowIndex] = resolved;
-        return next;
-      });
-    },
-    [rowIndex, setColumnFractions],
-  );
+  className,
+}: UsfmWorkspaceProps) {
+  const visibleSlots = slots.slice(0, gridRows * gridCols);
 
   const onDropTabFromOtherGroup = useCallback(
     (targetGroupId: string, tabId: string, fromGroupId: string, insertIndex: number) => {
@@ -588,146 +320,27 @@ function WorkspaceRow({
     [onMoveTabToGroup],
   );
 
-  const firstG = row.groups[0];
-  return (
-    <div ref={layoutRef} className="flex min-h-0 min-w-0 flex-1 flex-row">
-      {firstG ? <SplitDropZone rowId={row.id} beforeGroupId={firstG.id} onSplitDrop={onSplitDrop} /> : null}
-      {row.groups.map((g, idx) => (
-        <Fragment key={g.id}>
-          <div
-            className="flex min-h-0 min-w-[8rem] flex-col overflow-hidden"
-            style={{
-              flexGrow: columnFractions[idx] ?? 1,
-              flexShrink: 1,
-              flexBasis: 0,
-              minWidth: "min(12rem, 22%)",
-            }}
-          >
-            <EditorGroupPanel
-              group={g}
-              tabsById={tabsById}
-              onActivateTab={onActivateTab}
-              onCloseTab={onCloseTab}
-              onUpdateValue={onUpdateTabValue}
-              onMoveTabWithinGroup={onReorderTabInGroup}
-              onDropTabFromOtherGroup={onDropTabFromOtherGroup}
-              onSplitCurrentTabRight={onSplitCurrentTabRight}
-              onSplitCurrentTabBelow={onSplitCurrentTabBelow}
-            />
-          </div>
-          {idx < row.groups.length - 1 ? (
-            <InterGroupResizableGap
-              boundaryIndex={idx}
-              rowId={row.id}
-              beforeGroupId={row.groups[idx + 1]!.id}
-              layoutRef={layoutRef}
-              fractions={columnFractions}
-              setFractions={setFractionsForRow}
-              onSplitDrop={onSplitDrop}
-            />
-          ) : (
-            <SplitDropZone rowId={row.id} beforeGroupId={null} onSplitDrop={onSplitDrop} />
-          )}
-        </Fragment>
-      ))}
-    </div>
-  );
-}
-
-export function UsfmWorkspace({
-  rows,
-  tabsById,
-  onActivateTab,
-  onUpdateTabValue,
-  onCloseTab,
-  onReorderTabInGroup,
-  onMoveTabToGroup,
-  onSplitTabToNewGroup,
-  onSplitCurrentTabRight,
-  onSplitCurrentTabBelow,
-  className,
-}: UsfmWorkspaceProps) {
-  const colLayoutRef = useRef<HTMLDivElement>(null);
-  const rowsKey = useMemo(() => rows.map((r) => r.groups.map((g) => g.id).join(",")).join("|"), [rows]);
-
-  const [rowFractions, setRowFractions] = useState<number[]>(() =>
-    rows.length > 0 ? rows.map(() => 1 / rows.length) : [1],
-  );
-
-  const [colFractions, setColFractions] = useState<number[][]>(() =>
-    rows.map((r) => (r.groups.length > 0 ? r.groups.map(() => 1 / r.groups.length) : [1])),
-  );
-
-  useEffect(() => {
-    setRowFractions((prev) => {
-      if (prev.length === rows.length) return prev;
-      const n = rows.length;
-      return n > 0 ? Array.from({ length: n }, () => 1 / n) : [1];
-    });
-  }, [rows.length]);
-
-  useEffect(() => {
-    setColFractions((prev) =>
-      rows.map((row, ri) => {
-        const n = row.groups.length;
-        const old = prev[ri];
-        if (old && old.length === n) return old;
-        return n > 0 ? Array.from({ length: n }, () => 1 / n) : [1];
-      }),
-    );
-  }, [rowsKey]);
-
-  const onSplitDrop = useCallback(
-    (tabId: string, fromGroupId: string, targetRowId: string, beforeGroupId: string | null) => {
-      onSplitTabToNewGroup({ tabId, fromGroupId, targetRowId, beforeGroupId });
-    },
-    [onSplitTabToNewGroup],
-  );
-
   return (
     <div
-      className={`flex min-h-[320px] min-w-0 flex-1 flex-col bg-gray-200 ${className ?? ""}`}
+      className={`grid min-h-[320px] min-w-0 flex-1 gap-0.5 bg-gray-200 ${className ?? ""}`}
       data-testid="usfm-workspace"
+      style={{
+        gridTemplateRows: `repeat(${gridRows}, minmax(0, 1fr))`,
+        gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
+      }}
     >
-      <div ref={colLayoutRef} className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {rows.map((row, ri) => (
-          <Fragment key={row.id}>
-            <div
-              className="flex min-h-0 min-w-0 flex-col overflow-hidden"
-              style={{
-                flexGrow: rowFractions[ri] ?? 1,
-                flexShrink: 1,
-                flexBasis: 0,
-                minHeight: rows.length > 1 ? "min(10rem, 22%)" : undefined,
-              }}
-            >
-              <WorkspaceRow
-                row={row}
-                rowIndex={ri}
-                columnFractions={colFractions[ri] ?? [1]}
-                setColumnFractions={setColFractions}
-                tabsById={tabsById}
-                onActivateTab={onActivateTab}
-                onCloseTab={onCloseTab}
-                onUpdateTabValue={onUpdateTabValue}
-                onReorderTabInGroup={onReorderTabInGroup}
-                onMoveTabToGroup={onMoveTabToGroup}
-                onSplitDrop={onSplitDrop}
-                onSplitCurrentTabRight={onSplitCurrentTabRight}
-                onSplitCurrentTabBelow={onSplitCurrentTabBelow}
-              />
-            </div>
-            {ri < rows.length - 1 ? (
-              <InterRowResizableGap
-                boundaryIndex={ri}
-                layoutRef={colLayoutRef}
-                rowFractions={rowFractions}
-                setRowFractions={setRowFractions}
-              />
-            ) : null}
-          </Fragment>
-        ))}
-      </div>
+      {visibleSlots.map((group) => (
+        <EditorGroupPanel
+          key={group.id}
+          group={group}
+          tabsById={tabsById}
+          onActivateTab={onActivateTab}
+          onCloseTab={onCloseTab}
+          onUpdateValue={onUpdateTabValue}
+          onMoveTabWithinGroup={onReorderTabInGroup}
+          onDropTabFromOtherGroup={onDropTabFromOtherGroup}
+        />
+      ))}
     </div>
   );
 }

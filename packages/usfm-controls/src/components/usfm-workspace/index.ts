@@ -3,9 +3,9 @@ export type {
   UsfmWorkspaceProps,
   UsfmWorkspaceTabState,
   UsfmWorkspaceEditorGroupState,
-  UsfmWorkspaceEditorRowState,
   UsfmWorkspaceInitialTab,
   UsfmWorkspaceModel,
+  WorkspaceGridDimension,
 } from "./workspace-model.js";
 export {
   buildWorkspaceModelFromInitialTabs,
@@ -14,10 +14,9 @@ export {
   workspaceAppendTab,
   workspaceCloseTab,
   workspaceFlattenGroups,
+  workspaceFlattenNonEmptyGroups,
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
+  workspaceSetGridLayout,
   workspaceSetTabValue,
-  workspaceSplitCurrentTabToNewGroupBelow,
-  workspaceSplitCurrentTabToNewGroupRight,
-  workspaceSplitTabToNewGroup,
 } from "./workspace-model.js";

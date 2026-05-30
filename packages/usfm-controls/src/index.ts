@@ -4,14 +4,16 @@ export type { UsfmEditorHandle } from "./components/usfm-editor/index.js";
 export { UsfmPane } from "./components/usfm-pane/index.js";
 export type { UsfmPaneProps, UsfmPaneViewMode } from "./components/usfm-pane/index.js";
 export { UsfmWorkspace } from "./components/usfm-workspace/index.js";
+export { TabGroupLayoutSelector } from "./components/tab-group-layout-selector/index.js";
 export type {
   UsfmWorkspaceProps,
   UsfmWorkspaceTabState,
   UsfmWorkspaceEditorGroupState,
-  UsfmWorkspaceEditorRowState,
   UsfmWorkspaceInitialTab,
   UsfmWorkspaceModel,
+  WorkspaceGridDimension,
 } from "./components/usfm-workspace/index.js";
+export type { TabGroupLayoutSelectorProps } from "./components/tab-group-layout-selector/index.js";
 export {
   buildWorkspaceModelFromInitialTabs,
   newWorkspaceId,
@@ -19,12 +21,11 @@ export {
   workspaceAppendTab,
   workspaceCloseTab,
   workspaceFlattenGroups,
+  workspaceFlattenNonEmptyGroups,
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
+  workspaceSetGridLayout,
   workspaceSetTabValue,
-  workspaceSplitCurrentTabToNewGroupBelow,
-  workspaceSplitCurrentTabToNewGroupRight,
-  workspaceSplitTabToNewGroup,
 } from "./components/usfm-workspace/index.js";
 export { UsfmPreview } from "./components/usfm-preview/index.js";
 export type { UsfmPreviewProps } from "./components/usfm-preview/index.js";

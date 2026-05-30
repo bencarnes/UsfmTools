@@ -8,10 +8,8 @@ import {
   workspaceCloseTab,
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
+  workspaceSetGridLayout,
   workspaceSetTabValue,
-  workspaceSplitCurrentTabToNewGroupBelow,
-  workspaceSplitCurrentTabToNewGroupRight,
-  workspaceSplitTabToNewGroup,
   type UsfmWorkspaceInitialTab,
   type UsfmWorkspaceModel,
 } from "../src/components/usfm-workspace/workspace-model.js";
@@ -26,7 +24,9 @@ function Harness({ initialTabs }: { readonly initialTabs: readonly UsfmWorkspace
 
   return (
     <UsfmWorkspace
-      rows={model.rows}
+      gridRows={model.gridRows}
+      gridCols={model.gridCols}
+      slots={model.slots}
       tabsById={model.tabsById}
       onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
       onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
@@ -35,13 +35,6 @@ function Harness({ initialTabs }: { readonly initialTabs: readonly UsfmWorkspace
         setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
       }
       onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
-      onSplitTabToNewGroup={(d) => setModel((p) => workspaceSplitTabToNewGroup(p, d))}
-      onSplitCurrentTabRight={(groupId, tabId) =>
-        setModel((p) => workspaceSplitCurrentTabToNewGroupRight(p, groupId, tabId))
-      }
-      onSplitCurrentTabBelow={(groupId, tabId) =>
-        setModel((p) => workspaceSplitCurrentTabToNewGroupBelow(p, groupId, tabId))
-      }
     />
   );
 }
@@ -110,60 +103,65 @@ describe("UsfmWorkspace", () => {
     expect(screen.getByRole("tab", { name: /B\.usfm/i }).getAttribute("aria-selected")).toBe("true");
   });
 
-  it("split-right toolbar adds a second editor group in the row", () => {
-    render(
-      <Harness
-        initialTabs={[
-          { id: "s1", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
-          { id: "s2", fileName: "B.usfm", value: "\\id EXO\n\\c 1\n\\p\n\\v 1 B" },
-        ]}
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: /new editor group on the right/i }));
-    expect(screen.getAllByRole("combobox", { name: /open tab/i })).toHaveLength(2);
-  });
-
-  it("split-below toolbar adds a second row of editor groups", () => {
-    render(
-      <Harness
-        initialTabs={[
-          { id: "s1", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
-          { id: "s2", fileName: "B.usfm", value: "\\id EXO\n\\c 1\n\\p\n\\v 1 B" },
-        ]}
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: /new editor group below/i }));
-    expect(screen.getAllByRole("combobox", { name: /open tab/i })).toHaveLength(2);
-  });
-
   it("workspaceReorderTabInGroup reorders tabs within one group", () => {
     const m0 = buildWorkspaceModelFromInitialTabs([
       { id: "a", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
       { id: "b", fileName: "B.usfm", value: "\\id EXO\n\\c 1\n\\p\n\\v 1 B" },
       { id: "c", fileName: "C.usfm", value: "\\id LEV\n\\c 1\n\\p\n\\v 1 C" },
     ]);
-    const gid = m0.rows[0]!.groups[0]!.id;
+    const gid = m0.slots[0]!.id;
     const toFront = workspaceReorderTabInGroup(m0, gid, "c", 0);
-    expect(toFront.rows[0]!.groups[0]!.tabIds).toEqual(["c", "a", "b"]);
+    expect(toFront.slots[0]!.tabIds).toEqual(["c", "a", "b"]);
     const toEnd = workspaceReorderTabInGroup(toFront, gid, "c", 3);
-    expect(toEnd.rows[0]!.groups[0]!.tabIds).toEqual(["a", "b", "c"]);
+    expect(toEnd.slots[0]!.tabIds).toEqual(["a", "b", "c"]);
     const bFirst = workspaceReorderTabInGroup(toEnd, gid, "b", 0);
-    expect(bFirst.rows[0]!.groups[0]!.tabIds).toEqual(["b", "a", "c"]);
+    expect(bFirst.slots[0]!.tabIds).toEqual(["b", "a", "c"]);
   });
 
   it("workspaceAppendTab adds a tab to a group", () => {
     const m0 = buildWorkspaceModelFromInitialTabs([
       { id: "a1", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
     ]);
-    const gid = m0.rows[0]!.groups[0]!.id;
+    const gid = m0.slots[0]!.id;
     const m1 = workspaceAppendTab(m0, {
       groupId: gid,
       tab: { fileName: "B.usfm", value: "\\id EXO\n\\c 1\n\\p\n\\v 1 B" },
     });
-    expect(m1.rows[0]!.groups[0]!.tabIds.length).toBe(2);
-    expect(m1.rows[0]!.groups[0]!.activeTabId).toBe(m1.rows[0]!.groups[0]!.tabIds[1]);
+    expect(m1.slots[0]!.tabIds.length).toBe(2);
+    expect(m1.slots[0]!.activeTabId).toBe(m1.slots[0]!.tabIds[1]);
     expect(m1.tabsById["a1"]).toBeTruthy();
-    const secondId = m1.rows[0]!.groups[0]!.tabIds.find((t) => t !== "a1");
+    const secondId = m1.slots[0]!.tabIds.find((t) => t !== "a1");
     expect(secondId && m1.tabsById[secondId!]?.fileName).toBe("B.usfm");
+  });
+
+  it("workspaceCloseTab leaves an empty slot without creating a new tab", () => {
+    const m0 = buildWorkspaceModelFromInitialTabs([
+      { id: "only", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
+    ]);
+    const gid = m0.slots[0]!.id;
+    const m1 = workspaceCloseTab(m0, gid, "only");
+    expect(m1.slots[0]!.tabIds).toEqual([]);
+    expect(m1.slots[0]!.activeTabId).toBeNull();
+    expect(Object.keys(m1.tabsById)).toHaveLength(0);
+  });
+
+  it("workspaceSetGridLayout expands with empty slots and shrinks by moving tabs", () => {
+    const m0 = buildWorkspaceModelFromInitialTabs([
+      { id: "t1", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A", groupIndex: 0 },
+      { id: "t2", fileName: "B.usfm", value: "\\id EXO\n\\c 1\n\\p\n\\v 1 B", groupIndex: 1 },
+    ]);
+    const expanded = workspaceSetGridLayout(m0, 2, 2);
+    expect(expanded.gridRows).toBe(2);
+    expect(expanded.gridCols).toBe(2);
+    expect(expanded.slots).toHaveLength(4);
+    expect(expanded.slots[2]!.tabIds).toEqual([]);
+    expect(expanded.tabsById["t1"]).toBeTruthy();
+    expect(expanded.tabsById["t2"]).toBeTruthy();
+
+    const shrunk = workspaceSetGridLayout(expanded, 1, 1);
+    expect(shrunk.slots).toHaveLength(1);
+    expect(shrunk.slots[0]!.tabIds).toContain("t1");
+    expect(shrunk.slots[0]!.tabIds).toContain("t2");
+    expect(Object.keys(shrunk.tabsById).sort()).toEqual(["t1", "t2"]);
   });
 });
