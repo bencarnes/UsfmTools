@@ -19,6 +19,8 @@ import { UsfmWorkspace } from "./UsfmWorkspace.js";
 
 /** Fixed editor-panel height in stories (typical main content area in the desktop app). */
 const STORY_WORKSPACE_HEIGHT = "640px";
+/** Max width of the story frame (~30% wider than the previous 1200px cap). */
+const STORY_WORKSPACE_MAX_WIDTH = "1560px";
 
 const meta: Meta<typeof UsfmWorkspace> = {
   title: "Controls/UsfmWorkspace",
@@ -33,7 +35,7 @@ type Story = StoryObj<typeof meta>;
 
 function StoryChrome({ toolbar, workspace }: { readonly toolbar: ReactNode; readonly workspace: ReactNode }) {
   return (
-    <div className="box-border flex w-full max-w-[1200px] flex-col gap-2">
+    <div className="box-border flex w-full flex-col gap-2" style={{ maxWidth: STORY_WORKSPACE_MAX_WIDTH }}>
       {toolbar}
       <div className="w-full overflow-hidden rounded border border-gray-300" style={{ height: STORY_WORKSPACE_HEIGHT }}>
         {workspace}
