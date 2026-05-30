@@ -1,4 +1,15 @@
-import { useCallback, useRef, useState, type DragEvent } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type RefObject,
+  type SetStateAction,
+} from "react";
 import { UsfmPane } from "../usfm-pane/UsfmPane.js";
 import type {
   UsfmWorkspaceEditorGroupState,
@@ -7,6 +18,11 @@ import type {
 } from "./workspace-model.js";
 
 const TAB_DRAG_MIME = "application/vnd.usfmtools.workspace-tab+json";
+
+/** Minimum share of width for adjacent tab groups while dragging a column split. */
+const MIN_COL_FRAC = 0.12;
+/** Minimum share of height for adjacent rows while dragging a row split. */
+const MIN_ROW_FRAC = 0.12;
 
 function parseTabDrag(dt: DataTransfer): { tabId: string; fromGroupId: string } | null {
   const raw = dt.getData(TAB_DRAG_MIME);
@@ -28,6 +44,126 @@ function isTabDragTransfer(dt: DataTransfer): boolean {
     if (dt.types[i] === TAB_DRAG_MIME) return true;
   }
   return false;
+}
+
+interface ColumnResizableGapProps {
+  readonly boundaryIndex: number;
+  readonly layoutRef: RefObject<HTMLDivElement | null>;
+  readonly fractions: readonly number[];
+  readonly setFractions: Dispatch<SetStateAction<number[]>>;
+}
+
+function ColumnResizableGap({ boundaryIndex, layoutRef, fractions, setFractions }: ColumnResizableGapProps) {
+  const dragRef = useRef<{ startX: number; startFrac: number[] } | null>(null);
+
+  const onResizeMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (!layoutRef.current) return;
+    const startX = e.clientX;
+    const startFrac = [...fractions];
+    dragRef.current = { startX, startFrac };
+
+    const onMove = (ev: MouseEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const widthNow = layoutRef.current?.getBoundingClientRect().width || 1;
+      const t = (ev.clientX - drag.startX) / widthNow;
+      const i = boundaryIndex;
+      const pairSum = drag.startFrac[i]! + drag.startFrac[i + 1]!;
+      let na = drag.startFrac[i]! + t;
+      na = Math.max(MIN_COL_FRAC, Math.min(pairSum - MIN_COL_FRAC, na));
+      const nb = pairSum - na;
+      setFractions((prev) => {
+        const next = [...prev];
+        next[i] = na;
+        next[i + 1] = nb;
+        return next;
+      });
+    };
+
+    const onUp = () => {
+      dragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  return (
+    <div className="relative z-10 flex w-1.5 shrink-0 flex-col bg-gray-200">
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize tab groups"
+        tabIndex={0}
+        className="min-h-0 flex-1 cursor-col-resize border-l border-gray-300 hover:bg-gray-400"
+        onMouseDown={onResizeMouseDown}
+      />
+    </div>
+  );
+}
+
+interface RowResizableGapProps {
+  readonly boundaryIndex: number;
+  readonly layoutRef: RefObject<HTMLDivElement | null>;
+  readonly fractions: readonly number[];
+  readonly setFractions: Dispatch<SetStateAction<number[]>>;
+}
+
+function RowResizableGap({ boundaryIndex, layoutRef, fractions, setFractions }: RowResizableGapProps) {
+  const dragRef = useRef<{ startY: number; startFrac: number[] } | null>(null);
+
+  const onResizeMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    if (!layoutRef.current) return;
+    const startY = e.clientY;
+    const startFrac = [...fractions];
+    dragRef.current = { startY, startFrac };
+
+    const onMove = (ev: MouseEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const heightNow = layoutRef.current?.getBoundingClientRect().height || 1;
+      const t = (ev.clientY - drag.startY) / heightNow;
+      const i = boundaryIndex;
+      const pairSum = drag.startFrac[i]! + drag.startFrac[i + 1]!;
+      let na = drag.startFrac[i]! + t;
+      na = Math.max(MIN_ROW_FRAC, Math.min(pairSum - MIN_ROW_FRAC, na));
+      const nb = pairSum - na;
+      setFractions((prev) => {
+        const next = [...prev];
+        next[i] = na;
+        next[i + 1] = nb;
+        return next;
+      });
+    };
+
+    const onUp = () => {
+      dragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  return (
+    <div className="relative z-10 flex h-1.5 shrink-0 flex-row bg-gray-200">
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize tab group rows"
+        tabIndex={0}
+        className="min-w-0 flex-1 cursor-ns-resize border-t border-gray-300 hover:bg-gray-400"
+        onMouseDown={onResizeMouseDown}
+      />
+    </div>
+  );
 }
 
 interface TabStripProps {
@@ -298,6 +434,90 @@ function EditorGroupPanel({
   );
 }
 
+interface WorkspaceGridRowProps {
+  readonly rowIndex: number;
+  readonly gridCols: number;
+  readonly rowSlots: readonly UsfmWorkspaceEditorGroupState[];
+  readonly columnFractions: readonly number[];
+  readonly setColumnFractions: Dispatch<SetStateAction<number[][]>>;
+  readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
+  readonly onActivateTab: UsfmWorkspaceProps["onActivateTab"];
+  readonly onCloseTab: UsfmWorkspaceProps["onCloseTab"];
+  readonly onUpdateTabValue: UsfmWorkspaceProps["onUpdateTabValue"];
+  readonly onReorderTabInGroup: UsfmWorkspaceProps["onReorderTabInGroup"];
+  readonly onDropTabFromOtherGroup: (
+    targetGroupId: string,
+    tabId: string,
+    fromGroupId: string,
+    insertIndex: number,
+  ) => void;
+}
+
+function WorkspaceGridRow({
+  rowIndex,
+  gridCols,
+  rowSlots,
+  columnFractions,
+  setColumnFractions,
+  tabsById,
+  onActivateTab,
+  onCloseTab,
+  onUpdateTabValue,
+  onReorderTabInGroup,
+  onDropTabFromOtherGroup,
+}: WorkspaceGridRowProps) {
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  const setFractionsForRow = useCallback(
+    (action: SetStateAction<number[]>) => {
+      setColumnFractions((prev) => {
+        const next = prev.map((row) => [...row]);
+        while (next.length <= rowIndex) next.push([1]);
+        const cur = next[rowIndex] ?? [1];
+        next[rowIndex] = typeof action === "function" ? action([...cur]) : action;
+        return next;
+      });
+    },
+    [rowIndex, setColumnFractions],
+  );
+
+  return (
+    <div ref={rowRef} className="flex min-h-0 min-w-0 flex-1 flex-row">
+      {rowSlots.map((group, colIndex) => (
+        <Fragment key={group.id}>
+          {colIndex > 0 ? (
+            <ColumnResizableGap
+              boundaryIndex={colIndex - 1}
+              layoutRef={rowRef}
+              fractions={columnFractions}
+              setFractions={setFractionsForRow}
+            />
+          ) : null}
+          <div
+            className="flex min-h-0 min-w-0 flex-col"
+            style={{
+              flexGrow: columnFractions[colIndex] ?? 1,
+              flexShrink: 1,
+              flexBasis: 0,
+              minWidth: gridCols > 1 ? "min(10rem, 22%)" : undefined,
+            }}
+          >
+            <EditorGroupPanel
+              group={group}
+              tabsById={tabsById}
+              onActivateTab={onActivateTab}
+              onCloseTab={onCloseTab}
+              onUpdateValue={onUpdateTabValue}
+              onMoveTabWithinGroup={onReorderTabInGroup}
+              onDropTabFromOtherGroup={onDropTabFromOtherGroup}
+            />
+          </div>
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
 export function UsfmWorkspace({
   gridRows,
   gridCols,
@@ -310,7 +530,36 @@ export function UsfmWorkspace({
   onMoveTabToGroup,
   className,
 }: UsfmWorkspaceProps) {
+  const layoutRef = useRef<HTMLDivElement>(null);
   const visibleSlots = slots.slice(0, gridRows * gridCols);
+
+  const [rowFractions, setRowFractions] = useState<number[]>(() =>
+    gridRows > 0 ? Array.from({ length: gridRows }, () => 1 / gridRows) : [1],
+  );
+
+  const [colFractions, setColFractions] = useState<number[][]>(() =>
+    Array.from({ length: gridRows }, () =>
+      gridCols > 0 ? Array.from({ length: gridCols }, () => 1 / gridCols) : [1],
+    ),
+  );
+
+  useEffect(() => {
+    setRowFractions((prev) => {
+      if (prev.length === gridRows) return prev;
+      return gridRows > 0 ? Array.from({ length: gridRows }, () => 1 / gridRows) : [1];
+    });
+  }, [gridRows]);
+
+  useEffect(() => {
+    setColFractions((prev) =>
+      Array.from({ length: gridRows }, (_, ri) => {
+        const n = gridCols;
+        const old = prev[ri];
+        if (old && old.length === n) return old;
+        return n > 0 ? Array.from({ length: n }, () => 1 / n) : [1];
+      }),
+    );
+  }, [gridRows, gridCols]);
 
   const onDropTabFromOtherGroup = useCallback(
     (targetGroupId: string, tabId: string, fromGroupId: string, insertIndex: number) => {
@@ -322,25 +571,49 @@ export function UsfmWorkspace({
 
   return (
     <div
-      className={`grid min-h-[320px] min-w-0 flex-1 gap-0.5 bg-gray-200 ${className ?? ""}`}
+      ref={layoutRef}
+      className={`flex min-h-[320px] min-w-0 flex-1 flex-col bg-gray-200 ${className ?? ""}`}
       data-testid="usfm-workspace"
-      style={{
-        gridTemplateRows: `repeat(${gridRows}, minmax(0, 1fr))`,
-        gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
-      }}
     >
-      {visibleSlots.map((group) => (
-        <EditorGroupPanel
-          key={group.id}
-          group={group}
-          tabsById={tabsById}
-          onActivateTab={onActivateTab}
-          onCloseTab={onCloseTab}
-          onUpdateValue={onUpdateTabValue}
-          onMoveTabWithinGroup={onReorderTabInGroup}
-          onDropTabFromOtherGroup={onDropTabFromOtherGroup}
-        />
-      ))}
+      {Array.from({ length: gridRows }, (_, rowIndex) => {
+        const rowSlots = visibleSlots.slice(rowIndex * gridCols, rowIndex * gridCols + gridCols);
+        const colFracs = colFractions[rowIndex] ?? Array.from({ length: gridCols }, () => 1 / gridCols);
+        return (
+          <Fragment key={rowIndex}>
+            {rowIndex > 0 ? (
+              <RowResizableGap
+                boundaryIndex={rowIndex - 1}
+                layoutRef={layoutRef}
+                fractions={rowFractions}
+                setFractions={setRowFractions}
+              />
+            ) : null}
+            <div
+              className="flex min-h-0 min-w-0 flex-col"
+              style={{
+                flexGrow: rowFractions[rowIndex] ?? 1,
+                flexShrink: 1,
+                flexBasis: 0,
+                minHeight: gridRows > 1 ? "min(8rem, 22%)" : undefined,
+              }}
+            >
+              <WorkspaceGridRow
+                rowIndex={rowIndex}
+                gridCols={gridCols}
+                rowSlots={rowSlots}
+                columnFractions={colFracs}
+                setColumnFractions={setColFractions}
+                tabsById={tabsById}
+                onActivateTab={onActivateTab}
+                onCloseTab={onCloseTab}
+                onUpdateTabValue={onUpdateTabValue}
+                onReorderTabInGroup={onReorderTabInGroup}
+                onDropTabFromOtherGroup={onDropTabFromOtherGroup}
+              />
+            </div>
+          </Fragment>
+        );
+      })}
     </div>
   );
 }
