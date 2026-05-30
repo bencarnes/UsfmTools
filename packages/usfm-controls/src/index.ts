@@ -1,8 +1,32 @@
 export { UsfmEditor } from "./components/usfm-editor/index.js";
 export type { UsfmEditorProps } from "./components/usfm-editor/index.js";
 export type { UsfmEditorHandle } from "./components/usfm-editor/index.js";
-export { BookEditPane } from "./components/book-edit-pane/index.js";
-export type { BookEditPaneProps, BookEditPaneViewMode } from "./components/book-edit-pane/index.js";
+export { UsfmPane } from "./components/usfm-pane/index.js";
+export type { UsfmPaneProps, UsfmPaneViewMode } from "./components/usfm-pane/index.js";
+export { UsfmWorkspace } from "./components/usfm-workspace/index.js";
+export { TabGroupLayoutSelector } from "./components/tab-group-layout-selector/index.js";
+export type {
+  UsfmWorkspaceProps,
+  UsfmWorkspaceTabState,
+  UsfmWorkspaceEditorGroupState,
+  UsfmWorkspaceInitialTab,
+  UsfmWorkspaceModel,
+  WorkspaceGridDimension,
+} from "./components/usfm-workspace/index.js";
+export type { TabGroupLayoutSelectorProps } from "./components/tab-group-layout-selector/index.js";
+export {
+  buildWorkspaceModelFromInitialTabs,
+  newWorkspaceId,
+  workspaceActivateTab,
+  workspaceAppendTab,
+  workspaceCloseTab,
+  workspaceFlattenGroups,
+  workspaceFlattenNonEmptyGroups,
+  workspaceMoveTabToGroup,
+  workspaceReorderTabInGroup,
+  workspaceSetGridLayout,
+  workspaceSetTabValue,
+} from "./components/usfm-workspace/index.js";
 export { UsfmPreview } from "./components/usfm-preview/index.js";
 export type { UsfmPreviewProps } from "./components/usfm-preview/index.js";
 export { UsfmBookPicker } from "./components/usfm-book-picker/index.js";

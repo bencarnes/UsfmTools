@@ -70,7 +70,7 @@ const chapters = listChapterNumbersFromBook(book); // ["10", "2"]
 
 ### Chapter markers with source offsets (`listChapterMarkersInBook`, `chapterNumberAtOrBeforeSourceOffset`)
 
-**`listChapterMarkersInBook(book)`** returns `{ number, markerOffset }[]` for each chapter child on a **`BookNode`** that has a parser **`position`** (the offset is the start of the `\\c` marker in the USFM source). **`chapterNumberAtOrBeforeSourceOffset(markers, sourceOffset)`** returns the chapter **number** for the last marker whose offset is still at or before **`sourceOffset`**, or **`null`** when the offset lies before the first chapter marker or the book has no chapters. Together these support full-file tools such as **`BookEditPane`** in **`@usfm-tools/controls`**.
+**`listChapterMarkersInBook(book)`** returns `{ number, markerOffset }[]` for each chapter child on a **`BookNode`** that has a parser **`position`** (the offset is the start of the `\\c` marker in the USFM source). **`chapterNumberAtOrBeforeSourceOffset(markers, sourceOffset)`** returns the chapter **number** for the last marker whose offset is still at or before **`sourceOffset`**, or **`null`** when the offset lies before the first chapter marker or the book has no chapters. Together these support full-file tools such as **`UsfmPane`** and **`UsfmWorkspace`** in **`@usfm-tools/controls`**.
 
 ```typescript
 import { parse, listChapterMarkersInBook, chapterNumberAtOrBeforeSourceOffset } from "@usfm-tools/model";

@@ -93,19 +93,19 @@ const files = [
 | `onBookSelect` | `(detail: { fileId: string; code: string }) => void` | Optional; called when the user activates a book (click or keyboard). **`code`** is empty when the file has no `\\id` or an empty `\\id` line. |
 | `className` | `string` | CSS class on the root wrapper |
 
-### ChapterPicker
+### UsfmPane
 
-### BookEditPane
+**`UsfmPane`** is a full-book editor surface: a body that switches between **Edit**, **Preview**, and **Edit + Preview** (split with a draggable splitter). By default it includes an **inline toolbar** (chapter navigation, scroll sync toggle, view mode) above the body. When embedded in **`UsfmWorkspace`**, pass **`toolbarMount`** (a host element to the right of the tabs) and **`toolbarActive`** so only the selected tab’s controls render there, similar to VS Code.
 
-**`BookEditPane`** is a full-book workspace: a top bar (title, chapter navigator, view mode) and a body that switches between **Edit**, **Preview**, and **Edit + Preview** (split with a draggable splitter). The editor and preview both receive the same controlled **`value`** / **`onChange`** pair, so **several panes can edit one file** when the parent shares state. Chapter navigation uses **`listChapterMarkersInBook`** from **`@usfm-tools/model`** for marker offsets and **`ChapterPicker`** inside a **Chapters** menu for jumps. In split mode, scrolling one side debounces (~120ms) and aligns the other to the **same chapter** (approximate co-viewing; line-level sync is not guaranteed). The navigator stays visible for front matter without **`\\c`** markers; arrows and the menu are inert when there are no chapters.
+The editor and preview share the same controlled **`value`** / **`onChange`** pair, so **several panes can edit one file** when the parent shares state. Chapter navigation uses **`listChapterMarkersInBook`** from **`@usfm-tools/model`** for marker offsets and **`ChapterPicker`** inside a **Chapters** menu for jumps. In split mode, scrolling one side debounces (~120ms) and aligns the other to the **same chapter** (approximate co-viewing; line-level sync is not guaranteed). The navigator stays visible for front matter without **`\\c`** markers; arrows and the menu are inert when there are no chapters.
 
 ```tsx
 import { useState } from "react";
-import { BookEditPane } from "@usfm-tools/controls";
+import { UsfmPane } from "@usfm-tools/controls";
 
 function App() {
   const [usfm, setUsfm] = useState("\\id GEN\\n\\c 1\\n\\p\\n\\v 1 ...");
-  return <BookEditPane bookTitle="GEN" value={usfm} onChange={setUsfm} className="h-[600px]" />;
+  return <UsfmPane value={usfm} onChange={setUsfm} className="h-[600px]" />;
 }
 ```
 
@@ -113,10 +113,85 @@ function App() {
 |------|------|-------------|
 | `value` | `string` | Full USFM file body (controlled) |
 | `onChange` | `(value: string) => void` | Optional; same contract as **`UsfmEditor`** |
-| `bookTitle` | `string` | Label shown in the top bar |
+| `toolbarMount` | `HTMLElement \| null` | When set with **`toolbarActive`**, renders the chapter / sync / view toolbar into this node |
+| `toolbarActive` | `boolean` | When false, this pane does not occupy **`toolbarMount`** (inactive tab) |
 | `defaultViewMode` | `"edit" \| "preview" \| "split"` | Initial layout (default **`split`**) |
 | `versePerLine` | `boolean` | Passed through to **`UsfmPreview`** in preview / split |
 | `className` | `string` | Optional root wrapper class |
+
+### UsfmWorkspace
+
+**`UsfmWorkspace`** is a **fully controlled** tabbed document layout (**TDI**) on a **tab-group grid** (up to **2×2**, default **1×1**). You pass **`gridRows`**, **`gridCols`**, **`slots`** (row-major groups; empty slots have **`tabIds: []`**), **`tabsById`**, and callbacks. The UI shows **`UsfmPane`** per tab, filenames on tabs, chapter / sync / view controls **to the right of the tab strip**, a scrollable tab strip, a tab **dropdown**, close (**×** vs **circle** when **`dirty`**), **drag-and-drop** to reorder tabs or move them between groups (including **empty** slots). Closing the last tab in a group leaves an **empty slot** (no placeholder document is created).
+
+Resize the grid with **`TabGroupLayoutSelector`** (outside the workspace) and **`workspaceSetGridLayout`**: expanding adds empty slots; shrinking moves tabs from removed slots into the remaining groups without creating or destroying tabs. **Draggable splitter bars** between adjacent tab groups (horizontal) and rows (vertical) adjust relative size within the workspace panel.
+
+```tsx
+import { useState } from "react";
+import {
+  UsfmWorkspace,
+  TabGroupLayoutSelector,
+  buildWorkspaceModelFromInitialTabs,
+  workspaceActivateTab,
+  workspaceAppendTab,
+  workspaceCloseTab,
+  workspaceMoveTabToGroup,
+  workspaceReorderTabInGroup,
+  workspaceSetGridLayout,
+  workspaceSetTabValue,
+} from "@usfm-tools/controls";
+
+function App() {
+  const [model, setModel] = useState(() =>
+    buildWorkspaceModelFromInitialTabs([{ fileName: "GEN.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 ..." }]),
+  );
+
+  return (
+    <div className="flex h-[720px] flex-col gap-2">
+      <TabGroupLayoutSelector
+        gridRows={model.gridRows}
+        gridCols={model.gridCols}
+        onChange={(rows, cols) => setModel((m) => workspaceSetGridLayout(m, rows, cols))}
+      />
+      <UsfmWorkspace
+        gridRows={model.gridRows}
+        gridCols={model.gridCols}
+        slots={model.slots}
+        tabsById={model.tabsById}
+        onActivateTab={(groupId, tabId) => setModel((m) => workspaceActivateTab(m, groupId, tabId))}
+        onUpdateTabValue={(tabId, value) => setModel((m) => workspaceSetTabValue(m, tabId, value))}
+        onCloseTab={(groupId, tabId) => setModel((m) => workspaceCloseTab(m, groupId, tabId))}
+        onReorderTabInGroup={(groupId, tabId, toIndex) =>
+          setModel((m) => workspaceReorderTabInGroup(m, groupId, tabId, toIndex))
+        }
+        onMoveTabToGroup={(d) => setModel((m) => workspaceMoveTabToGroup(m, d))}
+        className="min-h-0 flex-1"
+      />
+    </div>
+  );
+}
+```
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `gridRows` / `gridCols` | `1 \| 2` | Visible grid size (max 2×2) |
+| `slots` | `UsfmWorkspaceEditorGroupState[]` | Row-major groups for the current grid (**`id`**, **`tabIds`**, **`activeTabId`**) |
+| `tabsById` | `Record<string, UsfmWorkspaceTabState>` | Tab id → **`fileName`**, **`value`**, **`dirty`** |
+| `onActivateTab` | `(groupId, tabId) => void` | User selected a tab |
+| `onUpdateTabValue` | `(tabId, value) => void` | Editor content changed |
+| `onCloseTab` | `(groupId, tabId) => void` | User closed a tab |
+| `onReorderTabInGroup` | `(groupId, tabId, toIndex) => void` | Reorder within the same strip |
+| `onMoveTabToGroup` | `(detail) => void` | Move tab to another slot (**`toGroupId`**, **`insertIndex`**, **`fromGroupId`**) |
+| `className` | `string` | Optional root wrapper class |
+
+### TabGroupLayoutSelector
+
+Dropdown with a **2×2 grid** trigger icon. The menu shows four squares; clicking cell **(row, col)** sets **`gridRows = row + 1`** and **`gridCols = col + 1`** (e.g. bottom-right → 2×2). Wire **`onChange`** to **`workspaceSetGridLayout`** on your workspace model.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `gridRows` / `gridCols` | `1 \| 2` | Current layout |
+| `onChange` | `(rows, cols) => void` | User picked a new layout |
+| `className` | `string` | Optional wrapper class |
 
 ### ChapterPicker
 
@@ -160,7 +235,7 @@ The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  UsfmEditor / UsfmPreview / UsfmBookPicker / ChapterPicker / BookEditPane (React) │
+│  UsfmEditor / UsfmPreview / UsfmBookPicker / ChapterPicker / UsfmPane / UsfmWorkspace (React) │
 │  ┌───────────────────────────────────────────┐  │
 │  │  CodeMirror 6 (editor only)               │  │
 │  └───────────────────────────────────────────┘  │
@@ -210,7 +285,7 @@ The service is currently synchronous (runs in the main thread via `createLanguag
 
 ## Design Considerations
 
-**Full-book editing:** **`BookEditPane`** targets entire files (multiple **`\\c`** markers). For very large books, callers may still prefer virtualization or worker-backed language features; the editor itself remains a single CodeMirror document. The language service protocol could later send diffs instead of full text on each keystroke.
+**Full-book editing:** **`UsfmPane`** targets entire files (multiple **`\\c`** markers). For very large books, callers may still prefer virtualization or worker-backed language features; the editor itself remains a single CodeMirror document. The language service protocol could later send diffs instead of full text on each keystroke.
 
 **Lightweight:** No VS Code / Monaco fork. CodeMirror 6 provides the editing primitives; the USFM-specific intelligence lives in our language service.
 
@@ -252,7 +327,8 @@ Stories demonstrate the editor, preview, book picker, and chapter picker with:
 - Psalm 1 (poetry formatting)
 - Empty state
 - Error state (unknown markers, stray end markers)
-- **BookEditPane** — **`FullBookSplit`** and **`TwoPanesSharedState`** use a shared `useState` USFM string; **`FrontMatterNoChapters`** shows the chapter bar when there are no `\\c` markers.
+- **UsfmPane** — **`FullBookSplit`** and **`TwoPanesSharedState`** use a shared `useState` USFM string; **`FrontMatterNoChapters`** shows the toolbar when there are no `\\c` markers.
+- **UsfmWorkspace** — **`SingleGroupTwoTabs`**, **`TwoEditorGroups`**, and **`OpenFileDemo`** (append tab). Shared long USFM lives under **`src/fixtures/`** for Storybook.
 - **UsfmPreview** — **`GenesisPreview`** uses `render: (args) => <UsfmPreview {...args} />` so Controls map to props; **`WithEditor`** must use that same **`args` parameter** (not a zero-arg render) so `versePerLine` updates when you toggle Controls or the checkbox (`useArgs` is only for pushing checkbox state back into Storybook). **Verse Per Line Compare** shows both modes side by side.
 
 ### Project Structure
@@ -260,6 +336,8 @@ Stories demonstrate the editor, preview, book picker, and chapter picker with:
 ```
 packages/usfm-controls/
 ├── src/
+│   ├── fixtures/
+│   │   └── sample-bsb-genesis-usfm.ts  # Long sample USFM for Storybook (not part of the published entry)
 │   ├── index.ts                     # Public API exports
 │   ├── styles.css                   # Tailwind + default preview reading styles
 │   ├── components/
@@ -276,9 +354,16 @@ packages/usfm-controls/
 │   │   │   ├── UsfmBookPicker.tsx   # OT / NT / other book grid + list
 │   │   │   ├── UsfmBookPicker.stories.tsx
 │   │   │   └── index.ts
-│   │   ├── book-edit-pane/
-│   │   │   ├── BookEditPane.tsx   # Full-book edit + preview + chapter bar
-│   │   │   └── BookEditPane.stories.tsx
+│   │   ├── usfm-pane/
+│   │   │   ├── UsfmPane.tsx       # Full-book edit + preview + toolbar (inline or portaled)
+│   │   │   └── UsfmPane.stories.tsx
+│   │   ├── usfm-workspace/
+│   │   │   ├── UsfmWorkspace.tsx    # Tab-group grid workspace (up to 2×2)
+│   │   ├── tab-group-layout-selector/
+│   │   │   ├── TabGroupLayoutSelector.tsx
+│   │   │   ├── workspace-model.ts # Controlled props + immutable state helpers
+│   │   │   ├── UsfmWorkspace.stories.tsx
+│   │   │   └── index.ts
 │   │   └── chapter-picker/
 │   │       ├── ChapterPicker.tsx    # Wrapping row of equal-width chapter buttons
 │   │       ├── ChapterPicker.stories.tsx
@@ -294,7 +379,8 @@ packages/usfm-controls/
 │   ├── language-service.test.ts
 │   ├── usfm-preview.test.tsx
 │   ├── usfm-book-picker.test.tsx
-│   ├── book-edit-pane.test.tsx
+│   ├── usfm-pane.test.tsx
+│   ├── usfm-workspace.test.tsx
 │   ├── chapter-offset-helpers.test.ts
 │   └── chapter-picker.test.tsx
 ├── vitest.config.ts                 # jsdom for React tests

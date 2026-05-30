@@ -3,7 +3,7 @@ import {
   lastVerseNumberBeforeOffset,
   scrollSyncModeFromMarkers,
   sourceOffsetForChapterVerse,
-} from "../src/components/book-edit-pane/scroll-sync.js";
+} from "../src/components/usfm-pane/scroll-sync.js";
 
 describe("scrollSyncModeFromMarkers", () => {
   it("uses chapter-verse when chapter markers exist", () => {
