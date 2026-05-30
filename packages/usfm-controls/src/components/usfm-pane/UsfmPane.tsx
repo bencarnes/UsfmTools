@@ -34,8 +34,9 @@ import {
   scrollSyncModeFromMarkers,
   sourceOffsetForChapterVerse,
 } from "./scroll-sync.js";
+import { nextViewMode, ViewModeCycleButton, type UsfmPaneViewMode } from "./view-mode-toggle.js";
 
-export type UsfmPaneViewMode = "edit" | "preview" | "split";
+export type { UsfmPaneViewMode };
 
 export interface UsfmPaneProps {
   /** Full-book USFM (controlled). Multiple panes may share the same string reference updates. */
@@ -403,29 +404,11 @@ export function UsfmPane({
         Scroll sync: {scrollSyncEnabled ? "On" : "Off"}
       </button>
 
-      <div style={{ display: "flex", gap: "0.25rem" }} role="group" aria-label="View mode">
-        {(
-          [
-            ["edit", "Edit"],
-            ["preview", "Preview"],
-            ["split", "Edit + Preview"],
-          ] as const
-        ).map(([mode, label]) => (
-          <button
-            key={mode}
-            type="button"
-            aria-pressed={viewMode === mode}
-            style={{
-              ...btnBase,
-              fontWeight: viewMode === mode ? 700 : 400,
-              outline: viewMode === mode ? "2px solid #2563eb" : undefined,
-            }}
-            onClick={() => setViewMode(mode)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <ViewModeCycleButton
+        viewMode={viewMode}
+        buttonStyle={btnBase}
+        onCycle={() => setViewMode(nextViewMode(viewMode))}
+      />
     </div>
   );
 
