@@ -15,8 +15,8 @@ import {
   listChapterMarkersInBook,
   type ChapterMarkerInBook,
 } from "@usfm-tools/model";
-import { ChapterPicker } from "../chapter-picker/ChapterPicker.js";
 import type { ChapterPickerSelectDetail } from "../chapter-picker/ChapterPicker.js";
+import { ChapterNavigator } from "./chapter-navigator.js";
 import { UsfmEditor, type UsfmEditorHandle } from "../usfm-editor/UsfmEditor.js";
 import { UsfmPreview } from "../usfm-preview/UsfmPreview.js";
 import {
@@ -34,8 +34,10 @@ import {
   scrollSyncModeFromMarkers,
   sourceOffsetForChapterVerse,
 } from "./scroll-sync.js";
+import { ScrollSyncToggleButton } from "./scroll-sync-toggle.js";
+import { nextViewMode, ViewModeCycleButton, type UsfmPaneViewMode } from "./view-mode-toggle.js";
 
-export type UsfmPaneViewMode = "edit" | "preview" | "split";
+export type { UsfmPaneViewMode };
 
 export interface UsfmPaneProps {
   /** Full-book USFM (controlled). Multiple panes may share the same string reference updates. */
@@ -57,10 +59,6 @@ export interface UsfmPaneProps {
    */
   readonly defaultScrollSyncEnabled?: boolean;
 }
-
-const mono: CSSProperties = {
-  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-};
 
 const btnBase: CSSProperties = {
   padding: "0.25rem 0.5rem",
@@ -105,7 +103,6 @@ export function UsfmPane({
   const editorRef = useRef<UsfmEditorHandle>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const splitHostRef = useRef<HTMLDivElement>(null);
-  const chapterMenuRef = useRef<HTMLDetailsElement>(null);
   const syncLockRef = useRef(false);
   const splitDragRef = useRef<{ startX: number; startPct: number } | null>(null);
   const previewScrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -256,8 +253,7 @@ export function UsfmPane({
 
   const onChapterPicked = useCallback(
     (d: ChapterPickerSelectDetail) => {
-      chapterMenuRef.current?.removeAttribute("open");
-      const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
+const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
       if (off == null) return;
       if (viewMode === "preview") {
         scrollPreviewContainerToChapter(previewScrollRef.current, d.chapterNumber);
@@ -306,126 +302,29 @@ export function UsfmPane({
 
   const toolbar = (
     <div style={toolbarRowStyle} data-testid="usfm-pane-toolbar">
-      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }} aria-label="Chapter">
-        <button
-          type="button"
-          aria-label="Previous chapter"
-          disabled={!hasChapters}
-          style={{ ...btnBase, opacity: hasChapters ? 1 : 0.45 }}
-          onClick={onPrevChapter}
-        >
-          ◀
-        </button>
-        <span
-          style={{
-            ...mono,
-            minWidth: "3.5rem",
-            textAlign: "center",
-            fontSize: "0.9rem",
-          }}
-          aria-live="polite"
-        >
-          {navChapterText}
-        </span>
-        <button
-          type="button"
-          aria-label="Next chapter"
-          disabled={!hasChapters || atLastChapter}
-          style={{
-            ...btnBase,
-            opacity: hasChapters && !atLastChapter ? 1 : 0.45,
-          }}
-          onClick={onNextChapter}
-        >
-          ▶
-        </button>
-        <details ref={chapterMenuRef} style={{ position: "relative" }}>
-          <summary
-            style={{
-              ...btnBase,
-              listStyle: "none",
-              cursor: hasChapters ? "pointer" : "not-allowed",
-              opacity: hasChapters ? 1 : 0.45,
-            }}
-            aria-label="Open chapter list"
-            onClick={(ev) => {
-              if (!hasChapters) ev.preventDefault();
-            }}
-          >
-            Chapters ▾
-          </summary>
-          <div
-            style={{
-              position: "absolute",
-              right: 0,
-              zIndex: 20,
-              marginTop: "0.25rem",
-              padding: "0.5rem",
-              maxHeight: "14rem",
-              overflow: "auto",
-              minWidth: "12rem",
-              background: "Canvas",
-              border: "1px solid color-mix(in srgb, CanvasText 22%, transparent)",
-              borderRadius: "6px",
-              boxShadow: "0 4px 12px color-mix(in srgb, CanvasText 12%, transparent)",
-            }}
-          >
-            {firstBook ? (
-              <ChapterPicker book={firstBook} onChapterSelect={onChapterPicked} />
-            ) : (
-              <span style={{ fontSize: "0.85rem", color: "#666" }}>No \\id book in source.</span>
-            )}
-          </div>
-        </details>
-      </div>
+      <ChapterNavigator
+        navChapterText={navChapterText}
+        hasChapters={hasChapters}
+        atLastChapter={atLastChapter}
+        firstBook={firstBook}
+        buttonStyle={btnBase}
+        onPrevChapter={onPrevChapter}
+        onNextChapter={onNextChapter}
+        onChapterPicked={onChapterPicked}
+      />
 
-      <button
-        type="button"
-        role="switch"
-        aria-checked={scrollSyncEnabled}
-        aria-label="Scroll sync between editor and preview"
-        disabled={!hasChapters}
-        title={
-          hasChapters
-            ? scrollSyncEnabled
-              ? "Split view: editor and preview scroll together"
-              : "Split view: scroll independently"
-            : "Add \\c chapter markers to enable scroll sync"
-        }
-        style={{
-          ...btnBase,
-          opacity: hasChapters ? 1 : 0.45,
-          cursor: hasChapters ? "pointer" : "not-allowed",
-          fontWeight: scrollSyncEnabled ? 600 : 400,
-        }}
-        onClick={() => setScrollSyncEnabled((v) => !v)}
-      >
-        Scroll sync: {scrollSyncEnabled ? "On" : "Off"}
-      </button>
+      <ScrollSyncToggleButton
+        scrollSyncEnabled={scrollSyncEnabled}
+        hasChapters={hasChapters}
+        buttonStyle={btnBase}
+        onToggle={() => setScrollSyncEnabled((v) => !v)}
+      />
 
-      <div style={{ display: "flex", gap: "0.25rem" }} role="group" aria-label="View mode">
-        {(
-          [
-            ["edit", "Edit"],
-            ["preview", "Preview"],
-            ["split", "Edit + Preview"],
-          ] as const
-        ).map(([mode, label]) => (
-          <button
-            key={mode}
-            type="button"
-            aria-pressed={viewMode === mode}
-            style={{
-              ...btnBase,
-              fontWeight: viewMode === mode ? 700 : 400,
-              outline: viewMode === mode ? "2px solid #2563eb" : undefined,
-            }}
-            onClick={() => setViewMode(mode)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <ViewModeCycleButton
+        viewMode={viewMode}
+        buttonStyle={btnBase}
+        onCycle={() => setViewMode(nextViewMode(viewMode))}
+      />
     </div>
   );
 
