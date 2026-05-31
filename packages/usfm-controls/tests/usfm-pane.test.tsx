@@ -22,7 +22,22 @@ describe("UsfmPane", () => {
     );
     expect(screen.getByLabelText("Previous chapter").hasAttribute("disabled")).toBe(true);
     expect(screen.getByLabelText("Next chapter").hasAttribute("disabled")).toBe(true);
+    expect(screen.getByLabelText("Previous chapter").getAttribute("title")).toBe("Previous chapter");
+    expect(screen.getByLabelText("Next chapter").getAttribute("title")).toBe("Next chapter");
     expect(screen.getByText("—")).toBeTruthy();
+    expect(screen.queryByText(/Chapters/)).toBeNull();
+  });
+
+  it("opens chapter list from the chapter number control", () => {
+    render(
+      <UsfmPane
+        value={"\\id GEN\n\\c 1\n\\p\n\\v 1 Hello.\n\\c 2\n\\p\n\\v 1 More."}
+        defaultViewMode="edit"
+      />,
+    );
+    expect(screen.queryByText(/Chapters/)).toBeNull();
+    fireEvent.click(screen.getByLabelText(/select chapter/i));
+    expect(screen.getByRole("button", { name: /Open chapter 2/ })).toBeTruthy();
   });
 
   it("exposes a scroll sync switch disabled without chapter markers", () => {
