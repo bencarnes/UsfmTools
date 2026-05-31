@@ -371,8 +371,8 @@ function EditorGroupPanel({
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white">
-      <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch border-b border-gray-300 bg-gray-50">
-        <div className="flex min-w-0 items-stretch overflow-hidden">
+      <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch overflow-visible border-b border-gray-300 bg-gray-50">
+        <div className="flex min-w-0 items-stretch">
           <TabStrip
             groupId={group.id}
             tabIds={group.tabIds}
