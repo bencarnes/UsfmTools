@@ -34,6 +34,7 @@ import {
   scrollSyncModeFromMarkers,
   sourceOffsetForChapterVerse,
 } from "./scroll-sync.js";
+import { ScrollSyncToggleButton } from "./scroll-sync-toggle.js";
 import { nextViewMode, ViewModeCycleButton, type UsfmPaneViewMode } from "./view-mode-toggle.js";
 
 export type { UsfmPaneViewMode };
@@ -380,29 +381,12 @@ export function UsfmPane({
         </details>
       </div>
 
-      <button
-        type="button"
-        role="switch"
-        aria-checked={scrollSyncEnabled}
-        aria-label="Scroll sync between editor and preview"
-        disabled={!hasChapters}
-        title={
-          hasChapters
-            ? scrollSyncEnabled
-              ? "Split view: editor and preview scroll together"
-              : "Split view: scroll independently"
-            : "Add \\c chapter markers to enable scroll sync"
-        }
-        style={{
-          ...btnBase,
-          opacity: hasChapters ? 1 : 0.45,
-          cursor: hasChapters ? "pointer" : "not-allowed",
-          fontWeight: scrollSyncEnabled ? 600 : 400,
-        }}
-        onClick={() => setScrollSyncEnabled((v) => !v)}
-      >
-        Scroll sync: {scrollSyncEnabled ? "On" : "Off"}
-      </button>
+      <ScrollSyncToggleButton
+        scrollSyncEnabled={scrollSyncEnabled}
+        hasChapters={hasChapters}
+        buttonStyle={btnBase}
+        onToggle={() => setScrollSyncEnabled((v) => !v)}
+      />
 
       <ViewModeCycleButton
         viewMode={viewMode}
