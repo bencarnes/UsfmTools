@@ -18,6 +18,29 @@ export interface ChapterNavigatorProps {
   readonly onChapterPicked: (detail: ChapterPickerSelectDetail) => void;
 }
 
+
+function IconChapterChevronDown() {
+  return (
+    <svg
+      width={16}
+      height={10}
+      viewBox="0 0 16 10"
+      aria-hidden
+      className="block"
+      style={{ flexShrink: 0, opacity: 0.85 }}
+    >
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2 2.5 8 8 14 2.5"
+      />
+    </svg>
+  );
+}
+
 export function ChapterNavigator({
   navChapterText,
   hasChapters,
@@ -82,11 +105,7 @@ export function ChapterNavigator({
           }}
         >
           <span aria-live="polite">{navChapterText}</span>
-          {hasChapters ? (
-            <span aria-hidden style={{ fontSize: "0.8em", opacity: 0.75 }}>
-              ▾
-            </span>
-          ) : null}
+          {hasChapters ? <IconChapterChevronDown /> : null}
         </summary>
         <div
           style={{
