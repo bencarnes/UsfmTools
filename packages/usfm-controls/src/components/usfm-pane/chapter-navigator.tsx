@@ -83,7 +83,7 @@ export function ChapterNavigator({
         >
           <span aria-live="polite">{navChapterText}</span>
           {hasChapters ? (
-            <span aria-hidden style={{ fontSize: "0.6em", opacity: 0.75 }}>
+            <span aria-hidden style={{ fontSize: "0.8em", opacity: 0.75 }}>
               ▾
             </span>
           ) : null}
