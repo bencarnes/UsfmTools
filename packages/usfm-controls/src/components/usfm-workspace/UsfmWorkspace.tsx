@@ -226,10 +226,10 @@ function TabStrip({
   };
 
   return (
-    <>
+    <div className="flex min-w-0 flex-1 items-stretch">
       <div
         ref={scrollRef}
-        className="flex min-w-0 flex-nowrap gap-0.5 overflow-x-auto overflow-y-hidden"
+        className="flex min-w-0 flex-1 flex-nowrap gap-0.5 overflow-x-auto overflow-y-hidden"
         onDragOver={onDragOverStrip}
         onDrop={onDropStrip}
       >
@@ -289,7 +289,7 @@ function TabStrip({
         tabsById={tabsById}
         onActivate={onActivate}
       />
-    </>
+    </div>
   );
 }
 
@@ -372,23 +372,21 @@ function EditorGroupPanel({
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white">
       <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch overflow-visible border-b border-gray-300 bg-gray-50">
-        <div className="flex min-w-0 items-stretch">
-          <TabStrip
-            groupId={group.id}
-            tabIds={group.tabIds}
-            activeTabId={group.activeTabId}
-            tabsById={tabsById}
-            onActivate={(tabId) => onActivateTab(group.id, tabId)}
-            onClose={(tabId) => onCloseTab(group.id, tabId)}
-            onMoveTabInGroup={(tabId, toIndex) => onMoveTabWithinGroup(group.id, tabId, toIndex)}
-            onDropTabFromOtherGroup={(tabId, fromGroupId, insertIndex) =>
-              onDropTabFromOtherGroup(group.id, tabId, fromGroupId, insertIndex)
-            }
-          />
-        </div>
+        <TabStrip
+          groupId={group.id}
+          tabIds={group.tabIds}
+          activeTabId={group.activeTabId}
+          tabsById={tabsById}
+          onActivate={(tabId) => onActivateTab(group.id, tabId)}
+          onClose={(tabId) => onCloseTab(group.id, tabId)}
+          onMoveTabInGroup={(tabId, toIndex) => onMoveTabWithinGroup(group.id, tabId, toIndex)}
+          onDropTabFromOtherGroup={(tabId, fromGroupId, insertIndex) =>
+            onDropTabFromOtherGroup(group.id, tabId, fromGroupId, insertIndex)
+          }
+        />
         <div
           ref={setToolbarEl}
-          className="flex min-w-0 flex-1 items-center gap-1 border-l border-gray-200 bg-gray-50 px-1.5"
+          className="flex shrink-0 items-center justify-end gap-1 border-l border-gray-200 bg-gray-50 px-1.5"
         />
       </div>
       <div className="relative z-0 grid min-h-0 flex-1 grid-cols-1 grid-rows-1 overflow-hidden">
