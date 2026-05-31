@@ -98,8 +98,8 @@ describe("UsfmWorkspace", () => {
         ]}
       />,
     );
-    const select = screen.getByRole("combobox", { name: /open tab/i });
-    fireEvent.change(select, { target: { value: "x2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Select tab" }));
+    fireEvent.click(screen.getByRole("option", { name: "B.usfm" }));
     expect(screen.getByRole("tab", { name: /B\.usfm/i }).getAttribute("aria-selected")).toBe("true");
   });
 

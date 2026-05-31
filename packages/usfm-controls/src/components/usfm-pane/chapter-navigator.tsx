@@ -2,6 +2,7 @@ import { useRef, type CSSProperties } from "react";
 import type { BookNode } from "@usfm-tools/parser";
 import { ChapterPicker } from "../chapter-picker/ChapterPicker.js";
 import type { ChapterPickerSelectDetail } from "../chapter-picker/ChapterPicker.js";
+import { ChevronDownIcon } from "../icons/chevron-down-icon.js";
 
 const mono: CSSProperties = {
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
@@ -16,29 +17,6 @@ export interface ChapterNavigatorProps {
   readonly onPrevChapter: () => void;
   readonly onNextChapter: () => void;
   readonly onChapterPicked: (detail: ChapterPickerSelectDetail) => void;
-}
-
-
-function IconChapterChevronDown() {
-  return (
-    <svg
-      width={16}
-      height={10}
-      viewBox="0 0 16 10"
-      aria-hidden
-      className="block"
-      style={{ flexShrink: 0, opacity: 0.85 }}
-    >
-      <path
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M2 2.5 8 8 14 2.5"
-      />
-    </svg>
-  );
 }
 
 export function ChapterNavigator({
@@ -105,7 +83,7 @@ export function ChapterNavigator({
           }}
         >
           <span aria-live="polite">{navChapterText}</span>
-          {hasChapters ? <IconChapterChevronDown /> : null}
+          {hasChapters ? <ChevronDownIcon /> : null}
         </summary>
         <div
           style={{

@@ -11,6 +11,7 @@ import {
   type SetStateAction,
 } from "react";
 import { UsfmPane } from "../usfm-pane/UsfmPane.js";
+import { TabListDropdown } from "./tab-list-dropdown.js";
 import type {
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceProps,
@@ -225,10 +226,10 @@ function TabStrip({
   };
 
   return (
-    <div className="flex min-w-0 flex-1 items-stretch gap-0.5">
+    <>
       <div
         ref={scrollRef}
-        className="flex min-w-0 flex-1 flex-nowrap gap-0.5 overflow-x-auto overflow-y-hidden"
+        className="flex min-w-0 flex-nowrap gap-0.5 overflow-x-auto overflow-y-hidden"
         onDragOver={onDragOverStrip}
         onDrop={onDropStrip}
       >
@@ -282,29 +283,13 @@ function TabStrip({
           );
         })}
       </div>
-      <label className="sr-only" htmlFor={`${groupId}-tab-select`}>
-        Open tab
-      </label>
-      <select
-        id={`${groupId}-tab-select`}
-        className="ml-1 max-w-[10rem] shrink-0 rounded border border-gray-300 bg-white px-1 py-1 text-xs"
-        value={activeTabId ?? ""}
-        onChange={(ev) => {
-          const v = ev.target.value;
-          if (v) onActivate(v);
-        }}
-      >
-        {tabIds.map((tid) => {
-          const tab = tabsById[tid];
-          if (!tab) return null;
-          return (
-            <option key={tid} value={tid}>
-              {tab.fileName}
-            </option>
-          );
-        })}
-      </select>
-    </div>
+      <TabListDropdown
+        tabIds={tabIds}
+        activeTabId={activeTabId}
+        tabsById={tabsById}
+        onActivate={onActivate}
+      />
+    </>
   );
 }
 
@@ -387,21 +372,23 @@ function EditorGroupPanel({
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white">
       <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch border-b border-gray-300 bg-gray-50">
-        <TabStrip
-          groupId={group.id}
-          tabIds={group.tabIds}
-          activeTabId={group.activeTabId}
-          tabsById={tabsById}
-          onActivate={(tabId) => onActivateTab(group.id, tabId)}
-          onClose={(tabId) => onCloseTab(group.id, tabId)}
-          onMoveTabInGroup={(tabId, toIndex) => onMoveTabWithinGroup(group.id, tabId, toIndex)}
-          onDropTabFromOtherGroup={(tabId, fromGroupId, insertIndex) =>
-            onDropTabFromOtherGroup(group.id, tabId, fromGroupId, insertIndex)
-          }
-        />
+        <div className="flex min-w-0 items-stretch overflow-hidden">
+          <TabStrip
+            groupId={group.id}
+            tabIds={group.tabIds}
+            activeTabId={group.activeTabId}
+            tabsById={tabsById}
+            onActivate={(tabId) => onActivateTab(group.id, tabId)}
+            onClose={(tabId) => onCloseTab(group.id, tabId)}
+            onMoveTabInGroup={(tabId, toIndex) => onMoveTabWithinGroup(group.id, tabId, toIndex)}
+            onDropTabFromOtherGroup={(tabId, fromGroupId, insertIndex) =>
+              onDropTabFromOtherGroup(group.id, tabId, fromGroupId, insertIndex)
+            }
+          />
+        </div>
         <div
           ref={setToolbarEl}
-          className="flex shrink-0 items-center gap-1 border-l border-gray-200 bg-gray-50 px-1.5"
+          className="flex min-w-0 flex-1 items-center gap-1 border-l border-gray-200 bg-gray-50 px-1.5"
         />
       </div>
       <div className="relative z-0 grid min-h-0 flex-1 grid-cols-1 grid-rows-1 overflow-hidden">
