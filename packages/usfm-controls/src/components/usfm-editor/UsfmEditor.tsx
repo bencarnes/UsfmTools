@@ -9,12 +9,21 @@ import { EditorState } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { usfmHighlighter, usfmLinter, usfmAutocomplete } from "./codemirror-usfm.js";
+import {
+  usfmSearchExtensions,
+  openFindPanel,
+  openFindReplacePanel,
+} from "./usfm-search-panel.js";
 
 export interface UsfmEditorHandle {
   /** Scroll so that {@link offset} sits at the top of the visible editor area. */
   scrollSourceOffsetIntoView(offset: number): void;
   /** Document offset nearest the top of the viewport, or `null` if the editor is not mounted. */
   getTopVisibleSourceOffset(): number | null;
+  /** Open the find bar (same as Ctrl+F). */
+  openFind(): void;
+  /** Open find and replace (same as Ctrl+H). */
+  openFindReplace(): void;
 }
 
 export interface UsfmEditorProps {
@@ -59,6 +68,14 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
       const y = rect.top + 4;
       return view.posAtCoords({ x, y }, false) ?? 0;
     },
+    openFind() {
+      const view = viewRef.current;
+      if (view) openFindPanel(view);
+    },
+    openFindReplace() {
+      const view = viewRef.current;
+      if (view) openFindReplacePanel(view);
+    },
   }));
 
   useEffect(() => {
@@ -96,6 +113,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
         usfmHighlighter,
         usfmLinter,
         usfmAutocomplete,
+        usfmSearchExtensions,
         updateListener,
         EditorView.theme({
           "&": {
@@ -165,7 +183,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   return (
     <div
       ref={containerRef}
-      className={`border border-gray-300 rounded-md overflow-hidden ${className ?? ""}`}
+      className={`usfm-editor-root relative border border-gray-300 rounded-md overflow-hidden ${className ?? ""}`}
     />
   );
 });

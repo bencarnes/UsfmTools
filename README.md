@@ -25,7 +25,7 @@ flowchart TB
 |--------|------|
 | **usfm-parser** | Parses USFM source into structured data; ships ESM and CJS bundles (`dist/`). |
 | **usfm-model** | View models (for example `ViewModels.Publication` / `PublicationViewModel`), publication-style HTML rendering via **`renderPreviewHtml`**, standard USFM **book identifier** metadata and **`buildUsfmBookPickerGroups`** (OT, NT, other standard, and non-standard entries including optional or missing `\\id`), **`listChapterNumbersFromBook`** for ordered `\\c` labels on a parsed book, plus re-exports of **`parse`**. |
-| **usfm-controls** | React controls: **`UsfmEditor`** (CodeMirror), **`UsfmPreview`** (publication-style HTML), **`UsfmBookPicker`** (OT/NT grids plus standard-other and non-standard book lists from in-memory USFM), **`ChapterPicker`** (equal-width chapter buttons for one parsed book), and the async USFM language service. Depends on the parser and model. |
+| **usfm-controls** | React controls: **`UsfmEditor`** (CodeMirror, with find/replace via **Ctrl+F** / **Ctrl+H**), **`UsfmPreview`** (publication-style HTML), **`UsfmBookPicker`** (OT/NT grids plus standard-other and non-standard book lists from in-memory USFM), **`ChapterPicker`** (equal-width chapter buttons for one parsed book), and the async USFM language service. Depends on the parser and model. |
 | **usfm-parser-integration-tests** | Longer-running checks against the parser; **no** `build` script, only `npm test`. |
 | **bible-edit** | Tauri + React + Tailwind desktop shell for a planned USFM Bible editor (lives at repo root). See **`bible-edit/README.md`** for build, run, tests, and design notes. |
 
