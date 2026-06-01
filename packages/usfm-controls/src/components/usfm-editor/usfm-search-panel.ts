@@ -63,32 +63,15 @@ export const openFindPanel: (view: EditorView) => boolean = (view) =>
 export const openFindReplacePanel: (view: EditorView) => boolean = (view) =>
   openSearchWithReplace(view, true);
 
-type MatchRange = { from: number; to: number };
-
-/** First match at or after `from` without wrapping to the document start. */
-function firstMatchForward(spec: SearchQuery, state: EditorState, from: number): MatchRange | null {
-  const iter = spec.getCursor(state, from, state.doc.length);
-  const result = iter.next();
-  return result.done ? null : result.value;
-}
-
-/** True when the selection is exactly one search match. */
-function selectionIsMatch(spec: SearchQuery, state: EditorState, from: number, to: number): boolean {
-  if (from >= to) return false;
-  const iter = spec.getCursor(state, from, to);
-  const result = iter.next();
-  return !result.done && result.value.from === from && result.value.to === to;
-}
-
-/** Replace the current or next match, then select the following match (forward only, no wrap). */
+/** Replace the current or next match, then select the following match (wraps at document end). */
 export function replaceAndAdvance(view: EditorView, spec: SearchQuery): boolean {
   if (view.state.readOnly || !spec.valid) return false;
   const query = spec.create();
   const { from, to } = view.state.selection.main;
-
-  const match: MatchRange | null = selectionIsMatch(spec, view.state, from, to)
-    ? { from, to }
-    : firstMatchForward(spec, view.state, from);
+  let match = query.nextMatch(view.state, from, to);
+  if (!match) {
+    match = query.nextMatch(view.state, from, from);
+  }
   if (!match) return false;
 
   const replacement = view.state.toText(query.getReplacement(match));
@@ -98,7 +81,7 @@ export function replaceAndAdvance(view: EditorView, spec: SearchQuery): boolean 
   });
 
   const after = match.from + replacement.length;
-  const next = firstMatchForward(spec, view.state, after);
+  const next = query.nextMatch(view.state, after, after);
   if (next) {
     view.dispatch({
       selection: EditorSelection.single(next.from, next.to),
