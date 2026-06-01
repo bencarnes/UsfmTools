@@ -36,6 +36,7 @@ import {
 } from "./scroll-sync.js";
 import { ScrollSyncToggleButton } from "./scroll-sync-toggle.js";
 import { nextViewMode, ViewModeCycleButton, type UsfmPaneViewMode } from "./view-mode-toggle.js";
+import { FindToolbarButton } from "./find-toolbar-button.js";
 
 export type { UsfmPaneViewMode };
 
@@ -318,6 +319,12 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
         hasChapters={hasChapters}
         buttonStyle={btnBase}
         onToggle={() => setScrollSyncEnabled((v) => !v)}
+      />
+
+      <FindToolbarButton
+        disabled={viewMode === "preview"}
+        buttonStyle={btnBase}
+        onOpenFind={() => editorRef.current?.openFind()}
       />
 
       <ViewModeCycleButton
