@@ -102,6 +102,35 @@ describe("UsfmEditor find and replace", () => {
     });
   });
 
+  it("replace does not wrap to earlier occurrences", async () => {
+    const onChange = vi.fn();
+    const { container, ref } = await renderEditor({
+      value: "\\id GEN\n\\p\n\\v 1 first second first end.",
+      onChange,
+    });
+    ref.current!.openFindReplace();
+    const findInput = await waitFor(() => {
+      const el = container.querySelector('input[aria-label="Find"]') as HTMLInputElement;
+      expect(el).toBeTruthy();
+      return el;
+    });
+    const replaceInput = container.querySelector(
+      'input[aria-label="Replace"]',
+    ) as HTMLInputElement;
+    fireEvent.input(findInput, { target: { value: "first" } });
+    fireEvent.input(replaceInput, { target: { value: "1st" } });
+
+    const replaceBtn = container.querySelector('button[title="Replace"]') as HTMLButtonElement;
+    fireEvent.click(replaceBtn);
+    await waitFor(() => {
+      expect(onChange.mock.calls.at(-1)?.[0]).toMatch(/1st second first/);
+    });
+    fireEvent.click(replaceBtn);
+    await waitFor(() => {
+      expect(onChange.mock.calls.at(-1)?.[0]).toMatch(/1st second 1st end/);
+    });
+  });
+
   it("replace advances to the next occurrence after replacing", async () => {
     const onChange = vi.fn();
     const { container, ref } = await renderEditor({
