@@ -6,6 +6,12 @@ const meta = {
   component: UsfmEditor,
   parameters: {
     layout: "padded",
+    docs: {
+      description: {
+        component:
+          "USFM source editor. Press **Ctrl+F** for find or **Ctrl+H** for find and replace (upper-right panel).",
+      },
+    },
   },
   argTypes: {
     value: { control: "text" },
