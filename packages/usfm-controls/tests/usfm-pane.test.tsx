@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { UsfmPane } from "../src/components/usfm-pane/UsfmPane.js";
 import { VIEW_MODE_LABELS } from "../src/components/usfm-pane/view-mode-toggle.js";
 
@@ -54,6 +54,23 @@ describe("UsfmPane", () => {
     expect(sw.getAttribute("aria-checked")).toBe("true");
     fireEvent.click(sw);
     expect(sw.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("opens find from the toolbar in edit view", async () => {
+    const { container } = render(
+      <UsfmPane value={"\\id GEN\n\\c 1\n\\p\n\\v 1 Hello."} defaultViewMode="edit" />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Find in document" }));
+    await waitFor(() => {
+      expect(container.querySelector(".usfm-search-panel")).toBeTruthy();
+    });
+  });
+
+  it("disables find in preview-only view", () => {
+    render(<UsfmPane value={"\\id GEN\n\\c 1\n\\p\n\\v 1 Hello."} defaultViewMode="preview" />);
+    expect(screen.getByRole("button", { name: "Find in document" }).hasAttribute("disabled")).toBe(
+      true,
+    );
   });
 
   it("cycles view mode when the toolbar control is clicked", () => {
