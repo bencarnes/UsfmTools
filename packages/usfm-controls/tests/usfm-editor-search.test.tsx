@@ -46,39 +46,37 @@ describe("UsfmEditor find and replace", () => {
     });
   });
 
-  it("toggles replace visibility from find panel", async () => {
+  it("toggles replace section with the left chevron", async () => {
     const { container, ref } = await renderEditor();
     ref.current!.openFind();
     await waitFor(() => {
       expect(container.querySelector(".usfm-search-panel")).toBeTruthy();
     });
-    const showReplace = container.querySelector(
-      'button[aria-label="Show replace"]',
+    const toggle = container.querySelector(
+      'button[title="Toggle Replace"]',
     ) as HTMLButtonElement;
-    fireEvent.click(showReplace);
+    expect(toggle).toBeTruthy();
+    fireEvent.click(toggle);
     await waitFor(() => {
       expect(container.querySelector('input[aria-label="Replace"]')).toBeTruthy();
     });
-    const hideReplace = container.querySelector(
-      'button[aria-label="Hide replace"]',
-    ) as HTMLButtonElement;
-    fireEvent.click(hideReplace);
+    fireEvent.click(toggle);
     await waitFor(() => {
       expect(container.querySelector('input[aria-label="Replace"]')).toBeNull();
     });
   });
 
-  it("exposes search mode toggles with icon labels", async () => {
+  it("exposes VS Code-style search mode toggles with tooltips", async () => {
     const { container, ref } = await renderEditor();
     ref.current!.openFind();
     await waitFor(() => {
-      expect(container.querySelector('button[aria-label="Match case"]')).toBeTruthy();
-      expect(container.querySelector('button[aria-label="Regular expression"]')).toBeTruthy();
-      expect(container.querySelector('button[aria-label="Exact match"]')).toBeTruthy();
+      expect(container.querySelector('button[title="Match Case"]')).toBeTruthy();
+      expect(container.querySelector('button[title="Match Whole Word"]')).toBeTruthy();
+      expect(container.querySelector('button[title="Use Regular Expression"]')).toBeTruthy();
     });
   });
 
-  it("finds and replaces text", async () => {
+  it("replaces all matches", async () => {
     const onChange = vi.fn();
     const { container, ref } = await renderEditor({
       value: "\\id GEN\n\\p\n\\v 1 Hello Hello.",
@@ -95,14 +93,44 @@ describe("UsfmEditor find and replace", () => {
     ) as HTMLInputElement;
     fireEvent.input(findInput, { target: { value: "Hello" } });
     fireEvent.input(replaceInput, { target: { value: "Hi" } });
-    const replaceAll = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent === "All",
-    );
-    fireEvent.click(replaceAll!);
+    const replaceAll = container.querySelector('button[title="Replace All"]') as HTMLButtonElement;
+    fireEvent.click(replaceAll);
     await waitFor(() => {
       const last = onChange.mock.calls.at(-1)?.[0] as string;
       expect(last).toContain("Hi");
       expect(last).not.toContain("Hello");
+    });
+  });
+
+  it("replace advances to the next occurrence after replacing", async () => {
+    const onChange = vi.fn();
+    const { container, ref } = await renderEditor({
+      value: "\\id GEN\n\\p\n\\v 1 aa bb aa.",
+      onChange,
+    });
+    ref.current!.openFindReplace();
+    const findInput = await waitFor(() => {
+      const el = container.querySelector('input[aria-label="Find"]') as HTMLInputElement;
+      expect(el).toBeTruthy();
+      return el;
+    });
+    const replaceInput = container.querySelector(
+      'input[aria-label="Replace"]',
+    ) as HTMLInputElement;
+    fireEvent.input(findInput, { target: { value: "aa" } });
+    fireEvent.input(replaceInput, { target: { value: "XX" } });
+
+    const replaceBtn = container.querySelector('button[title="Replace"]') as HTMLButtonElement;
+    fireEvent.click(replaceBtn);
+    await waitFor(() => {
+      const last = onChange.mock.calls.at(-1)?.[0] as string;
+      expect(last).toMatch(/XX bb aa/);
+    });
+
+    fireEvent.click(replaceBtn);
+    await waitFor(() => {
+      const last = onChange.mock.calls.at(-1)?.[0] as string;
+      expect(last).toMatch(/XX bb XX/);
     });
   });
 });

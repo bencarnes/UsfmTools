@@ -1,74 +1,204 @@
-/** Small inline SVG icons for search mode toggles (DOM nodes for CodeMirror panels). */
+/** VS Code–style inline SVG icons for the find/replace panel. */
 
-function svgIcon(pathD: string, viewBox = "0 0 18 18"): SVGSVGElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+const NS = "http://www.w3.org/2000/svg";
+
+function svgRoot(viewBox = "0 0 16 16"): SVGSVGElement {
+  const svg = document.createElementNS(NS, "svg");
   svg.setAttribute("width", "16");
   svg.setAttribute("height", "16");
   svg.setAttribute("viewBox", viewBox);
   svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("class", "usfm-search-mode-icon");
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  path.setAttribute("fill", "none");
-  path.setAttribute("stroke", "currentColor");
-  path.setAttribute("stroke-width", "1.35");
-  path.setAttribute("stroke-linecap", "round");
-  path.setAttribute("stroke-linejoin", "round");
-  path.setAttribute("d", pathD);
-  svg.appendChild(path);
+  svg.setAttribute("class", "usfm-search-icon");
   return svg;
 }
 
-/** Match case — capital A beside lowercase a. */
+function textIcon(content: string, opts?: { weight?: string; size?: string }): SVGSVGElement {
+  const svg = svgRoot();
+  const t = document.createElementNS(NS, "text");
+  t.setAttribute("x", "1");
+  t.setAttribute("y", "12");
+  t.setAttribute("font-size", opts?.size ?? "11");
+  t.setAttribute("font-family", "system-ui, sans-serif");
+  t.setAttribute("fill", "currentColor");
+  if (opts?.weight) t.setAttribute("font-weight", opts.weight);
+  t.textContent = content;
+  svg.appendChild(t);
+  return svg;
+}
+
+/** Match case — "Aa". */
 export function iconMatchCase(): SVGSVGElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", "16");
-  svg.setAttribute("height", "16");
-  svg.setAttribute("viewBox", "0 0 18 18");
-  svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("class", "usfm-search-mode-icon");
-  const a1 = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  a1.setAttribute("x", "2");
-  a1.setAttribute("y", "13");
-  a1.setAttribute("font-size", "11");
-  a1.setAttribute("font-weight", "700");
-  a1.setAttribute("fill", "currentColor");
-  a1.textContent = "A";
-  const a2 = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  a2.setAttribute("x", "9");
-  a2.setAttribute("y", "13");
-  a2.setAttribute("font-size", "11");
-  a2.setAttribute("fill", "currentColor");
-  a2.textContent = "a";
-  svg.append(a1, a2);
+  const svg = svgRoot();
+  const a = document.createElementNS(NS, "text");
+  a.setAttribute("x", "1");
+  a.setAttribute("y", "12");
+  a.setAttribute("font-size", "11");
+  a.setAttribute("font-weight", "600");
+  a.setAttribute("font-family", "system-ui, sans-serif");
+  a.setAttribute("fill", "currentColor");
+  a.textContent = "A";
+  const b = document.createElementNS(NS, "text");
+  b.setAttribute("x", "8");
+  b.setAttribute("y", "12");
+  b.setAttribute("font-size", "11");
+  b.setAttribute("font-family", "system-ui, sans-serif");
+  b.setAttribute("fill", "currentColor");
+  b.textContent = "a";
+  svg.append(a, b);
   return svg;
 }
 
-/** Regular expression — dot and asterisk. */
+/** Match whole word — "ab" with underline bracket. */
+export function iconMatchWholeWord(): SVGSVGElement {
+  const svg = svgRoot();
+  const ab = document.createElementNS(NS, "text");
+  ab.setAttribute("x", "2");
+  ab.setAttribute("y", "10");
+  ab.setAttribute("font-size", "10");
+  ab.setAttribute("font-family", "ui-monospace, monospace");
+  ab.setAttribute("fill", "currentColor");
+  ab.textContent = "ab";
+  const bracket = document.createElementNS(NS, "path");
+  bracket.setAttribute("fill", "none");
+  bracket.setAttribute("stroke", "currentColor");
+  bracket.setAttribute("stroke-width", "1.2");
+  bracket.setAttribute("d", "M2 12.5h8");
+  svg.append(ab, bracket);
+  return svg;
+}
+
+/** Use regular expression — ".*". */
 export function iconRegex(): SVGSVGElement {
-  return svgIcon("M4 9h2.2c1.2 0 2-.8 2-2s-.8-2-2-2H4M12 5v8M15.5 9c0 2.2-1.5 4-3.5 4");
+  return textIcon(".*", { size: "11" });
 }
 
-/** Exact match — equals sign between vertical bars. */
-export function iconExactMatch(): SVGSVGElement {
-  return svgIcon("M5 5.5v7M13 5.5v7M7.5 9h3");
+/** Expand replace section — chevron down. */
+export function iconChevronDown(): SVGSVGElement {
+  const svg = svgRoot();
+  const p = document.createElementNS(NS, "path");
+  p.setAttribute("fill", "none");
+  p.setAttribute("stroke", "currentColor");
+  p.setAttribute("stroke-width", "1.5");
+  p.setAttribute("stroke-linecap", "round");
+  p.setAttribute("stroke-linejoin", "round");
+  p.setAttribute("d", "M4 6l4 4 4-4");
+  svg.appendChild(p);
+  return svg;
 }
 
-/** Replace mode — swap / exchange arrows. */
-export function iconReplaceToggle(): SVGSVGElement {
-  return svgIcon("M4 6.5h7M9.5 4 12 6.5 9.5 9M14 11.5H7M8.5 9 6 11.5 8.5 14");
+/** Collapse replace section — chevron right. */
+export function iconChevronRight(): SVGSVGElement {
+  const svg = svgRoot();
+  const p = document.createElementNS(NS, "path");
+  p.setAttribute("fill", "none");
+  p.setAttribute("stroke", "currentColor");
+  p.setAttribute("stroke-width", "1.5");
+  p.setAttribute("stroke-linecap", "round");
+  p.setAttribute("stroke-linejoin", "round");
+  p.setAttribute("d", "M6 4l4 4-4 4");
+  svg.appendChild(p);
+  return svg;
 }
 
-/** Next match — down chevron. */
-export function iconFindNext(): SVGSVGElement {
-  return svgIcon("M5 7l4 4 4-4");
-}
-
-/** Previous match — up chevron. */
+/** Previous match. */
 export function iconFindPrevious(): SVGSVGElement {
-  return svgIcon("M5 11l4-4 4 4");
+  const svg = svgRoot();
+  const p = document.createElementNS(NS, "path");
+  p.setAttribute("fill", "none");
+  p.setAttribute("stroke", "currentColor");
+  p.setAttribute("stroke-width", "1.5");
+  p.setAttribute("stroke-linecap", "round");
+  p.setAttribute("stroke-linejoin", "round");
+  p.setAttribute("d", "M8 4.5L4.5 8 8 11.5M11.5 4.5 8 8 11.5 11.5");
+  svg.appendChild(p);
+  return svg;
+}
+
+/** Next match. */
+export function iconFindNext(): SVGSVGElement {
+  const svg = svgRoot();
+  const p = document.createElementNS(NS, "path");
+  p.setAttribute("fill", "none");
+  p.setAttribute("stroke", "currentColor");
+  p.setAttribute("stroke-width", "1.5");
+  p.setAttribute("stroke-linecap", "round");
+  p.setAttribute("stroke-linejoin", "round");
+  p.setAttribute("d", "M8 4.5l3.5 3.5L8 11.5M4.5 4.5 8 8 4.5 11.5");
+  svg.appendChild(p);
+  return svg;
 }
 
 /** Close panel. */
 export function iconClose(): SVGSVGElement {
-  return svgIcon("M5 5l8 8M13 5l-8 8");
+  const svg = svgRoot();
+  const p = document.createElementNS(NS, "path");
+  p.setAttribute("fill", "none");
+  p.setAttribute("stroke", "currentColor");
+  p.setAttribute("stroke-width", "1.5");
+  p.setAttribute("stroke-linecap", "round");
+  p.setAttribute("d", "M4.5 4.5l7 7M11.5 4.5l-7 7");
+  svg.appendChild(p);
+  return svg;
+}
+
+/** Replace one — stacked boxes with down arrow (VS Code style). */
+export function iconReplaceOne(): SVGSVGElement {
+  const svg = svgRoot();
+  const r1 = document.createElementNS(NS, "rect");
+  r1.setAttribute("x", "3");
+  r1.setAttribute("y", "2");
+  r1.setAttribute("width", "7");
+  r1.setAttribute("height", "4");
+  r1.setAttribute("rx", "0.5");
+  r1.setAttribute("fill", "none");
+  r1.setAttribute("stroke", "currentColor");
+  r1.setAttribute("stroke-width", "1");
+  const r2 = document.createElementNS(NS, "rect");
+  r2.setAttribute("x", "5");
+  r2.setAttribute("y", "9");
+  r2.setAttribute("width", "7");
+  r2.setAttribute("height", "4");
+  r2.setAttribute("rx", "0.5");
+  r2.setAttribute("fill", "none");
+  r2.setAttribute("stroke", "currentColor");
+  r2.setAttribute("stroke-width", "1");
+  const arrow = document.createElementNS(NS, "path");
+  arrow.setAttribute("fill", "none");
+  arrow.setAttribute("stroke", "currentColor");
+  arrow.setAttribute("stroke-width", "1.2");
+  arrow.setAttribute("stroke-linecap", "round");
+  arrow.setAttribute("d", "M8 6.5v2.5");
+  svg.append(r1, r2, arrow);
+  return svg;
+}
+
+/** Replace all — wider stacked boxes. */
+export function iconReplaceAll(): SVGSVGElement {
+  const svg = svgRoot();
+  const r1 = document.createElementNS(NS, "rect");
+  r1.setAttribute("x", "1");
+  r1.setAttribute("y", "2");
+  r1.setAttribute("width", "9");
+  r1.setAttribute("height", "4");
+  r1.setAttribute("rx", "0.5");
+  r1.setAttribute("fill", "none");
+  r1.setAttribute("stroke", "currentColor");
+  r1.setAttribute("stroke-width", "1");
+  const r2 = document.createElementNS(NS, "rect");
+  r2.setAttribute("x", "4");
+  r2.setAttribute("y", "9");
+  r2.setAttribute("width", "9");
+  r2.setAttribute("height", "4");
+  r2.setAttribute("rx", "0.5");
+  r2.setAttribute("fill", "none");
+  r2.setAttribute("stroke", "currentColor");
+  r2.setAttribute("stroke-width", "1");
+  const arrow = document.createElementNS(NS, "path");
+  arrow.setAttribute("fill", "none");
+  arrow.setAttribute("stroke", "currentColor");
+  arrow.setAttribute("stroke-width", "1.2");
+  arrow.setAttribute("stroke-linecap", "round");
+  arrow.setAttribute("d", "M8 6.5v2.5");
+  svg.append(r1, r2, arrow);
+  return svg;
 }

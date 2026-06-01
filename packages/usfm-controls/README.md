@@ -7,7 +7,7 @@ React UI controls for editing USFM scripture text, built on [CodeMirror 6](https
 - **Syntax highlighting** — color-coded markers, verse/chapter numbers, attributes
 - **Error diagnostics** — red squiggles under parse errors with hover messages
 - **Autocomplete** — type `\` to get a filtered list of USFM markers with descriptions; navigate with arrows, accept with Tab
-- **Find and replace** — **Ctrl+F** / **Ctrl+H** open a search bar in the upper-right of the editor (built on [`@codemirror/search`](https://codemirror.net/docs/ref/#search)); toggle replace, match case, regular expression, and exact match via icon buttons
+- **Find and replace** — **Ctrl+F** / **Ctrl+H** open a VS Code–style search widget in the upper-right (built on [`@codemirror/search`](https://codemirror.net/docs/ref/#search)); chevron toggles the replace row; icon buttons for match case (**Aa**), whole word (**ab**), and regex (**.\***)
 - **Async language service** — LSP-inspired message protocol for clean separation between editor UI and language intelligence
 - **Publication preview** — **`UsfmPreview`** renders USFM as continuous reading text (similar to a Bible app) using **`renderPreviewHtml`** from `@usfm-tools/model`; HTML output is memoized for fast updates next to the editor
 - **Book picker** — **`UsfmBookPicker`** lists books from caller-supplied USFM strings (no filesystem access): standard `\\id` codes in Old Testament, New Testament, and other standard groups, plus a fourth list for non-standard `\\id` values; selection is reported through **`onBookSelect`**
@@ -232,7 +232,7 @@ The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml
 | `className` | `string` | CSS class for the container (use for height) |
 | `onViewportAnchorChange` | `(sourceOffset: number) => void` | Optional; debounced (~120ms) after scroll or selection moves the viewport — document offset near the top edge |
 
-**Find / replace:** **Ctrl+F** opens find-only; **Ctrl+H** opens find with the replace row. Use the replace icon toggle to show or hide replacement. Icon toggles set match case, regular expression, and exact match (literal string). **F3** / **Ctrl+G** find next; **Shift+F3** / **Shift+Ctrl+G** find previous; **Escape** closes the panel.
+**Find / replace:** **Ctrl+F** opens find-only; **Ctrl+H** opens find with the replace row. The left **chevron** expands or collapses replace. Inline toggles: **Match Case** (Aa), **Match Whole Word** (ab), **Use Regular Expression** (.\*). **Replace** updates the current match and moves to the next; **Replace All** replaces every match. **F3** / **Ctrl+G** find next; **Shift+F3** / **Shift+Ctrl+G** find previous; **Escape** closes the panel. All controls have tooltips.
 
 **Imperative handle** (`ref` on **`UsfmEditor`**): **`scrollSourceOffsetIntoView`**, **`getTopVisibleSourceOffset`**, **`openFind()`**, **`openFindReplace()`** — same behavior as the keyboard shortcuts.
 
