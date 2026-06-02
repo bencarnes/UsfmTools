@@ -5,7 +5,7 @@ import {
   useRef,
 } from "react";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
+import { EditorState, EditorSelection } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { usfmHighlighter, usfmLinter, usfmAutocomplete } from "./codemirror-usfm.js";
@@ -20,6 +20,10 @@ export interface UsfmEditorHandle {
   scrollSourceOffsetIntoView(offset: number): void;
   /** Document offset nearest the top of the viewport, or `null` if the editor is not mounted. */
   getTopVisibleSourceOffset(): number | null;
+  /** Move the cursor/selection to the given source range and scroll it into view. */
+  selectSourceRange(from: number, to?: number): void;
+  /** Convert a 1-based line / 0-based column to a clamped source offset, or `null` if no view. */
+  lineColumnToOffset(line: number, column: number): number | null;
   /** Open the find bar (same as Ctrl+F). */
   openFind(): void;
   /** Open find and replace (same as Ctrl+H). */
@@ -67,6 +71,27 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
       const x = rect.left + rect.width / 2;
       const y = rect.top + 4;
       return view.posAtCoords({ x, y }, false) ?? 0;
+    },
+    selectSourceRange(from: number, to?: number) {
+      const view = viewRef.current;
+      if (!view) return;
+      const doc = view.state.doc;
+      const a = Math.max(0, Math.min(from, doc.length));
+      const b = to == null ? a : Math.max(0, Math.min(to, doc.length));
+      view.dispatch({
+        selection: EditorSelection.single(a, b),
+        effects: EditorView.scrollIntoView(EditorSelection.range(a, b), { y: "center" }),
+      });
+      view.focus();
+    },
+    lineColumnToOffset(line: number, column: number) {
+      const view = viewRef.current;
+      if (!view) return null;
+      const doc = view.state.doc;
+      const safeLine = Math.max(1, Math.min(line, doc.lines));
+      const l = doc.line(safeLine);
+      const off = l.from + Math.max(0, Math.min(column, l.length));
+      return off;
     },
     openFind() {
       const view = viewRef.current;

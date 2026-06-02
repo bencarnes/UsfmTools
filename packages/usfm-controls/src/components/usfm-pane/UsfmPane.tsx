@@ -59,6 +59,19 @@ export interface UsfmPaneProps {
    * When there are no chapter markers, the switch stays disabled and sync does not run.
    */
   readonly defaultScrollSyncEnabled?: boolean;
+  /**
+   * One-shot request to position the editor caret / selection and scroll it into view.
+   * Each new object identity is treated as a new request (compare the `nonce`).
+   * Forces view mode to include the editor when emitted from preview.
+   */
+  readonly selectionRequest?: UsfmPaneSelectionRequest;
+}
+
+export interface UsfmPaneSelectionRequest {
+  readonly from: number;
+  readonly to?: number;
+  /** Bump this when re-emitting the same offset to retrigger a select+scroll. */
+  readonly nonce: number;
 }
 
 const btnBase: CSSProperties = {
@@ -94,6 +107,7 @@ export function UsfmPane({
   versePerLine,
   className,
   defaultScrollSyncEnabled = true,
+  selectionRequest,
 }: UsfmPaneProps) {
   const [viewMode, setViewMode] = useState<UsfmPaneViewMode>(defaultViewMode);
   const [splitPct, setSplitPct] = useState(50);
@@ -209,6 +223,20 @@ export function UsfmPane({
   useEffect(() => {
     if (viewMode === "preview") readPreviewChapter();
   }, [value, viewMode, readPreviewChapter]);
+
+  const lastSelectionNonceRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!selectionRequest) return;
+    if (lastSelectionNonceRef.current === selectionRequest.nonce) return;
+    lastSelectionNonceRef.current = selectionRequest.nonce;
+    if (viewMode === "preview") setViewMode("split");
+    const apply = () => editorRef.current?.selectSourceRange(selectionRequest.from, selectionRequest.to);
+    if (viewMode === "preview") {
+      const t = setTimeout(apply, 0);
+      return () => clearTimeout(t);
+    }
+    apply();
+  }, [selectionRequest, viewMode]);
 
   const goChapterIndex = useCallback(
     (idx: number) => {

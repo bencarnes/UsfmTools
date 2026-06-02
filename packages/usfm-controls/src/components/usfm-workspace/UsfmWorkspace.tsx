@@ -409,6 +409,7 @@ function EditorGroupPanel({
                 onChange={(v) => onUpdateValue(tid, v)}
                 toolbarMount={toolbarEl}
                 toolbarActive={active}
+                selectionRequest={tab.selectionRequest}
                 className="min-h-0 flex-1 rounded-none border-0"
               />
             </div>

@@ -184,6 +184,40 @@ function App() {
 | `onMoveTabToGroup` | `(detail) => void` | Move tab to another slot (**`toGroupId`**, **`insertIndex`**, **`fromGroupId`**) |
 | `className` | `string` | Optional root wrapper class |
 
+### UsfmShell
+
+**`UsfmShell`** is the top-level shell for the **`bible-edit`** application: a left sidebar with vertical icon tabs (file browser + folder-wide search) that **spans the full height of the shell**, and to its right a column with the **`UsfmWorkspace`** stacked above a collapsible bottom bar (the bottom bar does **not** extend under the sidebar). The shell is **host-agnostic** — it never touches the filesystem itself. Pass a **`UsfmShellHost`** that lists files and reads their contents; a fixture host (**`createFixtureUsfmShellHost`**) is exported for Storybook and tests.
+
+```tsx
+import { UsfmShell, createFixtureUsfmShellHost } from "@usfm-tools/controls";
+
+const host = createFixtureUsfmShellHost();
+<UsfmShell host={host} className="h-screen" />;
+```
+
+**Sidebar.** Vertical icon tabs (document icon = file browser, magnifying-glass icon = search) on the left of the sidebar; the file browser is the default tab. A chevron button toggles the sidebar between **minimized** (icons only) and **expanded** (icons + tab panel). Clicking a file opens it as a new editor tab — or focuses the existing tab if the file is already open. Search uses regular-expression matching with **`Aa`** (match case), **`ab`** (whole word), and **`.*`** (regex) toggle buttons modeled after the editor's find bar; clicking a result opens (or focuses) the file and selects the matched range in the editor.
+
+**Bottom bar.** A horizontal icon-tab strip with a single tab today — a bug icon for **Errors**. The errors panel re-runs the USFM language service against the currently active editor's content, lists each diagnostic as **`line:column`** + message, and moves the editor caret to that line/column when a row is clicked. A chevron button toggles the bottom panel between expanded and collapsed (tabs only).
+
+```ts
+interface UsfmShellHost {
+  readonly label: string;
+  listFiles(): Promise<readonly UsfmShellFileEntry[]>;
+  readFile(fileId: string): Promise<string | null>;
+}
+interface UsfmShellFileEntry {
+  readonly id: string;
+  readonly name: string;
+}
+```
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `host` | `UsfmShellHost` | File-system adapter — list files in the current folder, read a file's USFM by id |
+| `defaultSidebarExpanded` | `boolean` | Initial sidebar state (default `true`) |
+| `defaultBottomExpanded` | `boolean` | Initial bottom-bar state (default `true`) |
+| `className` | `string` | Optional root wrapper class (typically `h-screen` or similar) |
+
 ### TabGroupLayoutSelector
 
 Dropdown with a **2×2 grid** trigger icon. The menu shows four squares; clicking cell **(row, col)** sets **`gridRows = row + 1`** and **`gridCols = col + 1`** (e.g. bottom-right → 2×2). Wire **`onChange`** to **`workspaceSetGridLayout`** on your workspace model.
@@ -334,6 +368,7 @@ Stories demonstrate the editor, preview, book picker, and chapter picker with:
 - Error state (unknown markers, stray end markers)
 - **UsfmPane** — **`FullBookSplit`** and **`TwoPanesSharedState`** use a shared `useState` USFM string; **`FrontMatterNoChapters`** shows the toolbar when there are no `\\c` markers.
 - **UsfmWorkspace** — **`SingleGroupTwoTabs`**, **`TwoEditorGroups`**, and **`OpenFileDemo`** (append tab). Shared long USFM lives under **`src/fixtures/`** for Storybook.
+- **UsfmShell** — **`Default`**, **`SidebarCollapsed`**, and **`BottomBarCollapsed`** mount **`UsfmShell`** with the fixture host (**`createFixtureUsfmShellHost`**), which serves a fake folder of USFM files (including one with an unknown marker so the errors tab has content).
 - **UsfmPreview** — **`GenesisPreview`** uses `render: (args) => <UsfmPreview {...args} />` so Controls map to props; **`WithEditor`** must use that same **`args` parameter** (not a zero-arg render) so `versePerLine` updates when you toggle Controls or the checkbox (`useArgs` is only for pushing checkbox state back into Storybook). **Verse Per Line Compare** shows both modes side by side.
 
 ### Project Structure
@@ -371,6 +406,17 @@ packages/usfm-controls/
 │   │   │   ├── workspace-model.ts # Controlled props + immutable state helpers
 │   │   │   ├── UsfmWorkspace.stories.tsx
 │   │   │   └── index.ts
+│   │   ├── usfm-shell/
+│   │   │   ├── UsfmShell.tsx        # Application shell: sidebar + workspace + bottom bar
+│   │   │   ├── UsfmShell.stories.tsx
+│   │   │   ├── host.ts              # UsfmShellHost interface (file source adapter)
+│   │   │   ├── fixture-host.ts      # In-memory host for Storybook + tests
+│   │   │   ├── file-browser.tsx     # Sidebar file list tab
+│   │   │   ├── search.tsx           # Sidebar folder-wide search tab
+│   │   │   ├── errors-panel.tsx     # Bottom-bar errors tab
+│   │   │   ├── shell-icons.tsx      # Doc / search / bug / collapse icons
+│   │   │   ├── line-offsets.ts      # line/column ↔ source offset helpers
+│   │   │   └── index.ts
 │   │   └── chapter-picker/
 │   │       ├── ChapterPicker.tsx    # Wrapping row of equal-width chapter buttons
 │   │       ├── ChapterPicker.stories.tsx
@@ -389,6 +435,7 @@ packages/usfm-controls/
 │   ├── usfm-pane.test.tsx
 │   ├── usfm-editor-search.test.tsx
 │   ├── usfm-workspace.test.tsx
+│   ├── usfm-shell.test.tsx
 │   ├── chapter-offset-helpers.test.ts
 │   └── chapter-picker.test.tsx
 ├── vitest.config.ts                 # jsdom for React tests

@@ -7,6 +7,17 @@ export interface UsfmWorkspaceTabState {
    * instead of an × (clean), similar to VS Code.
    */
   readonly dirty: boolean;
+  /**
+   * Optional one-shot request to position the caret / selection in this tab's editor.
+   * Bump `nonce` to retrigger; the workspace forwards this to the underlying `UsfmPane`.
+   */
+  readonly selectionRequest?: UsfmTabSelectionRequest;
+}
+
+export interface UsfmTabSelectionRequest {
+  readonly from: number;
+  readonly to?: number;
+  readonly nonce: number;
 }
 
 export interface UsfmWorkspaceEditorGroupState {
@@ -282,6 +293,33 @@ export function workspaceMoveTabToGroup(
 
   const tabsById = pruneTabs(slots, { ...model.tabsById });
   return asModel(model.gridRows, model.gridCols, slots, tabsById);
+}
+
+/**
+ * Set a one-shot selection request on a tab. The workspace will forward this to the underlying
+ * `UsfmPane` so the editor moves its caret / selection and scrolls it into view.
+ */
+export function workspaceRequestTabSelection(
+  model: UsfmWorkspaceModel,
+  tabId: string,
+  from: number,
+  to?: number,
+): UsfmWorkspaceModel {
+  const cur = model.tabsById[tabId];
+  if (!cur) return model;
+  const prevNonce = cur.selectionRequest?.nonce ?? 0;
+  return asModel(
+    model.gridRows,
+    model.gridCols,
+    model.slots.map(cloneGroup),
+    {
+      ...model.tabsById,
+      [tabId]: {
+        ...cur,
+        selectionRequest: { from, to, nonce: prevNonce + 1 },
+      },
+    },
+  );
 }
 
 /**

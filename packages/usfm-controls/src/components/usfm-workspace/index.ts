@@ -5,6 +5,7 @@ export type {
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceInitialTab,
   UsfmWorkspaceModel,
+  UsfmTabSelectionRequest,
   WorkspaceGridDimension,
 } from "./workspace-model.js";
 export {
@@ -17,6 +18,7 @@ export {
   workspaceFlattenNonEmptyGroups,
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
+  workspaceRequestTabSelection,
   workspaceSetGridLayout,
   workspaceSetTabValue,
 } from "./workspace-model.js";

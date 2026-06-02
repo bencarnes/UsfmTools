@@ -2,7 +2,11 @@ export { UsfmEditor } from "./components/usfm-editor/index.js";
 export type { UsfmEditorProps } from "./components/usfm-editor/index.js";
 export type { UsfmEditorHandle } from "./components/usfm-editor/index.js";
 export { UsfmPane } from "./components/usfm-pane/index.js";
-export type { UsfmPaneProps, UsfmPaneViewMode } from "./components/usfm-pane/index.js";
+export type {
+  UsfmPaneProps,
+  UsfmPaneViewMode,
+  UsfmPaneSelectionRequest,
+} from "./components/usfm-pane/index.js";
 export { UsfmWorkspace } from "./components/usfm-workspace/index.js";
 export { TabGroupLayoutSelector } from "./components/tab-group-layout-selector/index.js";
 export type {
@@ -11,6 +15,7 @@ export type {
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceInitialTab,
   UsfmWorkspaceModel,
+  UsfmTabSelectionRequest,
   WorkspaceGridDimension,
 } from "./components/usfm-workspace/index.js";
 export type { TabGroupLayoutSelectorProps } from "./components/tab-group-layout-selector/index.js";
@@ -24,9 +29,18 @@ export {
   workspaceFlattenNonEmptyGroups,
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
+  workspaceRequestTabSelection,
   workspaceSetGridLayout,
   workspaceSetTabValue,
 } from "./components/usfm-workspace/index.js";
+export { UsfmShell, createFixtureUsfmShellHost } from "./components/usfm-shell/index.js";
+export type {
+  UsfmShellProps,
+  UsfmShellHost,
+  UsfmShellFileEntry,
+  FixtureUsfmShellHostOptions,
+  SearchMatch as UsfmShellSearchMatch,
+} from "./components/usfm-shell/index.js";
 export { UsfmPreview } from "./components/usfm-preview/index.js";
 export type { UsfmPreviewProps } from "./components/usfm-preview/index.js";
 export { UsfmBookPicker } from "./components/usfm-book-picker/index.js";
