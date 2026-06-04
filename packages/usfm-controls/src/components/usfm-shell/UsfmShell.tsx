@@ -23,6 +23,7 @@ import {
   DocIcon,
   ExpandRightIcon,
   ExpandUpIcon,
+  GearIcon,
   SearchIcon,
 } from "./shell-icons.js";
 import { lineColumnToSourceOffset } from "./line-offsets.js";
@@ -279,6 +280,15 @@ export function UsfmShell({
             );
           })}
           <div className="flex-1" />
+          <button
+            type="button"
+            className="flex h-10 items-center justify-center text-gray-600 hover:bg-gray-100"
+            aria-label="Settings"
+            title="Settings"
+            data-testid="usfm-shell-sidebar-settings"
+          >
+            <GearIcon />
+          </button>
           <button
             type="button"
             className="flex h-10 items-center justify-center text-gray-600 hover:bg-gray-100"
