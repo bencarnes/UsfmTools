@@ -1,10 +1,14 @@
+import type { SettingsHost } from "../settings-pane/settings-model.js";
+
 /**
  * Host interface that supplies the {@link UsfmShell} with access to the underlying
  * file system (or any other storage backend). The shell never touches the file
  * system directly — production hosts (for example the Tauri/Electron app) and the
  * Storybook fixture implement this same shape so the shell stays portable.
+ *
+ * Also persists application settings via {@link SettingsHost}.
  */
-export interface UsfmShellHost {
+export interface UsfmShellHost extends SettingsHost {
   /**
    * Stable, human-readable label for the source — for example a folder name.
    * Shown above the file browser tab.

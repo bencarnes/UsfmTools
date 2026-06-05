@@ -11,6 +11,7 @@ import {
   type SetStateAction,
 } from "react";
 import { UsfmPane } from "../usfm-pane/UsfmPane.js";
+import { SettingsPane } from "../settings-pane/SettingsPane.js";
 import { TabListDropdown } from "./tab-list-dropdown.js";
 import type {
   UsfmWorkspaceEditorGroupState,
@@ -404,14 +405,18 @@ function EditorGroupPanel({
               }
               aria-hidden={!active}
             >
-              <UsfmPane
-                value={tab.value}
-                onChange={(v) => onUpdateValue(tid, v)}
-                toolbarMount={toolbarEl}
-                toolbarActive={active}
-                selectionRequest={tab.selectionRequest}
-                className="min-h-0 flex-1 rounded-none border-0"
-              />
+              {tab.kind === "settings" ? (
+                <SettingsPane className="min-h-0 flex-1" />
+              ) : (
+                <UsfmPane
+                  value={tab.value}
+                  onChange={(v) => onUpdateValue(tid, v)}
+                  toolbarMount={toolbarEl}
+                  toolbarActive={active}
+                  selectionRequest={tab.selectionRequest}
+                  className="min-h-0 flex-1 rounded-none border-0"
+                />
+              )}
             </div>
           );
         })}

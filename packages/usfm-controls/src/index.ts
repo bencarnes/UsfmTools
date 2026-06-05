@@ -12,6 +12,7 @@ export { TabGroupLayoutSelector } from "./components/tab-group-layout-selector/i
 export type {
   UsfmWorkspaceProps,
   UsfmWorkspaceTabState,
+  UsfmWorkspaceTabKind,
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceInitialTab,
   UsfmWorkspaceModel,
@@ -28,11 +29,27 @@ export {
   workspaceFlattenGroups,
   workspaceFlattenNonEmptyGroups,
   workspaceMoveTabToGroup,
+  workspaceOpenSettingsTab,
   workspaceReorderTabInGroup,
   workspaceRequestTabSelection,
   workspaceSetGridLayout,
   workspaceSetTabValue,
+  SETTINGS_TAB_ID,
 } from "./components/usfm-workspace/index.js";
+export { SettingsPane, SettingsProvider, useSettings } from "./components/settings-pane/index.js";
+export {
+  DEFAULT_APPLICATION_SETTINGS,
+  UI_THEME_OPTIONS,
+} from "./components/settings-pane/index.js";
+export type {
+  SettingsPaneProps,
+  SettingsProviderProps,
+  SettingsContextValue,
+  ApplicationSettings,
+  UiTheme,
+  UiThemeOption,
+  SettingsHost,
+} from "./components/settings-pane/index.js";
 export { UsfmShell, createFixtureUsfmShellHost } from "./components/usfm-shell/index.js";
 export type {
   UsfmShellProps,

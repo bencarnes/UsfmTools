@@ -1,4 +1,5 @@
 import { SAMPLE_BSB_GENESIS_USFM, SAMPLE_EXO_SNIPPET_USFM } from "../../fixtures/sample-bsb-genesis-usfm.js";
+import type { ApplicationSettings } from "../settings-pane/settings-model.js";
 import type { UsfmShellFileEntry, UsfmShellHost } from "./host.js";
 
 const LEV_USFM = `\\id LEV
@@ -43,6 +44,8 @@ const DEFAULT_FILES: readonly FixtureFile[] = [
 export interface FixtureUsfmShellHostOptions {
   readonly label?: string;
   readonly files?: readonly FixtureFile[];
+  /** Initial persisted settings. Defaults to `null` (the pane then falls back to defaults). */
+  readonly settings?: ApplicationSettings;
 }
 
 /**
@@ -52,6 +55,8 @@ export interface FixtureUsfmShellHostOptions {
 export function createFixtureUsfmShellHost(options: FixtureUsfmShellHostOptions = {}): UsfmShellHost {
   const files = options.files ?? DEFAULT_FILES;
   const byId = new Map(files.map((f) => [f.entry.id, f.usfm] as const));
+  // In-memory settings store; persists for the lifetime of this host instance.
+  let settings: ApplicationSettings | null = options.settings ?? null;
   return {
     label: options.label ?? "Sample bible folder",
     async listFiles() {
@@ -59,6 +64,12 @@ export function createFixtureUsfmShellHost(options: FixtureUsfmShellHostOptions 
     },
     async readFile(id: string) {
       return byId.get(id) ?? null;
+    },
+    async loadSettings() {
+      return settings;
+    },
+    async saveSettings(next: ApplicationSettings) {
+      settings = next;
     },
   };
 }

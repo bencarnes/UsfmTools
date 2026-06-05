@@ -1,7 +1,15 @@
+/**
+ * What a workspace tab renders. `editor` tabs hold USFM content edited in a {@link UsfmPane};
+ * `settings` tabs render the {@link SettingsPane}. Defaults to `editor` when omitted.
+ */
+export type UsfmWorkspaceTabKind = "editor" | "settings";
+
 export interface UsfmWorkspaceTabState {
   readonly id: string;
   readonly fileName: string;
   readonly value: string;
+  /** Pane kind for this tab. Omitted (or `editor`) renders a USFM editor pane. */
+  readonly kind?: UsfmWorkspaceTabKind;
   /**
    * Stub for future save integration. When true, the tab close affordance uses a circle (dirty)
    * instead of an × (clean), similar to VS Code.
@@ -329,7 +337,13 @@ export function workspaceAppendTab(
   model: UsfmWorkspaceModel,
   options: {
     readonly groupId: string;
-    readonly tab: { readonly id?: string; readonly fileName: string; readonly value: string; readonly dirty?: boolean };
+    readonly tab: {
+      readonly id?: string;
+      readonly fileName: string;
+      readonly value: string;
+      readonly dirty?: boolean;
+      readonly kind?: UsfmWorkspaceTabKind;
+    };
     readonly activate?: boolean;
   },
 ): UsfmWorkspaceModel {
@@ -338,6 +352,7 @@ export function workspaceAppendTab(
     id,
     fileName: options.tab.fileName,
     value: options.tab.value,
+    kind: options.tab.kind ?? "editor",
     dirty: options.tab.dirty ?? false,
   };
   const activate = options.activate !== false;
@@ -354,4 +369,35 @@ export function workspaceAppendTab(
     };
   });
   return asModel(model.gridRows, model.gridCols, slots, { ...model.tabsById, [id]: tab });
+}
+
+/** Stable id for the singleton settings tab. */
+export const SETTINGS_TAB_ID = "settings";
+
+/** Find the group that currently holds the given tab, if any. */
+function findGroupHoldingTab(model: UsfmWorkspaceModel, tabId: string): string | null {
+  for (const slot of model.slots) {
+    if (slot.tabIds.includes(tabId)) return slot.id;
+  }
+  return null;
+}
+
+/**
+ * Open (or focus) the singleton settings tab. If a settings tab already exists it is activated in
+ * place; otherwise a new one is appended to the first slot (or the given `groupId`).
+ */
+export function workspaceOpenSettingsTab(
+  model: UsfmWorkspaceModel,
+  options?: { readonly groupId?: string },
+): UsfmWorkspaceModel {
+  const existingGroup = findGroupHoldingTab(model, SETTINGS_TAB_ID);
+  if (existingGroup) {
+    return workspaceActivateTab(model, existingGroup, SETTINGS_TAB_ID);
+  }
+  const groupId = options?.groupId ?? model.slots[0]?.id;
+  if (!groupId) return model;
+  return workspaceAppendTab(model, {
+    groupId,
+    tab: { id: SETTINGS_TAB_ID, fileName: "Settings", value: "", kind: "settings" },
+  });
 }
