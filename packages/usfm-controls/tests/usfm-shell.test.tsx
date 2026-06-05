@@ -2,13 +2,18 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { UsfmShell } from "../src/components/usfm-shell/UsfmShell.js";
 import type { UsfmShellHost } from "../src/components/usfm-shell/host.js";
+import type { ApplicationSettings } from "../src/components/settings-pane/settings-model.js";
 import { lineColumnToSourceOffset, sourceOffsetToLineColumn } from "../src/components/usfm-shell/line-offsets.js";
 
 afterEach(() => {
   cleanup();
 });
 
-function makeHost(files: readonly { id: string; name: string; usfm: string }[]): UsfmShellHost {
+function makeHost(
+  files: readonly { id: string; name: string; usfm: string }[],
+  settingsStore?: { value: ApplicationSettings | null },
+): UsfmShellHost {
+  const store = settingsStore ?? { value: null };
   return {
     label: "Test folder",
     async listFiles() {
@@ -17,6 +22,12 @@ function makeHost(files: readonly { id: string; name: string; usfm: string }[]):
     async readFile(id: string) {
       const f = files.find((x) => x.id === id);
       return f ? f.usfm : null;
+    },
+    async loadSettings() {
+      return store.value;
+    },
+    async saveSettings(next) {
+      store.value = next;
     },
   };
 }
@@ -133,5 +144,39 @@ describe("UsfmShell", () => {
     expect(screen.queryByTestId("usfm-shell-bottom-panel")).toBeNull();
     fireEvent.click(screen.getByTestId("usfm-shell-bottom-toggle"));
     expect(screen.getByTestId("usfm-shell-bottom-panel")).toBeTruthy();
+  });
+
+  it("opens the settings pane as a workspace tab when the gear is clicked", async () => {
+    const host = makeHost([]);
+    render(<UsfmShell host={host} />);
+    fireEvent.click(screen.getByTestId("usfm-shell-sidebar-settings"));
+    await waitFor(() => screen.getByTestId("settings-pane"));
+    expect(screen.getByRole("tab", { name: /Settings/i })).toBeTruthy();
+  });
+
+  it("reuses the single settings tab when the gear is clicked again", async () => {
+    const host = makeHost([]);
+    render(<UsfmShell host={host} />);
+    fireEvent.click(screen.getByTestId("usfm-shell-sidebar-settings"));
+    await waitFor(() => screen.getByTestId("settings-pane"));
+    fireEvent.click(screen.getByTestId("usfm-shell-sidebar-settings"));
+    expect(screen.getAllByRole("tab", { name: /Settings/i }).length).toBe(1);
+  });
+
+  it("loads the persisted theme and saves a change through the host", async () => {
+    const store: { value: ApplicationSettings | null } = { value: { theme: "dark" } };
+    const host = makeHost([], store);
+    render(<UsfmShell host={host} />);
+    fireEvent.click(screen.getByTestId("usfm-shell-sidebar-settings"));
+    await waitFor(() => screen.getByTestId("settings-pane"));
+
+    // Persisted "dark" is reflected as the checked option.
+    const dark = screen.getByTestId("settings-theme-option-dark").querySelector("input")!;
+    await waitFor(() => expect((dark as HTMLInputElement).checked).toBe(true));
+
+    // Selecting "light" persists through the host.
+    const light = screen.getByTestId("settings-theme-option-light").querySelector("input")!;
+    fireEvent.click(light);
+    expect(store.value).toEqual({ theme: "light" });
   });
 });

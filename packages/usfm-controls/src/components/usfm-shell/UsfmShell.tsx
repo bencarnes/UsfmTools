@@ -9,10 +9,13 @@ import {
   workspaceCloseTab,
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
+  workspaceOpenSettingsTab,
   workspaceRequestTabSelection,
+  SETTINGS_TAB_ID,
   workspaceSetTabValue,
   type UsfmWorkspaceModel,
 } from "../usfm-workspace/workspace-model.js";
+import { SettingsProvider } from "../settings-pane/settings-context.js";
 import { FileBrowser } from "./file-browser.js";
 import { FileSearch, type SearchMatch } from "./search.js";
 import { ErrorsPanel } from "./errors-panel.js";
@@ -101,7 +104,8 @@ export function UsfmShell({
 
   // Re-validate when the focused tab's content (or identity) changes.
   useEffect(() => {
-    if (!focusedTab) {
+    // Only editor tabs carry USFM to validate; settings (and other non-editor panes) have none.
+    if (!focusedTab || focusedTab.kind === "settings") {
       setDiagnostics([]);
       return;
     }
@@ -156,6 +160,11 @@ export function UsfmShell({
       setModel((p) => workspaceMoveTabToGroup(p, detail)),
     [],
   );
+
+  const handleOpenSettings = useCallback(() => {
+    setModel((p) => workspaceOpenSettingsTab(p));
+    setFocusedTabId(SETTINGS_TAB_ID);
+  }, []);
 
   // ---- file open / focus ----
 
@@ -239,10 +248,11 @@ export function UsfmShell({
   );
 
   return (
-    <div
-      data-testid="usfm-shell"
-      className={`flex h-full min-h-0 min-w-0 flex-row bg-white ${className ?? ""}`}
-    >
+    <SettingsProvider host={host}>
+      <div
+        data-testid="usfm-shell"
+        className={`flex h-full min-h-0 min-w-0 flex-row bg-white ${className ?? ""}`}
+      >
       {/* Left sidebar — vertical tab rail + (when expanded) tab panel, spanning full height */}
       <aside
         className="flex min-h-0 shrink-0 flex-row border-r border-gray-300 bg-gray-100"
@@ -285,6 +295,7 @@ export function UsfmShell({
             className="flex h-10 items-center justify-center text-gray-600 hover:bg-gray-100"
             aria-label="Settings"
             title="Settings"
+            onClick={handleOpenSettings}
             data-testid="usfm-shell-sidebar-settings"
           >
             <GearIcon />
@@ -410,6 +421,7 @@ export function UsfmShell({
           ) : null}
         </section>
       </div>
-    </div>
+      </div>
+    </SettingsProvider>
   );
 }

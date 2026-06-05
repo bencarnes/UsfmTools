@@ -2,6 +2,7 @@ export { UsfmWorkspace } from "./UsfmWorkspace.js";
 export type {
   UsfmWorkspaceProps,
   UsfmWorkspaceTabState,
+  UsfmWorkspaceTabKind,
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceInitialTab,
   UsfmWorkspaceModel,
@@ -17,8 +18,10 @@ export {
   workspaceFlattenGroups,
   workspaceFlattenNonEmptyGroups,
   workspaceMoveTabToGroup,
+  workspaceOpenSettingsTab,
   workspaceReorderTabInGroup,
   workspaceRequestTabSelection,
   workspaceSetGridLayout,
   workspaceSetTabValue,
+  SETTINGS_TAB_ID,
 } from "./workspace-model.js";

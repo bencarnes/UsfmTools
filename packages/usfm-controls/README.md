@@ -195,15 +195,18 @@ const host = createFixtureUsfmShellHost();
 <UsfmShell host={host} className="h-screen" />;
 ```
 
-**Sidebar.** Vertical icon tabs (document icon = file browser, magnifying-glass icon = search) on the left of the sidebar; the file browser is the default tab. A chevron button toggles the sidebar between **minimized** (icons only) and **expanded** (icons + tab panel). Clicking a file opens it as a new editor tab — or focuses the existing tab if the file is already open. Search uses regular-expression matching with **`Aa`** (match case), **`ab`** (whole word), and **`.*`** (regex) toggle buttons modeled after the editor's find bar; clicking a result opens (or focuses) the file and selects the matched range in the editor.
+**Sidebar.** Vertical icon tabs (document icon = file browser, magnifying-glass icon = search) on the left of the sidebar; the file browser is the default tab. A chevron button toggles the sidebar between **minimized** (icons only) and **expanded** (icons + tab panel). A **gear** button at the bottom of the icon rail opens the **`SettingsPane`** as a singleton workspace tab (see **SettingsPane** above). Clicking a file opens it as a new editor tab — or focuses the existing tab if the file is already open. Search uses regular-expression matching with **`Aa`** (match case), **`ab`** (whole word), and **`.*`** (regex) toggle buttons modeled after the editor's find bar; clicking a result opens (or focuses) the file and selects the matched range in the editor.
 
 **Bottom bar.** A horizontal icon-tab strip with a single tab today — a bug icon for **Errors**. The errors panel re-runs the USFM language service against the currently active editor's content, lists each diagnostic as **`line:column`** + message, and moves the editor caret to that line/column when a row is clicked. A chevron button toggles the bottom panel between expanded and collapsed (tabs only).
 
 ```ts
-interface UsfmShellHost {
+interface UsfmShellHost extends SettingsHost {
   readonly label: string;
   listFiles(): Promise<readonly UsfmShellFileEntry[]>;
   readFile(fileId: string): Promise<string | null>;
+  // from SettingsHost — persist application settings (see SettingsPane):
+  loadSettings(): Promise<ApplicationSettings | null>;
+  saveSettings(settings: ApplicationSettings): Promise<void>;
 }
 interface UsfmShellFileEntry {
   readonly id: string;
@@ -217,6 +220,43 @@ interface UsfmShellFileEntry {
 | `defaultSidebarExpanded` | `boolean` | Initial sidebar state (default `true`) |
 | `defaultBottomExpanded` | `boolean` | Initial bottom-bar state (default `true`) |
 | `className` | `string` | Optional root wrapper class (typically `h-screen` or similar) |
+
+### SettingsPane
+
+**`SettingsPane`** is a workspace pane for editing application settings. Today it exposes a single setting — the **color theme** (**Light**, **Dark**, **System**) — as a radio group. (Theming itself is **not yet implemented**; the pane only persists the preference.) The pane reads and writes a **host-backed settings store** directly through the **`useSettings()`** hook, so it must be rendered inside a **`SettingsProvider`**; it takes no settings props of its own.
+
+Inside **`UsfmShell`**, the sidebar **gear** button opens the **`SettingsPane`** as a **singleton** workspace tab (clicking it again focuses the existing tab), and the shell wraps its tree in a **`SettingsProvider`** bound to the host. To use the pane standalone, supply your own provider:
+
+```tsx
+import { SettingsPane, SettingsProvider } from "@usfm-tools/controls";
+
+<SettingsProvider host={host}>
+  <SettingsPane className="h-full" />
+</SettingsProvider>;
+```
+
+**`SettingsProvider`** loads settings once from the host on mount (`loadSettings()`) and persists every change (`saveSettings(next)`), so neither the shell nor the **`UsfmWorkspace`** mediates settings changes. **`useSettings()`** returns `{ settings, loading, setSettings, setTheme }`. The persistence backend is the narrow **`SettingsHost`** interface, which **`UsfmShellHost`** extends:
+
+```ts
+type UiTheme = "light" | "dark" | "system";
+interface ApplicationSettings {
+  readonly theme: UiTheme;
+}
+interface SettingsHost {
+  loadSettings(): Promise<ApplicationSettings | null>; // null → defaults
+  saveSettings(settings: ApplicationSettings): Promise<void>;
+}
+```
+
+| Export | Kind | Description |
+|--------|------|-------------|
+| `SettingsPane` | component | Settings UI; reads/writes via `useSettings()` (needs a provider). Props: `className` |
+| `SettingsProvider` | component | Owns settings state + persistence; props: `host: SettingsHost`, `children` |
+| `useSettings` | hook | `{ settings, loading, setSettings, setTheme }` — throws outside a provider |
+| `ApplicationSettings` / `UiTheme` | types | Settings shape and theme union |
+| `UI_THEME_OPTIONS` / `DEFAULT_APPLICATION_SETTINGS` | values | Theme option list (label + description) and defaults |
+
+Workspace tabs carry an optional **`kind`** (**`"editor"`** \| **`"settings"`**, default `editor`); **`UsfmWorkspace`** renders a **`SettingsPane`** for settings tabs and a **`UsfmPane`** otherwise. Open the singleton settings tab on a model with **`workspaceOpenSettingsTab(model)`** (exported alongside **`SETTINGS_TAB_ID`**).
 
 ### TabGroupLayoutSelector
 
@@ -328,6 +368,8 @@ The service is currently synchronous (runs in the main thread via `createLanguag
 
 **Lightweight:** No VS Code / Monaco fork. CodeMirror 6 provides the editing primitives; the USFM-specific intelligence lives in our language service.
 
+**Self-contained pane state:** cross-cutting state that nothing else in the shell reads (for example **settings**) lives in a **host-backed context store** the pane reads and writes directly (**`SettingsProvider`** + **`useSettings()`**), rather than bubbling change events up through **`UsfmWorkspace`** to **`UsfmShell`**. The shell only wires the provider to the host; it does not own or mediate the state. Reserve the shell-owned, fully-controlled pattern (state + callbacks threaded through the workspace) for data genuinely shared across the shell — open tabs, focus, and diagnostics.
+
 ## Development
 
 ### Prerequisites
@@ -368,7 +410,8 @@ Stories demonstrate the editor, preview, book picker, and chapter picker with:
 - Error state (unknown markers, stray end markers)
 - **UsfmPane** — **`FullBookSplit`** and **`TwoPanesSharedState`** use a shared `useState` USFM string; **`FrontMatterNoChapters`** shows the toolbar when there are no `\\c` markers.
 - **UsfmWorkspace** — **`SingleGroupTwoTabs`**, **`TwoEditorGroups`**, and **`OpenFileDemo`** (append tab). Shared long USFM lives under **`src/fixtures/`** for Storybook.
-- **UsfmShell** — **`Default`**, **`SidebarCollapsed`**, and **`BottomBarCollapsed`** mount **`UsfmShell`** with the fixture host (**`createFixtureUsfmShellHost`**), which serves a fake folder of USFM files (including one with an unknown marker so the errors tab has content).
+- **UsfmShell** — **`Default`**, **`SidebarCollapsed`**, and **`BottomBarCollapsed`** mount **`UsfmShell`** with the fixture host (**`createFixtureUsfmShellHost`**), which serves a fake folder of USFM files (including one with an unknown marker so the errors tab has content) and an in-memory settings store.
+- **SettingsPane** — **`Default`** (no persisted settings) and **`DarkPersisted`** (host returns `theme: "dark"`) wrap the pane in a **`SettingsProvider`** backed by an in-memory host that logs `saveSettings` to the console.
 - **UsfmPreview** — **`GenesisPreview`** uses `render: (args) => <UsfmPreview {...args} />` so Controls map to props; **`WithEditor`** must use that same **`args` parameter** (not a zero-arg render) so `versePerLine` updates when you toggle Controls or the checkbox (`useArgs` is only for pushing checkbox state back into Storybook). **Verse Per Line Compare** shows both modes side by side.
 
 ### Project Structure
@@ -416,6 +459,12 @@ packages/usfm-controls/
 │   │   │   ├── errors-panel.tsx     # Bottom-bar errors tab
 │   │   │   ├── shell-icons.tsx      # Doc / search / bug / collapse icons
 │   │   │   ├── line-offsets.ts      # line/column ↔ source offset helpers
+│   │   │   └── index.ts
+│   │   ├── settings-pane/
+│   │   │   ├── SettingsPane.tsx      # Settings UI (theme); reads/writes via useSettings()
+│   │   │   ├── SettingsPane.stories.tsx
+│   │   │   ├── settings-context.tsx  # SettingsProvider + useSettings (host-backed store)
+│   │   │   ├── settings-model.ts     # ApplicationSettings, UiTheme, SettingsHost, defaults
 │   │   │   └── index.ts
 │   │   └── chapter-picker/
 │   │       ├── ChapterPicker.tsx    # Wrapping row of equal-width chapter buttons
