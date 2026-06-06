@@ -82,7 +82,7 @@ export const WithEditor: Story = {
           <UsfmPreview
             value={value}
             versePerLine={versePerLine}
-            className="max-w-prose flex-1 overflow-auto rounded-md border border-gray-200 bg-amber-50/30 p-4 dark:border-gray-700 dark:bg-amber-950/20"
+            className={`${previewPanelClass} flex-1 overflow-auto`}
           />
         </div>
       </div>
