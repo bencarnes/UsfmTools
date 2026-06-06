@@ -14,6 +14,7 @@ import {
   type SettingsHost,
   type UiTheme,
 } from "./settings-model.js";
+import { SettingsThemePreferenceProvider, ThemeScope } from "./theme-scope.js";
 
 export interface SettingsContextValue {
   /** Current settings. Equals {@link DEFAULT_APPLICATION_SETTINGS} until the host load resolves. */
@@ -84,7 +85,15 @@ export function SettingsProvider({ host, children }: SettingsProviderProps) {
     [settings, loading, setSettings, setTheme],
   );
 
-  return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
+  return (
+    <SettingsContext.Provider value={value}>
+      <SettingsThemePreferenceProvider theme={settings.theme}>
+        <ThemeScope theme={settings.theme} className="h-full min-h-0 min-w-0">
+          {children}
+        </ThemeScope>
+      </SettingsThemePreferenceProvider>
+    </SettingsContext.Provider>
+  );
 }
 
 /** Read the settings store. Must be called within a {@link SettingsProvider}. */

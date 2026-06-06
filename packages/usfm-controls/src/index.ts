@@ -40,6 +40,10 @@ export { SettingsPane, SettingsProvider, useSettings } from "./components/settin
 export {
   DEFAULT_APPLICATION_SETTINGS,
   UI_THEME_OPTIONS,
+  ThemeScope,
+  useResolvedTheme,
+  getSystemTheme,
+  resolveUiTheme,
 } from "./components/settings-pane/index.js";
 export type {
   SettingsPaneProps,
@@ -49,6 +53,8 @@ export type {
   UiTheme,
   UiThemeOption,
   SettingsHost,
+  ThemeScopeProps,
+  ResolvedTheme,
 } from "./components/settings-pane/index.js";
 export { UsfmShell, createFixtureUsfmShellHost } from "./components/usfm-shell/index.js";
 export type {

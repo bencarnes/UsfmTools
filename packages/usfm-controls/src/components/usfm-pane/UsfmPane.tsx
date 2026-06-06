@@ -37,6 +37,7 @@ import {
 import { ScrollSyncToggleButton } from "./scroll-sync-toggle.js";
 import { nextViewMode, ViewModeCycleButton, type UsfmPaneViewMode } from "./view-mode-toggle.js";
 import { FindToolbarButton } from "./find-toolbar-button.js";
+import { themedControlButton } from "../../theme-tokens.js";
 
 export type { UsfmPaneViewMode };
 
@@ -75,10 +76,9 @@ export interface UsfmPaneSelectionRequest {
 }
 
 const btnBase: CSSProperties = {
+  ...themedControlButton,
   padding: "0.25rem 0.5rem",
   borderRadius: "4px",
-  border: "1px solid color-mix(in srgb, CanvasText 22%, transparent)",
-  background: "color-mix(in srgb, Canvas 96%, CanvasText 4%)",
   cursor: "pointer",
   fontSize: "0.85rem",
 };
@@ -369,7 +369,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
 
   return (
     <div
-      className={`flex h-full flex-col overflow-hidden bg-white border border-gray-300 rounded-md ${
+      className={`flex h-full flex-col overflow-hidden rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900 ${
         useExternalToolbar ? "min-h-0" : "min-h-[280px]"
       } ${className ?? ""}`}
     >
@@ -379,8 +379,8 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
             ...toolbarRowStyle,
             flexWrap: "wrap",
             padding: "0.4rem 0.5rem",
-            borderBottom: "1px solid color-mix(in srgb, CanvasText 18%, transparent)",
-            background: "color-mix(in srgb, Canvas 97%, CanvasText 3%)",
+            borderBottom: "1px solid var(--usfm-border-subtle)",
+            background: "var(--usfm-surface-muted)",
           }}
         >
           {toolbar}
@@ -424,13 +424,13 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
               role="separator"
               aria-orientation="vertical"
               tabIndex={0}
-              className="w-1.5 shrink-0 cursor-col-resize bg-gray-200 hover:bg-gray-400"
+              className="w-1.5 shrink-0 cursor-col-resize bg-gray-200 hover:bg-gray-400 dark:bg-gray-700 dark:hover:bg-gray-500"
               onMouseDown={onSplitMouseDown}
             />
             <div style={{ flex: 1, minWidth: 0 }} className="flex min-h-0 flex-col">
               <div
                 ref={previewScrollRef}
-                className="flex-1 min-h-0 overflow-auto p-3 border-l border-gray-200"
+                className="flex-1 min-h-0 overflow-auto border-l border-gray-200 p-3 dark:border-gray-700"
                 onScroll={onPreviewScroll}
               >
                 <UsfmPreview value={value} versePerLine={versePerLine} />

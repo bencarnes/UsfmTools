@@ -2,7 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --usfm-fg: #111827;
+    --usfm-fg-muted: #6b7280;
+    --usfm-fg-subtle: #9ca3af;
+    --usfm-surface: #ffffff;
+    --usfm-surface-muted: #f9fafb;
+    --usfm-surface-elevated: #f3f4f6;
+    --usfm-border: #d1d5db;
+    --usfm-border-subtle: #e5e7eb;
+    --usfm-accent: #2563eb;
+    --usfm-accent-muted: #eff6ff;
+    --usfm-accent-fg: #1e3a8a;
+    --usfm-control-bg: color-mix(in srgb, var(--usfm-surface) 96%, var(--usfm-fg) 4%);
+    --usfm-shadow-popover: 0 4px 12px rgb(15 23 42 / 0.12);
+
+    --usfm-cm-bg: #ffffff;
+    --usfm-cm-fg: #111827;
+    --usfm-cm-gutter: #f3f4f6;
+    --usfm-cm-gutter-fg: #9ca3af;
+    --usfm-cm-selection: #dbeafe;
+    --usfm-syntax-marker: #1e40af;
+    --usfm-syntax-endmarker: #6b21a8;
+    --usfm-syntax-verse: #b91c1c;
+    --usfm-syntax-chapter: #c2410c;
+    --usfm-syntax-attribute: #0f766e;
+    --usfm-syntax-attrvalue: #15803d;
+
+    --usfm-search-panel-bg: #f8fafc;
+    --usfm-search-panel-border: #cbd5e1;
+    --usfm-search-field-bg: #ffffff;
+    --usfm-search-field-border: #cbd5e1;
+    --usfm-search-field-focus: #93c5fd;
+    --usfm-search-btn-hover: rgb(15 23 42 / 0.08);
+    --usfm-search-mode-on-bg: #dbeafe;
+    --usfm-search-mode-on-border: #93c5fd;
+    --usfm-search-mode-on-fg: #1e40af;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --usfm-fg: #f3f4f6;
+    --usfm-fg-muted: #9ca3af;
+    --usfm-fg-subtle: #6b7280;
+    --usfm-surface: #111827;
+    --usfm-surface-muted: #1f2937;
+    --usfm-surface-elevated: #374151;
+    --usfm-border: #4b5563;
+    --usfm-border-subtle: #374151;
+    --usfm-accent: #60a5fa;
+    --usfm-accent-muted: rgb(30 58 138 / 0.35);
+    --usfm-accent-fg: #bfdbfe;
+    --usfm-control-bg: color-mix(in srgb, var(--usfm-surface) 92%, var(--usfm-fg) 8%);
+    --usfm-shadow-popover: 0 4px 12px rgb(0 0 0 / 0.45);
+
+    --usfm-cm-bg: #111827;
+    --usfm-cm-fg: #f3f4f6;
+    --usfm-cm-gutter: #1f2937;
+    --usfm-cm-gutter-fg: #6b7280;
+    --usfm-cm-selection: rgb(37 99 235 / 0.35);
+    --usfm-syntax-marker: #60a5fa;
+    --usfm-syntax-endmarker: #c084fc;
+    --usfm-syntax-verse: #f87171;
+    --usfm-syntax-chapter: #fb923c;
+    --usfm-syntax-attribute: #2dd4bf;
+    --usfm-syntax-attrvalue: #4ade80;
+
+    --usfm-search-panel-bg: #1f2937;
+    --usfm-search-panel-border: #4b5563;
+    --usfm-search-field-bg: #111827;
+    --usfm-search-field-border: #4b5563;
+    --usfm-search-field-focus: #60a5fa;
+    --usfm-search-btn-hover: rgb(255 255 255 / 0.08);
+    --usfm-search-mode-on-bg: rgb(37 99 235 / 0.35);
+    --usfm-search-mode-on-border: #60a5fa;
+    --usfm-search-mode-on-fg: #bfdbfe;
+  }
+}
+
 @layer components {
+  .usfm-preview-root {
+    color: var(--usfm-fg);
+    background-color: var(--usfm-surface);
+  }
+
   .usfm-preview-root .usfm-document {
     font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
     max-width: 42rem;
@@ -28,7 +115,15 @@
     display: none;
   }
   .usfm-preview-root .usfm-preview-errors {
-    @apply text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-2;
+    @apply text-sm rounded p-2 mb-2;
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+  }
+
+  .dark .usfm-preview-root .usfm-preview-errors {
+    color: #fca5a5;
+    background: rgb(127 29 29 / 0.35);
+    border-color: #991b1b;
   }
 }
-

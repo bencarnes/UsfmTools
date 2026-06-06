@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
 import { UsfmEditor } from "./UsfmEditor.js";
 
 const meta = {
   title: "Controls/UsfmEditor",
   component: UsfmEditor,
+  decorators: [withSystemTheme],
   parameters: {
     layout: "padded",
     docs: {

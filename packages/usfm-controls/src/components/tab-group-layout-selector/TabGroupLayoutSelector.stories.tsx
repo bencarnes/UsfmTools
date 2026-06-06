@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
+import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
 import type { WorkspaceGridDimension } from "../usfm-workspace/workspace-model.js";
 import { TabGroupLayoutSelector } from "./TabGroupLayoutSelector.js";
 
 const meta: Meta<typeof TabGroupLayoutSelector> = {
   title: "Controls/TabGroupLayoutSelector",
   component: TabGroupLayoutSelector,
+  decorators: [withSystemTheme],
 };
 
 export default meta;
@@ -25,7 +27,7 @@ export const Default: Story = {
             setCols(c);
           }}
         />
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-600 dark:text-gray-400">
           Layout: {rows}×{cols}
         </span>
       </div>

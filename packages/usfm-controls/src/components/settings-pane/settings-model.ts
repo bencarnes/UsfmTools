@@ -4,7 +4,7 @@
  * and the Storybook fixture share the same shape.
  */
 
-/** Color theme preference. `system` follows the OS setting. (Theming itself is not yet implemented.) */
+/** Color theme preference. `system` follows the OS light/dark setting. */
 export type UiTheme = "light" | "dark" | "system";
 
 export interface ApplicationSettings {

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
+import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
 import {
   STANDARD_USFM_BOOK_IDENTIFIERS,
   type UsfmBookPickerFileInput,
@@ -76,6 +77,7 @@ const SAMPLE_FILES: readonly UsfmBookPickerFileInput[] = [
 const meta = {
   title: "Controls/UsfmBookPicker",
   component: UsfmBookPicker,
+  decorators: [withSystemTheme],
   parameters: {
     layout: "padded",
   },
@@ -95,9 +97,9 @@ export const Default: Story = {
         <UsfmBookPicker
           {...args}
           onBookSelect={(d) => setLast(`${d.code} → fileId ${d.fileId}`)}
-          className="border border-gray-200 rounded-md p-3 bg-white"
+          className="rounded-md border border-gray-200 p-3 dark:border-gray-700"
         />
-        <p className="text-sm text-gray-600">Last selection: {last}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">Last selection: {last}</p>
       </div>
     );
   },

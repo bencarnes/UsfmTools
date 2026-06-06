@@ -30,12 +30,12 @@ const usfmAttributeValueTag = Tag.define(tags.attributeValue);
 
 export const usfmHighlightStyle = syntaxHighlighting(
   HighlightStyle.define([
-    { tag: usfmMarkerTag, color: "#1e40af", fontWeight: "bold" },
-    { tag: usfmEndMarkerTag, color: "#6b21a8", fontWeight: "bold" },
-    { tag: usfmVerseNumTag, color: "#b91c1c", fontWeight: "bold" },
-    { tag: usfmChapterNumTag, color: "#c2410c", fontWeight: "bold", fontSize: "1.1em" },
-    { tag: usfmAttributeTag, color: "#0f766e" },
-    { tag: usfmAttributeValueTag, color: "#15803d" },
+    { tag: usfmMarkerTag, color: "var(--usfm-syntax-marker)", fontWeight: "bold" },
+    { tag: usfmEndMarkerTag, color: "var(--usfm-syntax-endmarker)", fontWeight: "bold" },
+    { tag: usfmVerseNumTag, color: "var(--usfm-syntax-verse)", fontWeight: "bold" },
+    { tag: usfmChapterNumTag, color: "var(--usfm-syntax-chapter)", fontWeight: "bold", fontSize: "1.1em" },
+    { tag: usfmAttributeTag, color: "var(--usfm-syntax-attribute)" },
+    { tag: usfmAttributeValueTag, color: "var(--usfm-syntax-attrvalue)" },
   ]),
 );
 

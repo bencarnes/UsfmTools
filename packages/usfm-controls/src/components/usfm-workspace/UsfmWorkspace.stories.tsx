@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState, type ReactNode } from "react";
+import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
 import { SAMPLE_BSB_GENESIS_USFM, SAMPLE_EXO_SNIPPET_USFM } from "../../fixtures/sample-bsb-genesis-usfm.js";
 import { TabGroupLayoutSelector } from "../tab-group-layout-selector/TabGroupLayoutSelector.js";
 import {
@@ -25,6 +26,7 @@ const STORY_WORKSPACE_MAX_WIDTH = "1560px";
 const meta: Meta<typeof UsfmWorkspace> = {
   title: "Controls/UsfmWorkspace",
   component: UsfmWorkspace,
+  decorators: [withSystemTheme],
   parameters: {
     layout: "padded",
   },
@@ -136,7 +138,7 @@ export const OpenFileDemo: Story = {
             />
             <button
               type="button"
-              className="rounded border border-gray-400 bg-white px-3 py-1 text-sm hover:bg-gray-50"
+              className="rounded border border-gray-400 bg-white px-3 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
               onClick={openLeviticus}
             >
               Open LEV.usfm (append tab)

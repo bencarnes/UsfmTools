@@ -1,4 +1,5 @@
 import { useMemo, type CSSProperties } from "react";
+import { themedControlButton, themedControlDivider } from "../../theme-tokens.js";
 import {
   buildUsfmBookPickerGroups,
   type UsfmBookPickerBook,
@@ -32,22 +33,17 @@ const monoLabel: CSSProperties = {
   letterSpacing: "0.02em",
 };
 
-const dividerStyle: CSSProperties = {
-  border: 0,
-  borderTop: "1px solid color-mix(in srgb, CanvasText 18%, transparent)",
-  margin: "0.65rem 0",
-};
+const dividerStyle: CSSProperties = themedControlDivider;
 
 const bookButtonBase: CSSProperties = {
   ...monoLabel,
+  ...themedControlButton,
   width: "100%",
   minHeight: "2rem",
   padding: "0.25rem 0.35rem",
   boxSizing: "border-box",
   cursor: "pointer",
   borderRadius: "4px",
-  border: "1px solid color-mix(in srgb, CanvasText 22%, transparent)",
-  background: "color-mix(in srgb, Canvas 96%, CanvasText 4%)",
 };
 
 function pickerButtonTitle(book: UsfmBookPickerBook): string {

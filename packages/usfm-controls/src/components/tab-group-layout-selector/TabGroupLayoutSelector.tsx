@@ -49,7 +49,7 @@ export function TabGroupLayoutSelector({ gridRows, gridCols, onChange, className
     <div ref={rootRef} className={`relative inline-block ${className ?? ""}`}>
       <button
         type="button"
-        className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+        className="flex h-8 w-8 items-center justify-center rounded border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
@@ -64,7 +64,7 @@ export function TabGroupLayoutSelector({ gridRows, gridCols, onChange, className
           id={listId}
           role="listbox"
           aria-label="Tab group grid layout"
-          className="absolute left-0 top-full z-50 mt-1 rounded border border-gray-300 bg-white p-2 shadow-md"
+          className="absolute left-0 top-full z-50 mt-1 rounded border border-gray-300 bg-white p-2 shadow-md dark:border-gray-600 dark:bg-gray-800"
         >
           <div className="grid grid-cols-2 gap-1" style={{ width: "4.5rem" }}>
             {[0, 1].map((row) =>
@@ -82,10 +82,10 @@ export function TabGroupLayoutSelector({ gridRows, gridCols, onChange, className
                     title={`${rows}×${cols} layout`}
                     className={`h-8 w-8 rounded border ${
                       isCurrent
-                        ? "border-blue-500 bg-blue-50 ring-1 ring-blue-400"
+                        ? "border-blue-500 bg-blue-50 ring-1 ring-blue-400 dark:border-blue-400 dark:bg-blue-950/50 dark:ring-blue-500"
                         : active
-                          ? "border-gray-400 bg-gray-100"
-                          : "border-gray-200 bg-white hover:border-gray-400 hover:bg-gray-50"
+                          ? "border-gray-400 bg-gray-100 dark:border-gray-500 dark:bg-gray-700"
+                          : "border-gray-200 bg-white hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:border-gray-500 dark:hover:bg-gray-700"
                     }`}
                     onClick={() => {
                       onChange(rows, cols);

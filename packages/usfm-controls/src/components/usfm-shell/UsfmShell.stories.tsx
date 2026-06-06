@@ -20,7 +20,7 @@ const STORY_MAX_WIDTH = "1560px";
 function StoryFrame({ children }: { readonly children: React.ReactNode }) {
   return (
     <div className="box-border p-4" style={{ maxWidth: STORY_MAX_WIDTH }}>
-      <div className="overflow-hidden rounded border border-gray-300" style={{ height: STORY_HEIGHT }}>
+      <div className="h-full overflow-hidden rounded border border-gray-300 dark:border-gray-600" style={{ height: STORY_HEIGHT }}>
         {children}
       </div>
     </div>

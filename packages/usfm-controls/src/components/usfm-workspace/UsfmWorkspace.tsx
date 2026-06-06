@@ -95,13 +95,13 @@ function ColumnResizableGap({ boundaryIndex, layoutRef, fractions, setFractions 
   };
 
   return (
-    <div className="relative z-10 flex w-1.5 shrink-0 flex-col bg-gray-200">
+    <div className="relative z-10 flex w-1.5 shrink-0 flex-col bg-gray-200 dark:bg-gray-700">
       <div
         role="separator"
         aria-orientation="vertical"
         aria-label="Resize tab groups"
         tabIndex={0}
-        className="min-h-0 flex-1 cursor-col-resize border-l border-gray-300 hover:bg-gray-400"
+        className="min-h-0 flex-1 cursor-col-resize border-l border-gray-300 hover:bg-gray-400 dark:border-gray-600 dark:hover:bg-gray-500"
         onMouseDown={onResizeMouseDown}
       />
     </div>
@@ -155,13 +155,13 @@ function RowResizableGap({ boundaryIndex, layoutRef, fractions, setFractions }: 
   };
 
   return (
-    <div className="relative z-10 flex h-1.5 shrink-0 flex-row bg-gray-200">
+    <div className="relative z-10 flex h-1.5 shrink-0 flex-row bg-gray-200 dark:bg-gray-700">
       <div
         role="separator"
         aria-orientation="horizontal"
         aria-label="Resize tab group rows"
         tabIndex={0}
-        className="min-w-0 flex-1 cursor-ns-resize border-t border-gray-300 hover:bg-gray-400"
+        className="min-w-0 flex-1 cursor-ns-resize border-t border-gray-300 hover:bg-gray-400 dark:border-gray-600 dark:hover:bg-gray-500"
         onMouseDown={onResizeMouseDown}
       />
     </div>
@@ -242,7 +242,9 @@ function TabStrip({
             <div
               key={tid}
               className={`flex min-w-0 max-w-[11rem] shrink-0 items-center rounded-t border border-b-0 px-1 text-sm ${
-                active ? "border-gray-400 bg-white" : "border-transparent bg-gray-100 text-gray-700"
+                active
+                  ? "border-gray-400 bg-white dark:border-gray-500 dark:bg-gray-900"
+                  : "border-transparent bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
               }`}
               data-workspace-tab-id={tid}
               onDragOver={(e) => {
@@ -264,7 +266,7 @@ function TabStrip({
               </button>
               <button
                 type="button"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-gray-200"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                 aria-label={tab.dirty ? "Close tab (unsaved changes)" : "Close tab"}
                 onClick={(ev) => {
                   ev.stopPropagation();
@@ -273,7 +275,7 @@ function TabStrip({
               >
                 {tab.dirty ? (
                   <span
-                    className="inline-block h-3.5 w-3.5 rounded-full border-2 border-gray-600"
+                    className="inline-block h-3.5 w-3.5 rounded-full border-2 border-gray-600 dark:border-gray-400"
                     title="Unsaved (stub)"
                   />
                 ) : (
@@ -305,7 +307,9 @@ function EmptySlotDropTarget({ groupId, onDropTab }: EmptySlotDropTargetProps) {
   return (
     <div
       className={`flex min-h-0 flex-1 flex-col items-center justify-center border border-dashed text-sm ${
-        hover ? "border-blue-400 bg-blue-50/60 text-blue-800" : "border-gray-300 bg-gray-50/80 text-gray-500"
+        hover
+          ? "border-blue-400 bg-blue-50/60 text-blue-800 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-200"
+          : "border-gray-300 bg-gray-50/80 text-gray-500 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-400"
       }`}
       onDragEnter={(e) => {
         if (isTabDragTransfer(e.dataTransfer)) setHover(true);
@@ -361,7 +365,7 @@ function EditorGroupPanel({
 
   if (isEmpty) {
     return (
-      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white">
+      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900">
         <EmptySlotDropTarget
           groupId={group.id}
           onDropTab={(tabId, fromGroupId) => onDropTabFromOtherGroup(group.id, tabId, fromGroupId, 0)}
@@ -371,8 +375,8 @@ function EditorGroupPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white">
-      <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch overflow-visible border-b border-gray-300 bg-gray-50">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900">
+      <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch overflow-visible border-b border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800">
         <TabStrip
           groupId={group.id}
           tabIds={group.tabIds}
@@ -387,7 +391,7 @@ function EditorGroupPanel({
         />
         <div
           ref={setToolbarEl}
-          className="flex shrink-0 items-center justify-end gap-1 border-l border-gray-200 bg-gray-50 px-1.5"
+          className="flex shrink-0 items-center justify-end gap-1 border-l border-gray-200 bg-gray-50 px-1.5 dark:border-gray-700 dark:bg-gray-800"
         />
       </div>
       <div className="relative z-0 grid min-h-0 flex-1 grid-cols-1 grid-rows-1 overflow-hidden">
@@ -563,7 +567,7 @@ export function UsfmWorkspace({
   return (
     <div
       ref={layoutRef}
-      className={`flex min-h-[320px] min-w-0 flex-1 flex-col bg-gray-200 ${className ?? ""}`}
+      className={`flex min-h-[320px] min-w-0 flex-1 flex-col bg-gray-200 dark:bg-gray-950 ${className ?? ""}`}
       data-testid="usfm-workspace"
     >
       {Array.from({ length: gridRows }, (_, rowIndex) => {
