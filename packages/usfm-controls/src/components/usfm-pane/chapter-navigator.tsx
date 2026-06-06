@@ -3,6 +3,7 @@ import type { BookNode } from "@usfm-tools/parser";
 import { ChapterPicker } from "../chapter-picker/ChapterPicker.js";
 import type { ChapterPickerSelectDetail } from "../chapter-picker/ChapterPicker.js";
 import { ChevronDownIcon } from "../icons/chevron-down-icon.js";
+import { themedPopoverSurface } from "../../theme-tokens.js";
 
 const mono: CSSProperties = {
   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
@@ -95,16 +96,14 @@ export function ChapterNavigator({
             maxHeight: "14rem",
             overflow: "auto",
             minWidth: "12rem",
-            background: "Canvas",
-            border: "1px solid color-mix(in srgb, CanvasText 22%, transparent)",
             borderRadius: "6px",
-            boxShadow: "0 4px 12px color-mix(in srgb, CanvasText 12%, transparent)",
+            ...themedPopoverSurface,
           }}
         >
           {firstBook ? (
             <ChapterPicker book={firstBook} onChapterSelect={onPicked} />
           ) : (
-            <span style={{ fontSize: "0.85rem", color: "#666" }}>No \\id book in source.</span>
+            <span style={{ fontSize: "0.85rem", color: "var(--usfm-fg-muted)" }}>No \\id book in source.</span>
           )}
         </div>
       </details>

@@ -112,12 +112,12 @@ export function FileSearch({ files, readFile, onSelectResult, loadingFiles }: Fi
     <div className="flex h-full min-h-0 flex-col" data-testid="usfm-shell-file-search">
       <div
         id={headingId}
-        className="border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-700"
+        className="border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
       >
         Search in folder
       </div>
       <form
-        className="flex flex-col gap-1 border-b border-gray-200 px-3 py-2"
+        className="flex flex-col gap-1 border-b border-gray-200 px-3 py-2 dark:border-gray-700"
         onSubmit={(e) => {
           e.preventDefault();
           void runSearch();
@@ -125,7 +125,7 @@ export function FileSearch({ files, readFile, onSelectResult, loadingFiles }: Fi
       >
         <input
           type="text"
-          className="rounded border border-gray-300 px-2 py-1 text-sm"
+          className="rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
           placeholder="Search…"
           value={state.query}
           onChange={(e) => update("query", e.target.value)}
@@ -143,20 +143,20 @@ export function FileSearch({ files, readFile, onSelectResult, loadingFiles }: Fi
           </ToggleButton>
           <button
             type="submit"
-            className="ml-auto rounded border border-gray-300 bg-white px-2 py-0.5 hover:bg-gray-50"
+            className="ml-auto rounded border border-gray-300 bg-white px-2 py-0.5 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
             disabled={!state.query || searching || loadingFiles}
           >
             Search
           </button>
         </div>
-        {invalid ? <div className="text-xs text-red-600">Invalid regular expression</div> : null}
+        {invalid ? <div className="text-xs text-red-600 dark:text-red-400">Invalid regular expression</div> : null}
       </form>
       <div className="min-h-0 flex-1 overflow-auto">
         {searching ? (
-          <div className="px-3 py-2 text-sm text-gray-500">Searching…</div>
+          <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">Searching…</div>
         ) : results.length === 0 ? (
           state.query && !invalid ? (
-            <div className="px-3 py-2 text-sm text-gray-500">No results</div>
+            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No results</div>
           ) : null
         ) : (
           <ul className="py-1">
@@ -164,17 +164,17 @@ export function FileSearch({ files, readFile, onSelectResult, loadingFiles }: Fi
               <li key={`${r.fileId}:${r.from}:${i}`}>
                 <button
                   type="button"
-                  className="block w-full px-3 py-1 text-left text-sm hover:bg-gray-100"
+                  className="block w-full px-3 py-1 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
                   onClick={() => onSelectResult(r)}
                   data-testid={`usfm-shell-search-result-${i}`}
                 >
-                  <div className="truncate font-medium text-gray-800">
+                  <div className="truncate font-medium text-gray-800 dark:text-gray-200">
                     {r.fileName}{" "}
-                    <span className="text-xs font-normal text-gray-500">
+                    <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
                       {r.line + 1}:{r.column + 1}
                     </span>
                   </div>
-                  <div className="truncate font-mono text-xs text-gray-600">{r.snippet}</div>
+                  <div className="truncate font-mono text-xs text-gray-600 dark:text-gray-400">{r.snippet}</div>
                 </button>
               </li>
             ))}
@@ -204,7 +204,9 @@ function ToggleButton({
       aria-pressed={pressed}
       onClick={onClick}
       className={`rounded border px-1.5 py-0.5 font-mono ${
-        pressed ? "border-blue-500 bg-blue-100 text-blue-900" : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+        pressed
+          ? "border-blue-500 bg-blue-100 text-blue-900 dark:border-blue-400 dark:bg-blue-950/50 dark:text-blue-200"
+          : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
       }`}
     >
       {children}

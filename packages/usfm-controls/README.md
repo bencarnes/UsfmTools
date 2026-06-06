@@ -223,7 +223,7 @@ interface UsfmShellFileEntry {
 
 ### SettingsPane
 
-**`SettingsPane`** is a workspace pane for editing application settings. Today it exposes a single setting — the **color theme** (**Light**, **Dark**, **System**) — as a radio group. (Theming itself is **not yet implemented**; the pane only persists the preference.) The pane reads and writes a **host-backed settings store** directly through the **`useSettings()`** hook, so it must be rendered inside a **`SettingsProvider`**; it takes no settings props of its own.
+**`SettingsPane`** is a workspace pane for editing application settings. Today it exposes a single setting — the **color theme** (**Light**, **Dark**, **System**) — as a radio group. Changing the theme updates the UI immediately and persists through the host. The pane reads and writes a **host-backed settings store** directly through the **`useSettings()`** hook, so it must be rendered inside a **`SettingsProvider`**; it takes no settings props of its own.
 
 Inside **`UsfmShell`**, the sidebar **gear** button opens the **`SettingsPane`** as a **singleton** workspace tab (clicking it again focuses the existing tab), and the shell wraps its tree in a **`SettingsProvider`** bound to the host. To use the pane standalone, supply your own provider:
 
@@ -251,12 +251,31 @@ interface SettingsHost {
 | Export | Kind | Description |
 |--------|------|-------------|
 | `SettingsPane` | component | Settings UI; reads/writes via `useSettings()` (needs a provider). Props: `className` |
-| `SettingsProvider` | component | Owns settings state + persistence; props: `host: SettingsHost`, `children` |
+| `SettingsProvider` | component | Owns settings state + persistence; applies the active theme to descendants. Props: `host: SettingsHost`, `children` |
 | `useSettings` | hook | `{ settings, loading, setSettings, setTheme }` — throws outside a provider |
+| `ThemeScope` | component | Applies resolved light/dark styling (`dark` class + `data-theme`). Used automatically by `SettingsProvider`; pass `theme` to use standalone |
+| `useResolvedTheme` | hook | Returns the effective `"light"` \| `"dark"` appearance (follows OS when preference is `system`) |
 | `ApplicationSettings` / `UiTheme` | types | Settings shape and theme union |
-| `UI_THEME_OPTIONS` / `DEFAULT_APPLICATION_SETTINGS` | values | Theme option list (label + description) and defaults |
+| `UI_THEME_OPTIONS` / `DEFAULT_APPLICATION_SETTINGS` | values | Theme option list (label + description) and defaults (`theme: "system"`) |
 
 Workspace tabs carry an optional **`kind`** (**`"editor"`** \| **`"settings"`**, default `editor`); **`UsfmWorkspace`** renders a **`SettingsPane`** for settings tabs and a **`UsfmPane`** otherwise. Open the singleton settings tab on a model with **`workspaceOpenSettingsTab(model)`** (exported alongside **`SETTINGS_TAB_ID`**).
+
+### Theming
+
+Components use **Tailwind `dark:` variants** and **CSS custom properties** (see **`src/styles.css`**) for surfaces, borders, CodeMirror chrome, and the find/replace panel. The default theme preference is **`system`**, which follows `prefers-color-scheme`.
+
+Inside **`UsfmShell`**, **`SettingsProvider`** wraps the shell tree and applies the resolved theme automatically. For standalone usage, import the package stylesheet and wrap your tree:
+
+```tsx
+import "@usfm-tools/controls/styles.css"; // if you publish/export styles from your app bundle
+import { ThemeScope, UsfmEditor } from "@usfm-tools/controls";
+
+<ThemeScope theme="dark">
+  <UsfmEditor value={usfm} onChange={setUsfm} className="h-[500px]" />
+</ThemeScope>;
+```
+
+When integrating into an app that already owns global dark mode, either nest **`ThemeScope`** inside your own theme root or call **`useResolvedTheme()`** to align host chrome with the controls.
 
 ### TabGroupLayoutSelector
 
@@ -411,7 +430,7 @@ Stories demonstrate the editor, preview, book picker, and chapter picker with:
 - **UsfmPane** — **`FullBookSplit`** and **`TwoPanesSharedState`** use a shared `useState` USFM string; **`FrontMatterNoChapters`** shows the toolbar when there are no `\\c` markers.
 - **UsfmWorkspace** — **`SingleGroupTwoTabs`**, **`TwoEditorGroups`**, and **`OpenFileDemo`** (append tab). Shared long USFM lives under **`src/fixtures/`** for Storybook.
 - **UsfmShell** — **`Default`**, **`SidebarCollapsed`**, and **`BottomBarCollapsed`** mount **`UsfmShell`** with the fixture host (**`createFixtureUsfmShellHost`**), which serves a fake folder of USFM files (including one with an unknown marker so the errors tab has content) and an in-memory settings store.
-- **SettingsPane** — **`Default`** (no persisted settings) and **`DarkPersisted`** (host returns `theme: "dark"`) wrap the pane in a **`SettingsProvider`** backed by an in-memory host that logs `saveSettings` to the console.
+- **SettingsPane** — **`Default`** (no persisted settings; follows OS via `system`) and **`DarkPersisted`** (host returns `theme: "dark"`) wrap the pane in a **`SettingsProvider`** backed by an in-memory host that logs `saveSettings` to the console.
 - **UsfmPreview** — **`GenesisPreview`** uses `render: (args) => <UsfmPreview {...args} />` so Controls map to props; **`WithEditor`** must use that same **`args` parameter** (not a zero-arg render) so `versePerLine` updates when you toggle Controls or the checkbox (`useArgs` is only for pushing checkbox state back into Storybook). **Verse Per Line Compare** shows both modes side by side.
 
 ### Project Structure
@@ -422,7 +441,8 @@ packages/usfm-controls/
 │   ├── fixtures/
 │   │   └── sample-bsb-genesis-usfm.ts  # Long sample USFM for Storybook (not part of the published entry)
 │   ├── index.ts                     # Public API exports
-│   ├── styles.css                   # Tailwind + default preview reading styles
+│   ├── styles.css                   # Tailwind + theme tokens + preview reading styles
+│   ├── theme-tokens.ts              # Shared CSS-variable-driven control styles
 │   ├── components/
 │   │   ├── usfm-editor/
 │   │   │   ├── UsfmEditor.tsx       # React component
@@ -465,6 +485,8 @@ packages/usfm-controls/
 │   │   │   ├── SettingsPane.stories.tsx
 │   │   │   ├── settings-context.tsx  # SettingsProvider + useSettings (host-backed store)
 │   │   │   ├── settings-model.ts     # ApplicationSettings, UiTheme, SettingsHost, defaults
+│   │   │   ├── theme-scope.tsx       # ThemeScope + useResolvedTheme (applies light/dark)
+│   │   │   ├── theme-utils.ts        # resolveUiTheme, getSystemTheme
 │   │   │   └── index.ts
 │   │   └── chapter-picker/
 │   │       ├── ChapterPicker.tsx    # Wrapping row of equal-width chapter buttons
@@ -485,6 +507,8 @@ packages/usfm-controls/
 │   ├── usfm-editor-search.test.tsx
 │   ├── usfm-workspace.test.tsx
 │   ├── usfm-shell.test.tsx
+│   ├── theme-utils.test.ts
+│   ├── theme-scope.test.tsx
 │   ├── chapter-offset-helpers.test.ts
 │   └── chapter-picker.test.tsx
 ├── vitest.config.ts                 # jsdom for React tests

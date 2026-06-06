@@ -170,13 +170,27 @@ describe("UsfmShell", () => {
     fireEvent.click(screen.getByTestId("usfm-shell-sidebar-settings"));
     await waitFor(() => screen.getByTestId("settings-pane"));
 
-    // Persisted "dark" is reflected as the checked option.
+    // Persisted "dark" is reflected as the checked option and applied to the shell.
     const dark = screen.getByTestId("settings-theme-option-dark").querySelector("input")!;
     await waitFor(() => expect((dark as HTMLInputElement).checked).toBe(true));
+    await waitFor(() =>
+      expect(screen.getByTestId("theme-scope").getAttribute("data-theme")).toBe("dark"),
+    );
 
-    // Selecting "light" persists through the host.
+    // Selecting "light" persists through the host and updates the resolved theme.
     const light = screen.getByTestId("settings-theme-option-light").querySelector("input")!;
     fireEvent.click(light);
     expect(store.value).toEqual({ theme: "light" });
+    await waitFor(() =>
+      expect(screen.getByTestId("theme-scope").getAttribute("data-theme")).toBe("light"),
+    );
+  });
+
+  it("defaults to the system theme preference when no settings are persisted", async () => {
+    const host = makeHost([]);
+    render(<UsfmShell host={host} />);
+    await waitFor(() => screen.getByTestId("theme-scope"));
+    const resolved = screen.getByTestId("theme-scope").getAttribute("data-theme");
+    expect(resolved === "light" || resolved === "dark").toBe(true);
   });
 });

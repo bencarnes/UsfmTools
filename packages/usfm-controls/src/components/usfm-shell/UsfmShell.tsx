@@ -251,18 +251,18 @@ export function UsfmShell({
     <SettingsProvider host={host}>
       <div
         data-testid="usfm-shell"
-        className={`flex h-full min-h-0 min-w-0 flex-row bg-white ${className ?? ""}`}
+        className={`flex h-full min-h-0 min-w-0 flex-row bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 ${className ?? ""}`}
       >
       {/* Left sidebar — vertical tab rail + (when expanded) tab panel, spanning full height */}
       <aside
-        className="flex min-h-0 shrink-0 flex-row border-r border-gray-300 bg-gray-100"
+        className="flex min-h-0 shrink-0 flex-row border-r border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-800"
         data-testid="usfm-shell-sidebar"
         aria-expanded={sidebarExpanded}
       >
         <div
           role="tablist"
           aria-orientation="vertical"
-          className="flex w-10 shrink-0 flex-col items-stretch border-r border-gray-200 bg-gray-50"
+          className="flex w-10 shrink-0 flex-col items-stretch border-r border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
         >
           {sidebarTabs.map(({ id, label, Icon }) => {
             const selected = sidebarTab === id;
@@ -280,8 +280,8 @@ export function UsfmShell({
                 }}
                 className={`flex h-10 items-center justify-center border-l-2 ${
                   selected && sidebarExpanded
-                    ? "border-blue-600 bg-white text-gray-900"
-                    : "border-transparent text-gray-600 hover:bg-gray-100"
+                    ? "border-blue-600 bg-white text-gray-900 dark:border-blue-400 dark:bg-gray-900 dark:text-gray-100"
+                    : "border-transparent text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                 }`}
                 data-testid={`usfm-shell-sidebar-tab-${id}`}
               >
@@ -292,7 +292,7 @@ export function UsfmShell({
           <div className="flex-1" />
           <button
             type="button"
-            className="flex h-10 items-center justify-center text-gray-600 hover:bg-gray-100"
+            className="flex h-10 items-center justify-center text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
             aria-label="Settings"
             title="Settings"
             onClick={handleOpenSettings}
@@ -302,7 +302,7 @@ export function UsfmShell({
           </button>
           <button
             type="button"
-            className="flex h-10 items-center justify-center text-gray-600 hover:bg-gray-100"
+            className="flex h-10 items-center justify-center text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
             aria-label={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
             aria-pressed={!sidebarExpanded}
             title={sidebarExpanded ? "Collapse sidebar" : "Expand sidebar"}
@@ -313,7 +313,7 @@ export function UsfmShell({
           </button>
         </div>
         {sidebarExpanded ? (
-          <div className="flex min-h-0 w-64 flex-col bg-white" data-testid="usfm-shell-sidebar-panel">
+          <div className="flex min-h-0 w-64 flex-col bg-white dark:bg-gray-900" data-testid="usfm-shell-sidebar-panel">
             {sidebarTab === "files" ? (
               <FileBrowser
                 files={files}
@@ -336,7 +336,7 @@ export function UsfmShell({
 
       {/* Right column — workspace stacked above the bottom bar (bottom bar does not span under sidebar) */}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-white" data-testid="usfm-shell-workspace-host">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-gray-900" data-testid="usfm-shell-workspace-host">
           <UsfmWorkspace
             gridRows={model.gridRows}
             gridCols={model.gridCols}
@@ -352,14 +352,14 @@ export function UsfmShell({
         </main>
 
         <section
-          className="flex shrink-0 flex-col border-t border-gray-300 bg-gray-100"
+          className="flex shrink-0 flex-col border-t border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-800"
           data-testid="usfm-shell-bottom-bar"
           aria-expanded={bottomExpanded}
         >
           <div
             role="tablist"
             aria-orientation="horizontal"
-            className="flex h-8 shrink-0 items-stretch border-b border-gray-200 bg-gray-50"
+            className="flex h-8 shrink-0 items-stretch border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800"
           >
             {bottomTabs.map(({ id, label, Icon }) => {
               const selected = bottomTab === id;
@@ -377,8 +377,8 @@ export function UsfmShell({
                   }}
                   className={`flex w-10 items-center justify-center border-t-2 ${
                     selected && bottomExpanded
-                      ? "border-blue-600 bg-white text-gray-900"
-                      : "border-transparent text-gray-600 hover:bg-gray-100"
+                      ? "border-blue-600 bg-white text-gray-900 dark:border-blue-400 dark:bg-gray-900 dark:text-gray-100"
+                      : "border-transparent text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                   }`}
                   data-testid={`usfm-shell-bottom-tab-${id}`}
                 >
@@ -394,7 +394,7 @@ export function UsfmShell({
             <div className="flex-1" />
             <button
               type="button"
-              className="flex w-10 items-center justify-center text-gray-600 hover:bg-gray-100"
+              className="flex w-10 items-center justify-center text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
               aria-label={bottomExpanded ? "Collapse bottom bar" : "Expand bottom bar"}
               aria-pressed={!bottomExpanded}
               title={bottomExpanded ? "Collapse bottom bar" : "Expand bottom bar"}
@@ -406,7 +406,7 @@ export function UsfmShell({
           </div>
           {bottomExpanded ? (
             <div
-              className="flex h-48 min-h-0 flex-col bg-white"
+              className="flex h-48 min-h-0 flex-col bg-white dark:bg-gray-900"
               data-testid="usfm-shell-bottom-panel"
             >
               {bottomTab === "errors" ? (

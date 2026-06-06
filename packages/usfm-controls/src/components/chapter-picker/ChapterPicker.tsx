@@ -1,4 +1,5 @@
 import { useMemo, type CSSProperties } from "react";
+import { themedControlButton } from "../../theme-tokens.js";
 import type { BookNode } from "@usfm-tools/parser";
 import { listChapterNumbersFromBook } from "@usfm-tools/model";
 
@@ -33,6 +34,7 @@ const chapterButtonWidth = "calc(3ch + 1.25rem)";
 
 const chapterButtonBase: CSSProperties = {
   ...monoLabel,
+  ...themedControlButton,
   boxSizing: "border-box",
   width: chapterButtonWidth,
   minWidth: chapterButtonWidth,
@@ -42,8 +44,6 @@ const chapterButtonBase: CSSProperties = {
   padding: "0.25rem 0.35rem",
   cursor: "pointer",
   borderRadius: "4px",
-  border: "1px solid color-mix(in srgb, CanvasText 22%, transparent)",
-  background: "color-mix(in srgb, Canvas 96%, CanvasText 4%)",
   textAlign: "center",
 };
 

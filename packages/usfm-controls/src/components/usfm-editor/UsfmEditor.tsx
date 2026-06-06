@@ -144,33 +144,43 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
           "&": {
             fontSize: "14px",
             height: "100%",
+            backgroundColor: "var(--usfm-cm-bg)",
+            color: "var(--usfm-cm-fg)",
           },
           ".cm-scroller": {
             overflow: "auto",
             fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
           },
+          ".cm-gutters": {
+            backgroundColor: "var(--usfm-cm-gutter)",
+            color: "var(--usfm-cm-gutter-fg)",
+            borderRight: "1px solid var(--usfm-border-subtle)",
+          },
+          "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
+            backgroundColor: "var(--usfm-cm-selection)",
+          },
           ".cm-usfm-marker": {
-            color: "#1e40af",
+            color: "var(--usfm-syntax-marker)",
             fontWeight: "bold",
           },
           ".cm-usfm-endmarker": {
-            color: "#6b21a8",
+            color: "var(--usfm-syntax-endmarker)",
             fontWeight: "bold",
           },
           ".cm-usfm-versenum": {
-            color: "#b91c1c",
+            color: "var(--usfm-syntax-verse)",
             fontWeight: "bold",
           },
           ".cm-usfm-chapternum": {
-            color: "#c2410c",
+            color: "var(--usfm-syntax-chapter)",
             fontWeight: "bold",
             fontSize: "1.1em",
           },
           ".cm-usfm-attribute": {
-            color: "#0f766e",
+            color: "var(--usfm-syntax-attribute)",
           },
           ".cm-usfm-attrvalue": {
-            color: "#15803d",
+            color: "var(--usfm-syntax-attrvalue)",
           },
         }),
       ],
@@ -208,7 +218,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   return (
     <div
       ref={containerRef}
-      className={`usfm-editor-root relative border border-gray-300 rounded-md overflow-hidden ${className ?? ""}`}
+      className={`usfm-editor-root relative overflow-hidden rounded-md border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900 ${className ?? ""}`}
     />
   );
 });
