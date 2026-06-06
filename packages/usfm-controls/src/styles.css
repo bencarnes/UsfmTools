@@ -87,6 +87,7 @@
 @layer components {
   .usfm-preview-root {
     color: var(--usfm-fg);
+    background-color: var(--usfm-surface);
   }
 
   .usfm-preview-root .usfm-document {

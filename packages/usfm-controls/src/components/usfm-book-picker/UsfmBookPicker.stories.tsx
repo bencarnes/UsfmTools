@@ -95,9 +95,9 @@ export const Default: Story = {
         <UsfmBookPicker
           {...args}
           onBookSelect={(d) => setLast(`${d.code} → fileId ${d.fileId}`)}
-          className="border border-gray-200 rounded-md p-3 bg-white"
+          className="rounded-md border border-gray-200 p-3 dark:border-gray-700"
         />
-        <p className="text-sm text-gray-600">Last selection: {last}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400">Last selection: {last}</p>
       </div>
     );
   },

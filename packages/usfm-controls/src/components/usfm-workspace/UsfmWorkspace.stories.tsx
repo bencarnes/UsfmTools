@@ -136,7 +136,7 @@ export const OpenFileDemo: Story = {
             />
             <button
               type="button"
-              className="rounded border border-gray-400 bg-white px-3 py-1 text-sm hover:bg-gray-50"
+              className="rounded border border-gray-400 bg-white px-3 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
               onClick={openLeviticus}
             >
               Open LEV.usfm (append tab)

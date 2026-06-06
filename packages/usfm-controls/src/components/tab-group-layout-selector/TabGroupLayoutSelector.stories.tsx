@@ -25,7 +25,7 @@ export const Default: Story = {
             setCols(c);
           }}
         />
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-600 dark:text-gray-400">
           Layout: {rows}×{cols}
         </span>
       </div>

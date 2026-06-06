@@ -10,6 +10,12 @@ const MULTI_VERSE_PARAGRAPH = `\\id GEN Sample
 \\s1 The Creation
 \\p \\v 1 In the beginning God created the heavens and the earth. \\v 2 Now the earth was \\nd void\\nd* and without form.`;
 
+/** Theme-aware panel chrome for preview stories (background comes from `.usfm-preview-root`). */
+const previewPanelClass =
+  "max-w-prose rounded-md border border-gray-200 p-4 dark:border-gray-700";
+
+const storyLabelClass = "mb-2 text-sm font-medium text-gray-700 dark:text-gray-300";
+
 const meta = {
   title: "Controls/UsfmPreview",
   component: UsfmPreview,
@@ -34,7 +40,7 @@ type Story = StoryObj<typeof meta>;
 export const GenesisPreview: Story = {
   args: {
     value: MULTI_VERSE_PARAGRAPH,
-    className: "max-w-prose border border-gray-200 rounded-md p-4 bg-white",
+    className: previewPanelClass,
     versePerLine: false,
   },
   /** Explicit render so all `args` (including Controls) are forwarded to the component. */
@@ -54,15 +60,15 @@ export const WithEditor: Story = {
     const versePerLine = rawVp === true || rawVp === 1 || (typeof rawVp === "string" && rawVp.toLowerCase() === "true");
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-[min(90vh,720px)]">
-        <div className="flex flex-col min-h-0">
-          <p className="text-sm text-gray-600 mb-1">USFM source</p>
-          <UsfmEditor value={value} onChange={setValue} className="flex-1 min-h-[200px]" />
+      <div className="grid h-[min(90vh,720px)] grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="flex min-h-0 flex-col">
+          <p className="mb-1 text-sm text-gray-600 dark:text-gray-400">USFM source</p>
+          <UsfmEditor value={value} onChange={setValue} className="min-h-[200px] flex-1" />
         </div>
-        <div className="flex flex-col min-h-0 overflow-auto">
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <p className="text-sm text-gray-600">Preview (updates as you type)</p>
-            <label className="flex items-center gap-2 text-sm text-gray-800 cursor-pointer select-none">
+        <div className="flex min-h-0 flex-col overflow-auto">
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <p className="text-sm text-gray-600 dark:text-gray-400">Preview (updates as you type)</p>
+            <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
               <input
                 type="checkbox"
                 checked={versePerLine}
@@ -76,7 +82,7 @@ export const WithEditor: Story = {
           <UsfmPreview
             value={value}
             versePerLine={versePerLine}
-            className="flex-1 overflow-auto max-w-prose border border-gray-200 rounded-md p-4 bg-amber-50/30"
+            className="max-w-prose flex-1 overflow-auto rounded-md border border-gray-200 bg-amber-50/30 p-4 dark:border-gray-700 dark:bg-amber-950/20"
           />
         </div>
       </div>
@@ -91,21 +97,14 @@ export const VersePerLineCompare: Story = {
     versePerLine: false,
   },
   render: () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">versePerLine=false (default)</p>
-        <UsfmPreview
-          value={MULTI_VERSE_PARAGRAPH}
-          className="max-w-prose border border-gray-200 rounded-md p-4 bg-white"
-        />
+        <p className={storyLabelClass}>versePerLine=false (default)</p>
+        <UsfmPreview value={MULTI_VERSE_PARAGRAPH} className={previewPanelClass} />
       </div>
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">versePerLine=true</p>
-        <UsfmPreview
-          value={MULTI_VERSE_PARAGRAPH}
-          versePerLine
-          className="max-w-prose border border-gray-200 rounded-md p-4 bg-white"
-        />
+        <p className={storyLabelClass}>versePerLine=true</p>
+        <UsfmPreview value={MULTI_VERSE_PARAGRAPH} versePerLine className={previewPanelClass} />
       </div>
     </div>
   ),
