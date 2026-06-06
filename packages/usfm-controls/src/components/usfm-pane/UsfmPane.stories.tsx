@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
+import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
 import { SAMPLE_BSB_GENESIS_USFM } from "../../fixtures/sample-bsb-genesis-usfm.js";
 import { UsfmPane } from "./UsfmPane.js";
 
 const meta: Meta<typeof UsfmPane> = {
   title: "Controls/UsfmPane",
   component: UsfmPane,
+  decorators: [withSystemTheme],
   parameters: {
     layout: "fullscreen",
   },

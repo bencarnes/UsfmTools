@@ -88,7 +88,9 @@ export function SettingsProvider({ host, children }: SettingsProviderProps) {
   return (
     <SettingsContext.Provider value={value}>
       <SettingsThemePreferenceProvider theme={settings.theme}>
-        <ThemeScope className="contents">{children}</ThemeScope>
+        <ThemeScope theme={settings.theme} className="h-full min-h-0 min-w-0">
+          {children}
+        </ThemeScope>
       </SettingsThemePreferenceProvider>
     </SettingsContext.Provider>
   );

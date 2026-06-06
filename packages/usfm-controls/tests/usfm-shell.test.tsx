@@ -186,6 +186,25 @@ describe("UsfmShell", () => {
     );
   });
 
+  it("toggles the resolved theme when light and dark are selected in settings", async () => {
+    const host = makeHost([]);
+    render(<UsfmShell host={host} />);
+    fireEvent.click(screen.getByTestId("usfm-shell-sidebar-settings"));
+    await waitFor(() => screen.getByTestId("settings-pane"));
+
+    fireEvent.click(screen.getByTestId("settings-theme-option-light").querySelector("input")!);
+    await waitFor(() =>
+      expect(screen.getByTestId("theme-scope").getAttribute("data-theme")).toBe("light"),
+    );
+    expect(screen.getByTestId("theme-scope").classList.contains("dark")).toBe(false);
+
+    fireEvent.click(screen.getByTestId("settings-theme-option-dark").querySelector("input")!);
+    await waitFor(() =>
+      expect(screen.getByTestId("theme-scope").getAttribute("data-theme")).toBe("dark"),
+    );
+    expect(screen.getByTestId("theme-scope").classList.contains("dark")).toBe(true);
+  });
+
   it("defaults to the system theme preference when no settings are persisted", async () => {
     const host = makeHost([]);
     render(<UsfmShell host={host} />);

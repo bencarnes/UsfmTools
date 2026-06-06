@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { BookNode } from "@usfm-tools/parser";
 import { parse } from "@usfm-tools/parser";
+import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
 import { ChapterPicker } from "./ChapterPicker.js";
 
 function bookFromUsfm(usfm: string): BookNode {
@@ -16,6 +17,7 @@ const meta: Meta<typeof ChapterPicker> = {
   title: "Controls/ChapterPicker",
   component: ChapterPicker,
   decorators: [
+    withSystemTheme,
     (Story) => (
       <div style={{ maxWidth: 320, border: "1px solid #ccc", padding: "0.75rem", borderRadius: 6 }}>
         <Story />

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useArgs } from "@storybook/preview-api";
 import { useState } from "react";
+import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
 import { UsfmEditor } from "../usfm-editor/UsfmEditor.js";
 import { UsfmPreview } from "./UsfmPreview.js";
 
@@ -19,6 +20,7 @@ const storyLabelClass = "mb-2 text-sm font-medium text-gray-700 dark:text-gray-3
 const meta = {
   title: "Controls/UsfmPreview",
   component: UsfmPreview,
+  decorators: [withSystemTheme],
   args: {
     versePerLine: false,
   },

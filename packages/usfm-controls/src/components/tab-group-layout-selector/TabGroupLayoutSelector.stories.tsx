@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
+import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
 import type { WorkspaceGridDimension } from "../usfm-workspace/workspace-model.js";
 import { TabGroupLayoutSelector } from "./TabGroupLayoutSelector.js";
 
 const meta: Meta<typeof TabGroupLayoutSelector> = {
   title: "Controls/TabGroupLayoutSelector",
   component: TabGroupLayoutSelector,
+  decorators: [withSystemTheme],
 };
 
 export default meta;

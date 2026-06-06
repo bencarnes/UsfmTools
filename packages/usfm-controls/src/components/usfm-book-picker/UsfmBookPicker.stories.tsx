@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { useState } from "react";
+import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
 import {
   STANDARD_USFM_BOOK_IDENTIFIERS,
   type UsfmBookPickerFileInput,
@@ -76,6 +77,7 @@ const SAMPLE_FILES: readonly UsfmBookPickerFileInput[] = [
 const meta = {
   title: "Controls/UsfmBookPicker",
   component: UsfmBookPicker,
+  decorators: [withSystemTheme],
   parameters: {
     layout: "padded",
   },
