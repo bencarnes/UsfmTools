@@ -1,10 +1,12 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { registerDomTestHooks } from "./deno-test-setup.ts";
+
+registerDomTestHooks();
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { spy } from "@std/testing/mock";
+import { cleanup, render, screen, fireEvent } from "./testing-react.ts";
 import { TabListDropdown } from "../src/components/usfm-workspace/tab-list-dropdown.js";
 
-afterEach(() => {
-  cleanup();
-});
 
 describe("TabListDropdown", () => {
   it("shows a chevron button with tooltip and no visible label text", () => {
@@ -25,7 +27,7 @@ describe("TabListDropdown", () => {
   });
 
   it("activates a tab from the list", () => {
-    const onActivate = vi.fn();
+    const onActivate = spy((_id: string) => {});
     render(
       <TabListDropdown
         tabIds={["a", "b"]}
@@ -39,6 +41,6 @@ describe("TabListDropdown", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Select tab" }));
     fireEvent.click(screen.getByRole("option", { name: "B.usfm" }));
-    expect(onActivate).toHaveBeenCalledWith("b");
+    expect(onActivate.calls[0]?.args).toEqual(["b"]);
   });
 });

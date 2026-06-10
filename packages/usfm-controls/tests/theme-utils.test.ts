@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { getSystemTheme, resolveUiTheme } from "../src/components/settings-pane/theme-utils.js";
 
 describe("theme-utils", () => {

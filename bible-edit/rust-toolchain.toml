@@ -1,4 +1,0 @@
-[toolchain]
-# Tauri 2 pulls crates that need a recent stable: edition-2024 manifests (Cargo >= 1.85),
-# plus current transitive crates (ICU 2.x, darling 0.23, time 0.3.47, etc.) require rustc >= 1.86–1.88.
-channel = "1.88"

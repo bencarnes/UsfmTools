@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Install dependencies and run production builds for packages under packages/
-# plus the bible-edit application at the repository root, in dependency order.
+# Type-check and test all Deno workspace packages in dependency order.
 # Run from the repository root: ./build.sh
 
 set -euo pipefail
@@ -8,57 +7,36 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-# npm install does NOT re-copy `file:` workspace deps once they are installed —
-# the version in package.json hasn't changed, so npm assumes the local copy
-# under node_modules/@usfm-tools/<pkg> is still current. After we rebuild a
-# package here, downstream packages would otherwise keep serving stale dist/
-# files (this bites Storybook in particular). Purge them before each install
-# so the fresh dist/ from packages/* gets copied in.
-purge_workspace_copies() {
-  local rel="$1"
-  local dir="$ROOT/$rel/node_modules/@usfm-tools"
-  if [ -d "$dir" ]; then
-    echo "==> [$rel] purging stale workspace copies under node_modules/@usfm-tools"
-    rm -rf "$dir"
-  fi
-}
+if ! command -v deno >/dev/null 2>&1; then
+  echo "Error: deno is not installed or not on PATH." >&2
+  exit 1
+fi
 
-# Vite's dep optimizer pre-bundles `@usfm-tools/*` into node_modules/.cache/...;
-# those bundles are keyed on the dep path, not its contents, so they outlive a
-# fresh copy and Storybook then errors with "does not provide an export named X".
-# Wipe the optimizer caches whenever we refresh the workspace copies.
-purge_dev_caches() {
-  local rel="$1"
-  local cache_dir="$ROOT/$rel/node_modules/.cache"
-  if [ -d "$cache_dir" ]; then
-    echo "==> [$rel] clearing node_modules/.cache (Storybook / Vite dep cache)"
-    rm -rf "$cache_dir"
-  fi
-}
-
-build_package() {
+check_package() {
   local rel="$1"
   local dir="$ROOT/$rel"
   echo ""
-  purge_workspace_copies "$rel"
-  purge_dev_caches "$rel"
-  echo "==> [$rel] npm install"
-  (cd "$dir" && npm install)
-  if (cd "$dir" && node -e "process.exit(require('./package.json').scripts?.build ? 0 : 1)"); then
-    echo "==> [$rel] npm run build"
-    (cd "$dir" && npm run build)
-  else
-    echo "==> [$rel] no build script (skipped)"
-  fi
+  echo "==> [$rel] deno task check"
+  (cd "$dir" && deno task check)
 }
 
-echo "UsfmTools — install and build packages (under packages/) and the bible-edit app (repo root)"
+test_package() {
+  local rel="$1"
+  local dir="$ROOT/$rel"
+  echo ""
+  echo "==> [$rel] deno task test"
+  (cd "$dir" && deno task test)
+}
 
-build_package "packages/usfm-parser"
-build_package "packages/usfm-model"
-build_package "packages/usfm-controls"
-build_package "packages/usfm-parser-integration-tests"
-build_package "bible-edit"
+echo "UsfmTools — check and test Deno workspace packages (under packages/)"
+
+check_package "packages/usfm-parser"
+check_package "packages/usfm-model"
+check_package "packages/usfm-controls"
+test_package "packages/usfm-parser"
+test_package "packages/usfm-model"
+test_package "packages/usfm-controls"
+test_package "packages/usfm-parser-integration-tests"
 
 echo ""
-echo "Done. Libraries emit dist/ under each packages/* path; bible-edit emits dist/ under bible-edit/. Run tests from individual packages or from bible-edit/ as needed."
+echo "Done. Packages export TypeScript source via deno.json exports. Run tasks from individual packages/ paths as needed."

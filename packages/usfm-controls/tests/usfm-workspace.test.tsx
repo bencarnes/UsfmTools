@@ -1,5 +1,9 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { registerDomTestHooks } from "./deno-test-setup.ts";
+
+registerDomTestHooks();
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { cleanup, render, screen, fireEvent } from "./testing-react.ts";
 import { useState } from "react";
 import {
   buildWorkspaceModelFromInitialTabs,
@@ -15,9 +19,6 @@ import {
 } from "../src/components/usfm-workspace/workspace-model.js";
 import { UsfmWorkspace } from "../src/components/usfm-workspace/UsfmWorkspace.js";
 
-afterEach(() => {
-  cleanup();
-});
 
 function Harness({ initialTabs }: { readonly initialTabs: readonly UsfmWorkspaceInitialTab[] }) {
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs(initialTabs));

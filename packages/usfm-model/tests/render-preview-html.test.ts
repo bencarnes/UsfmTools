@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { renderPreviewHtml } from "../src/index.js";
 
 const MULTI_VERSE = "\\id GEN\n\\c 1\n\\p\n\\v 1 A. \\v 2 B.";

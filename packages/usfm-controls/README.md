@@ -15,11 +15,7 @@ React UI controls for editing USFM scripture text, built on [CodeMirror 6](https
 
 ## Installation
 
-```bash
-npm install @usfm-tools/controls
-```
-
-Peer dependencies: `react >= 18`, `react-dom >= 18`
+Add `@usfm-tools/controls` as a dependency in your Deno workspace or import map. Peer dependencies: `react >= 18`, `react-dom >= 18`.
 
 ## Usage
 
@@ -186,7 +182,7 @@ function App() {
 
 ### UsfmShell
 
-**`UsfmShell`** is the top-level shell for the **`bible-edit`** application: a left sidebar with vertical icon tabs (file browser + folder-wide search) that **spans the full height of the shell**, and to its right a column with the **`UsfmWorkspace`** stacked above a collapsible bottom bar (the bottom bar does **not** extend under the sidebar). The shell is **host-agnostic** — it never touches the filesystem itself. Pass a **`UsfmShellHost`** that lists files and reads their contents; a fixture host (**`createFixtureUsfmShellHost`**) is exported for Storybook and tests.
+**`UsfmShell`** is a top-level application shell: a left sidebar with vertical icon tabs (file browser + folder-wide search) that **spans the full height of the shell**, and to its right a column with the **`UsfmWorkspace`** stacked above a collapsible bottom bar (the bottom bar does **not** extend under the sidebar). The shell is **host-agnostic** — it never touches the filesystem itself. Pass a **`UsfmShellHost`** that lists files and reads their contents; a fixture host (**`createFixtureUsfmShellHost`**) is exported for tests.
 
 ```tsx
 import { UsfmShell, createFixtureUsfmShellHost } from "@usfm-tools/controls";
@@ -393,45 +389,23 @@ The service is currently synchronous (runs in the main thread via `createLanguag
 
 ### Prerequisites
 
-- Node.js 20+
-- npm
-- `@usfm-tools/parser` and `@usfm-tools/model` must be built first
+- Deno 2+
 
 ### Setup
 
 ```bash
 cd packages/usfm-controls
-npm install
 ```
 
-### Scripts
+### Tasks
 
 | Command | Description |
 |---------|-------------|
-| `npm run build` | Bundle with tsup |
-| `npm run dev` | Watch mode rebuild |
-| `npm test` | Run tests (vitest) |
-| `npm run lint` | Lint with ESLint |
-| `npm run typecheck` | Type-check |
-| `npm run storybook` | Launch Storybook dev server |
-| `npm run build-storybook` | Build static Storybook |
+| `deno task check` | Type-check `src/` |
+| `deno task test` | Run tests (happy-dom + Testing Library) |
+| `deno task lint` | Lint sources and tests |
 
-### Storybook
-
-```bash
-npm run storybook
-```
-
-Stories demonstrate the editor, preview, book picker, and chapter picker with:
-- Genesis 1 (prose + poetry + footnotes)
-- Psalm 1 (poetry formatting)
-- Empty state
-- Error state (unknown markers, stray end markers)
-- **UsfmPane** — **`FullBookSplit`** and **`TwoPanesSharedState`** use a shared `useState` USFM string; **`FrontMatterNoChapters`** shows the toolbar when there are no `\\c` markers.
-- **UsfmWorkspace** — **`SingleGroupTwoTabs`**, **`TwoEditorGroups`**, and **`OpenFileDemo`** (append tab). Shared long USFM lives under **`src/fixtures/`** for Storybook.
-- **UsfmShell** — **`Default`**, **`SidebarCollapsed`**, and **`BottomBarCollapsed`** mount **`UsfmShell`** with the fixture host (**`createFixtureUsfmShellHost`**), which serves a fake folder of USFM files (including one with an unknown marker so the errors tab has content) and an in-memory settings store.
-- **SettingsPane** — **`Default`** (no persisted settings; follows OS via `system`) and **`DarkPersisted`** (host returns `theme: "dark"`) wrap the pane in a **`SettingsProvider`** backed by an in-memory host that logs `saveSettings` to the console.
-- **UsfmPreview** — **`GenesisPreview`** uses `render: (args) => <UsfmPreview {...args} />` so Controls map to props; **`WithEditor`** must use that same **`args` parameter** (not a zero-arg render) so `versePerLine` updates when you toggle Controls or the checkbox (`useArgs` is only for pushing checkbox state back into Storybook). **Verse Per Line Compare** shows both modes side by side.
+React component tests import `./testing-react.ts`, which registers happy-dom before Loading Library. CodeMirror-heavy suites call `registerDomTestHooks({ flushTimers: true })`.
 
 ### Project Structure
 
@@ -511,16 +485,11 @@ packages/usfm-controls/
 │   ├── theme-scope.test.tsx
 │   ├── chapter-offset-helpers.test.ts
 │   └── chapter-picker.test.tsx
-├── vitest.config.ts                 # jsdom for React tests
-├── .storybook/
-│   ├── main.ts
-│   └── preview.ts
-├── tailwind.config.js
-├── postcss.config.js
-├── tsconfig.json
-├── tsup.config.ts
-├── eslint.config.js
-└── package.json
+├── tests/
+│   ├── dom-setup.ts                 # happy-dom registration for Deno tests
+│   ├── testing-react.ts             # Testing Library re-export (after DOM setup)
+│   └── deno-test-setup.ts           # per-file RTL cleanup hooks
+└── deno.json
 ```
 
 ## References

@@ -1,0 +1,16 @@
+{
+  "name": "@usfm-tools/model",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "tasks": {
+    "test": "deno test -A --unstable-sloppy-imports",
+    "lint": "deno lint",
+    "check": "deno check --unstable-sloppy-imports src/"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["esnext", "deno.ns"]
+  }
+}

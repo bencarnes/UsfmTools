@@ -1,13 +1,14 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { registerDomTestHooks } from "./deno-test-setup.ts";
+
+registerDomTestHooks({ flushTimers: true });
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { cleanup, fireEvent, render, screen, waitFor } from "./testing-react.ts";
 import { UsfmShell } from "../src/components/usfm-shell/UsfmShell.js";
 import type { UsfmShellHost } from "../src/components/usfm-shell/host.js";
 import type { ApplicationSettings } from "../src/components/settings-pane/settings-model.js";
 import { lineColumnToSourceOffset, sourceOffsetToLineColumn } from "../src/components/usfm-shell/line-offsets.js";
 
-afterEach(() => {
-  cleanup();
-});
 
 function makeHost(
   files: readonly { id: string; name: string; usfm: string }[],

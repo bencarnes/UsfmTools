@@ -1,0 +1,38 @@
+{
+  "name": "@usfm-tools/controls",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "tasks": {
+    "test": "deno test -A --unstable-sloppy-imports",
+    "lint": "deno lint",
+    "check": "deno check --unstable-sloppy-imports src/"
+  },
+  "imports": {
+    "@codemirror/autocomplete": "npm:@codemirror/autocomplete@^6.18.0",
+    "@codemirror/commands": "npm:@codemirror/commands@^6.10.3",
+    "@codemirror/language": "npm:@codemirror/language@^6.10.0",
+    "@codemirror/lint": "npm:@codemirror/lint@^6.8.0",
+    "@codemirror/search": "npm:@codemirror/search@^6.7.0",
+    "@codemirror/state": "npm:@codemirror/state@^6.5.0",
+    "@codemirror/view": "npm:@codemirror/view@^6.35.0",
+    "crelt": "npm:crelt@^1.0.6",
+    "@happy-dom/global-registrator": "npm:@happy-dom/global-registrator@^17.0.0",
+    "@lezer/highlight": "npm:@lezer/highlight@^1.2.0",
+    "@lezer/lr": "npm:@lezer/lr@^1.4.0",
+    "@testing-library/react": "npm:@testing-library/react@^16.0.0",
+    "@types/react": "npm:@types/react@^19.0.0",
+    "@types/react-dom": "npm:@types/react-dom@^19.0.0",
+    "react": "npm:react@^19.0.0",
+    "react-dom": "npm:react-dom@^19.0.0",
+    "react/jsx-runtime": "npm:react@^19.0.0/jsx-runtime"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "lib": ["dom", "dom.iterable", "esnext", "deno.ns"],
+    "types": ["@types/react", "@types/react-dom"]
+  }
+}

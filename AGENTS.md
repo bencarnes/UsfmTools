@@ -6,35 +6,35 @@ This repository ("UsfmTools") contains TypeScript tools for processing USFM (Uni
 
 ### Project Layout
 
-- `packages/usfm-parser/` — USFM parser library (TypeScript, bundled with tsup)
-- `bible-edit/` — Tauri desktop application (React + Vite + Tailwind) at the repository root; end-product app, not a consumable package under `packages/`
+- `packages/usfm-parser/` — USFM parser library (TypeScript, Deno workspace member)
+- `packages/usfm-model/` — application-level model on top of the parser
+- `packages/usfm-controls/` — React + CodeMirror UI controls
+- `packages/usfm-parser-integration-tests/` — integration tests against the Berean Standard Bible corpus
 - `Plan/` — Obsidian-compatible planning documents
+
+All packages under `packages/` are **Deno projects** wired together as a [Deno workspace](https://docs.deno.com/runtime/fundamentals/configuration/#workspaces) (root `deno.json`).
+
+### Requirements
+
+- **Deno 2+** ([install](https://docs.deno.com/runtime/getting_started/installation/))
 
 ### Development Commands
 
-**Parser** — run from `packages/usfm-parser/`:
+Run from the **repository root** for the whole workspace, or from an individual package directory.
 
-| Task        | Command                 |
-|-------------|-------------------------|
-| Install     | `npm install`           |
-| Build       | `npm run build`         |
-| Test        | `npm test`              |
-| Lint        | `npm run lint`          |
-| Type-check  | `npm run typecheck`     |
+| Task | Command (root) | Command (single package) |
+|------|----------------|--------------------------|
+| Type-check | `deno task check` | `deno task check` |
+| Test | `deno task test` | `deno task test` |
+| Lint | `deno task lint` | `deno task lint` |
+| Check + test all | `./build.sh` | — |
 
-**bible-edit** — run from `bible-edit/` (repository root):
-
-| Task        | Command                 |
-|-------------|-------------------------|
-| Install     | `npm install`           |
-| Frontend build | `npm run build`      |
-| Test        | `npm test`              |
-| Desktop dev | `npm run tauri dev`     |
+Package dependency order: **usfm-parser** → **usfm-model** → **usfm-controls**. Integration tests depend on **usfm-parser**.
 
 ### Notes
 
-- Node.js 20+ is required.
-- The parser package outputs both ESM (`dist/index.js`) and CJS (`dist/index.cjs`) bundles.
-- Parser tests use vitest; lint uses ESLint with typescript-eslint.
-- The parser has zero runtime dependencies — all deps are devDependencies.
-- `bible-edit` additionally needs Rust (**see `bible-edit/rust-toolchain.toml`**, currently **1.88+** for Tauri 2’s dependency graph) and [Tauri prerequisites](https://tauri.app/start/prerequisites/) for `npm run tauri dev` / `tauri build`. On Linux, install GTK/WebKit dev packages listed in `bible-edit/README.md` so `pkg-config` finds `gdk-3.0` and `webkit2gtk-4.1`.
+- Packages export TypeScript source via `deno.json` `exports` (no npm `dist/` bundles).
+- Local workspace imports use package names such as `@usfm-tools/parser`.
+- TypeScript sources use `.js` extensions in relative imports; the workspace enables `unstable-sloppy-imports` so Deno resolves them to `.ts` files.
+- **usfm-controls** React tests use happy-dom (`tests/dom-setup.ts`, `tests/testing-react.ts`). CodeMirror-heavy suites pass `flushTimers: true` to `registerDomTestHooks()` so pending timers finish before unmount.
+- Storybook was removed during the Deno migration; component behavior is covered by the Deno test suite.
