@@ -409,7 +409,7 @@ cd packages/usfm-controls
 
 React component tests import `./testing-react.ts`, which registers happy-dom before Loading Library. CodeMirror-heavy suites call `registerDomTestHooks({ flushTimers: true })`.
 
-Component stories (`*.stories.tsx`) use Ladle’s CSF-compatible format (`@ladle/react`). Global theming is configured in `.ladle/components.tsx` (wraps stories in `ThemeScope`). Vite resolves workspace packages via aliases in `vite.config.ts`.
+Component stories (`*.stories.tsx`) use Ladle’s CSF-compatible format (`@ladle/react`). Global theming is configured in `.ladle/components.tsx` (wraps stories in `ThemeScope`). Vite resolves workspace packages via aliases in `vite.config.ts`. Ladle uses `@vitejs/plugin-react` (Babel) in `vite.config.ts` so story dev/build works with **Deno only** — no Node.js or npm CLI required.
 
 ### Project Structure
 

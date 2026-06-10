@@ -1,5 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import react from "@vitejs/plugin-react";
 import tailwindcss from "tailwindcss";
 import autoprefixer from "autoprefixer";
 import { defineConfig } from "vite";
@@ -8,6 +9,8 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.join(rootDir, "../..");
 
 export default defineConfig({
+  // Use Babel (not SWC) so Ladle works with Deno only — @swc/core postinstall needs Node.js.
+  plugins: [react()],
   server: {
     fs: {
       allow: [
