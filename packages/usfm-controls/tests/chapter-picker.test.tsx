@@ -24,7 +24,7 @@ describe("ChapterPicker", () => {
     const book = firstBook("\\id PSA\n\\c 10\n\\p\n\\v 1\n\\c 2\n\\p\n\\v 1");
     render(<ChapterPicker book={book} />);
     const buttons = screen.getAllByRole("button");
-    expect(buttons.map((b) => b.textContent)).toEqual(["10", "2"]);
+    expect(buttons.map((b: HTMLElement) => b.textContent)).toEqual(["10", "2"]);
   });
 
   it("fires onChapterSelect with the exact chapter number string", () => {

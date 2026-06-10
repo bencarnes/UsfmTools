@@ -1,12 +1,11 @@
 {
   "name": "@usfm-tools/controls",
   "version": "0.1.0",
-  "nodeModulesDir": "auto",
   "exports": {
     ".": "./src/index.ts"
   },
   "tasks": {
-    "test": "deno test -A --node-modules-dir=auto --unstable-sloppy-imports",
+    "test": "deno test -A --unstable-sloppy-imports",
     "lint": "deno lint",
     "check": "deno check --unstable-sloppy-imports src/",
     "ladle": "deno run -A --node-modules-dir=auto --allow-scripts=npm:@swc/core,npm:msw --unstable-sloppy-imports npm:@ladle/react@5.1.1 serve",

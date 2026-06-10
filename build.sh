@@ -30,6 +30,10 @@ test_package() {
 
 echo "UsfmTools — check and test Deno workspace packages (under packages/)"
 
+# Ladle (optional dev tooling) may create a workspace node_modules/ directory.
+# Remove it so Deno resolves npm: imports from its cache without invoking npm.
+rm -rf "$ROOT/node_modules" "$ROOT"/packages/*/node_modules
+
 check_package "packages/usfm-parser"
 check_package "packages/usfm-model"
 check_package "packages/usfm-controls"
