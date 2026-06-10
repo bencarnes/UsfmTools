@@ -1,10 +1,12 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { registerDomTestHooks } from "./deno-test-setup.ts";
+
+registerDomTestHooks();
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { spy } from "@std/testing/mock";
+import { cleanup, render, screen, fireEvent } from "./testing-react.ts";
 import { UsfmBookPicker } from "../src/components/usfm-book-picker/UsfmBookPicker.js";
 
-afterEach(() => {
-  cleanup();
-});
 
 describe("UsfmBookPicker", () => {
   it("renders OT and NT grids and omits optional groups when empty", () => {
@@ -48,7 +50,7 @@ describe("UsfmBookPicker", () => {
   });
 
   it("fires onBookSelect with file id and code", () => {
-    const onBookSelect = vi.fn();
+    const onBookSelect = spy((_selection: { fileId: string; code: string }) => {});
     render(
       <UsfmBookPicker
         files={[{ id: "myfile", usfm: "\\id LUK\n\\toc3 Luk\n\\c 1\n\\p\n" }]}
@@ -56,7 +58,7 @@ describe("UsfmBookPicker", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /Open Luk \(LUK\)/ }));
-    expect(onBookSelect).toHaveBeenCalledWith({ fileId: "myfile", code: "LUK" });
+    expect(onBookSelect.calls[0]?.args).toEqual([{ fileId: "myfile", code: "LUK" }]);
   });
 
   it("renders non-standard file without \\id using aria label without code suffix", () => {
@@ -67,7 +69,7 @@ describe("UsfmBookPicker", () => {
   });
 
   it("fires onBookSelect with empty code when there is no \\id", () => {
-    const onBookSelect = vi.fn();
+    const onBookSelect = spy((_selection: { fileId: string; code: string }) => {});
     render(
       <UsfmBookPicker
         files={[{ id: "z", usfm: "\\toc1 Zine\n\\c 1\n\\p\n" }]}
@@ -75,11 +77,11 @@ describe("UsfmBookPicker", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /^Open Zine$/ }));
-    expect(onBookSelect).toHaveBeenCalledWith({ fileId: "z", code: "" });
+    expect(onBookSelect.calls[0]?.args).toEqual([{ fileId: "z", code: "" }]);
   });
 
   it("fires onBookSelect for non-standard ids", () => {
-    const onBookSelect = vi.fn();
+    const onBookSelect = spy((_selection: { fileId: string; code: string }) => {});
     render(
       <UsfmBookPicker
         files={[{ id: "hym", usfm: "\\id HYM\n\\toc1 Hymnal\n\\c 1\n\\p\n" }]}
@@ -87,6 +89,6 @@ describe("UsfmBookPicker", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /Open Hymnal \(HYM\)/ }));
-    expect(onBookSelect).toHaveBeenCalledWith({ fileId: "hym", code: "HYM" });
+    expect(onBookSelect.calls[0]?.args).toEqual([{ fileId: "hym", code: "HYM" }]);
   });
 });

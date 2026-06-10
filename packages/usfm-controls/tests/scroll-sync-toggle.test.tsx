@@ -1,10 +1,12 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { registerDomTestHooks } from "./deno-test-setup.ts";
+
+registerDomTestHooks();
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { spy } from "@std/testing/mock";
+import { cleanup, render, screen, fireEvent } from "./testing-react.ts";
 import { ScrollSyncToggleButton } from "../src/components/usfm-pane/scroll-sync-toggle.js";
 
-afterEach(() => {
-  cleanup();
-});
 
 describe("ScrollSyncToggleButton", () => {
   it("renders as a switch with icon only (no On/Off text)", () => {
@@ -22,7 +24,7 @@ describe("ScrollSyncToggleButton", () => {
   });
 
   it("calls onToggle when clicked and chapters exist", () => {
-    const onToggle = vi.fn();
+    const onToggle = spy((): void => {});
     render(
       <ScrollSyncToggleButton
         scrollSyncEnabled
@@ -32,6 +34,6 @@ describe("ScrollSyncToggleButton", () => {
       />,
     );
     fireEvent.click(screen.getByRole("switch", { name: /scroll sync between editor and preview/i }));
-    expect(onToggle).toHaveBeenCalledOnce();
+    expect(onToggle.calls.length).toBe(1);
   });
 });

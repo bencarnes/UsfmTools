@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import { parse } from "@usfm-tools/parser";
 import type {
   BookNode,
@@ -12,19 +13,20 @@ import type {
   ParentNode,
   ParseResult,
 } from "@usfm-tools/parser";
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-
-const BSB_DIR = join(__dirname, "../../../bibles/bsb/usfm");
+const BSB_DIR = new URL("../../../bibles/bsb/usfm/", import.meta.url);
 
 function loadUsfm(filename: string): string {
-  return readFileSync(join(BSB_DIR, filename), "utf-8");
+  return Deno.readTextFileSync(new URL(filename, BSB_DIR));
 }
 
 function allUsfmFiles(): string[] {
-  return readdirSync(BSB_DIR)
-    .filter((f) => f.endsWith(".usfm"))
-    .sort();
+  const files: string[] = [];
+  for (const entry of Deno.readDirSync(BSB_DIR)) {
+    if (entry.isFile && entry.name.endsWith(".usfm")) {
+      files.push(entry.name);
+    }
+  }
+  return files.sort();
 }
 
 function findChild<T>(

@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
 import type { BookNode } from "@usfm-tools/parser";
 import { parse } from "../src/index.js";
 import { listChapterNumbersFromBook } from "../src/list-chapter-numbers-from-book.js";

@@ -1,11 +1,12 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { registerDomTestHooks } from "./deno-test-setup.ts";
+
+registerDomTestHooks();
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { cleanup, render, screen, fireEvent, waitFor } from "./testing-react.ts";
 import { UsfmPane } from "../src/components/usfm-pane/UsfmPane.js";
 import { VIEW_MODE_LABELS } from "../src/components/usfm-pane/view-mode-toggle.js";
 
-afterEach(() => {
-  cleanup();
-});
 
 describe("UsfmPane", () => {
   it("shows the toolbar and view mode cycle control", () => {

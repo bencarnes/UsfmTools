@@ -36,11 +36,10 @@ Previous parser limitations that have been resolved:
 
 ```bash
 cd packages/usfm-parser-integration-tests
-npm install
-npm test
+deno task test
 ```
 
-**Prerequisites:** The parser package must be built first (`npm run build` in `packages/usfm-parser`).
+From the repository root, `./build.sh` runs checks and all workspace tests in dependency order.
 
 ## Test Data
 

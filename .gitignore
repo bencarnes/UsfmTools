@@ -1,6 +1,8 @@
 node_modules/
+packages/*/node_modules/
 dist/
 *.tsbuildinfo
 .eslintcache
 coverage/
 storybook-static/
+build/

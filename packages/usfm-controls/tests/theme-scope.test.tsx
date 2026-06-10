@@ -1,15 +1,18 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { registerDomTestHooks } from "./deno-test-setup.ts";
+
+registerDomTestHooks();
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { cleanup, fireEvent, render, screen, waitFor } from "./testing-react.ts";
 import { SettingsProvider, useSettings } from "../src/components/settings-pane/settings-context.js";
-import type { SettingsHost } from "../src/components/settings-pane/settings-model.js";
+import type { ApplicationSettings, SettingsHost } from "../src/components/settings-pane/settings-model.js";
 import { ThemeScope } from "../src/components/settings-pane/theme-scope.js";
 
-afterEach(() => {
-  cleanup();
-});
 
 function makeHost(initialTheme: "light" | "dark" | "system" = "system"): SettingsHost {
-  const store = { value: initialTheme === "system" ? null : { theme: initialTheme } };
+  const store: { value: ApplicationSettings | null } = {
+    value: initialTheme === "system" ? null : { theme: initialTheme },
+  };
   return {
     async loadSettings() {
       return store.value;

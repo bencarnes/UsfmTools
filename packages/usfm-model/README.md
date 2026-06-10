@@ -8,9 +8,7 @@ The parser produces a low-level AST that faithfully represents the USFM markup s
 
 ## Installation
 
-```bash
-npm install @usfm-tools/model
-```
+Add `@usfm-tools/model` as a dependency in your Deno workspace or import map.
 
 ## Usage
 
@@ -95,28 +93,21 @@ const html = renderPreviewHtml(src, { versePerLine: true });
 
 ### Prerequisites
 
-- Node.js 20+
-- npm
-- The `@usfm-tools/parser` package must be built first (`npm run build` in `packages/usfm-parser`)
+- Deno 2+
 
 ### Setup
 
 ```bash
 cd packages/usfm-model
-npm install
 ```
 
-### Scripts
+### Tasks
 
-| Command            | Description                          |
-|--------------------|--------------------------------------|
-| `npm run build`    | Bundle with tsup (ESM + CJS + .d.ts) |
-| `npm run dev`      | Watch mode rebuild                   |
-| `npm test`         | Run tests (vitest)                   |
-| `npm run test:watch` | Run tests in watch mode            |
-| `npm run lint`     | Lint with ESLint                     |
-| `npm run lint:fix` | Lint and auto-fix                    |
-| `npm run typecheck` | Type-check without emitting         |
+| Command            | Description                |
+|--------------------|----------------------------|
+| `deno task check`  | Type-check `src/`          |
+| `deno task test`   | Run tests                  |
+| `deno task lint`   | Lint sources and tests     |
 
 ### Project Structure
 
@@ -135,10 +126,7 @@ packages/usfm-model/
 │   ├── book-picker-model.test.ts
 │   ├── publication-preview.test.ts
 │   └── render-preview-html.test.ts
-├── tsconfig.json
-├── tsup.config.ts
-├── eslint.config.js
-└── package.json
+└── deno.json
 ```
 
 ## Architecture

@@ -1,0 +1,12 @@
+{
+  "name": "@usfm-tools/parser-integration-tests",
+  "version": "0.1.0",
+  "exports": {},
+  "tasks": {
+    "test": "deno test -A --unstable-sloppy-imports"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["esnext", "deno.ns", "dom"]
+  }
+}

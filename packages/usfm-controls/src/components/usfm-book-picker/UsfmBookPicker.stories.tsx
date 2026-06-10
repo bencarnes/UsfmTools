@@ -1,6 +1,5 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Story, StoryDefault } from "@ladle/react";
 import { useState } from "react";
-import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
 import {
   STANDARD_USFM_BOOK_IDENTIFIERS,
   type UsfmBookPickerFileInput,
@@ -74,33 +73,20 @@ const SAMPLE_FILES: readonly UsfmBookPickerFileInput[] = [
   NO_ID_SAMPLE,
 ];
 
-const meta = {
+export default {
   title: "Controls/UsfmBookPicker",
-  component: UsfmBookPicker,
-  decorators: [withSystemTheme],
-  parameters: {
-    layout: "padded",
-  },
-} satisfies Meta<typeof UsfmBookPicker>;
+} satisfies StoryDefault;
 
-export default meta;
-type Story = StoryObj<typeof meta>;
-
-export const Default: Story = {
-  args: {
-    files: SAMPLE_FILES,
-  },
-  render: (args) => {
-    const [last, setLast] = useState<string>("(none)");
-    return (
-      <div className="max-w-6xl space-y-3">
-        <UsfmBookPicker
-          {...args}
-          onBookSelect={(d) => setLast(`${d.code} → fileId ${d.fileId}`)}
-          className="rounded-md border border-gray-200 p-3 dark:border-gray-700"
-        />
-        <p className="text-sm text-gray-600 dark:text-gray-400">Last selection: {last}</p>
-      </div>
-    );
-  },
+export const Default: Story = () => {
+  const [last, setLast] = useState<string>("(none)");
+  return (
+    <div className="max-w-6xl space-y-3">
+      <UsfmBookPicker
+        files={SAMPLE_FILES}
+        onBookSelect={(d) => setLast(`${d.code} → fileId ${d.fileId}`)}
+        className="rounded-md border border-gray-200 p-3 dark:border-gray-700"
+      />
+      <p className="text-sm text-gray-600 dark:text-gray-400">Last selection: {last}</p>
+    </div>
+  );
 };

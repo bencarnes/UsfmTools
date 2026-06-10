@@ -14,9 +14,7 @@ This parser tokenizes and parses USFM source text into a structured AST (Abstrac
 
 ## Installation
 
-```bash
-npm install @usfm-tools/parser
-```
+Add `@usfm-tools/parser` as a dependency in your Deno workspace or import map.
 
 ## Usage
 
@@ -364,28 +362,21 @@ Footnote char example:
 
 ### Prerequisites
 
-- Node.js 20+
-- npm
+- Deno 2+
 
 ### Setup
 
 ```bash
 cd packages/usfm-parser
-npm install
 ```
 
-### Scripts
+### Tasks
 
-| Command            | Description                          |
-|--------------------|--------------------------------------|
-| `npm run build`    | Bundle with tsup (ESM + CJS + .d.ts) |
-| `npm run dev`      | Watch mode rebuild                   |
-| `npm test`         | Run tests (vitest)                   |
-| `npm run test:watch` | Run tests in watch mode            |
-| `npm run test:coverage` | Run tests with coverage report  |
-| `npm run lint`     | Lint with ESLint                     |
-| `npm run lint:fix` | Lint and auto-fix                    |
-| `npm run typecheck` | Type-check without emitting         |
+| Command            | Description                |
+|--------------------|----------------------------|
+| `deno task check`  | Type-check `src/`          |
+| `deno task test`   | Run tests                  |
+| `deno task lint`   | Lint sources and tests     |
 
 ### Project Structure
 
@@ -401,10 +392,7 @@ packages/usfm-parser/
 │   ├── lexer.test.ts   # Lexer unit tests
 │   ├── parser.test.ts  # Parser integration tests
 │   └── grammar.test.ts # Grammar helper tests
-├── tsconfig.json       # TypeScript configuration
-├── tsup.config.ts      # Bundle configuration
-├── eslint.config.js    # Linting configuration
-└── package.json
+└── deno.json           # Deno package manifest and tasks
 ```
 
 ### Architecture

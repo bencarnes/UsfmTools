@@ -66,7 +66,15 @@ export const openFindReplacePanel: (view: EditorView) => boolean = (view) =>
 /** Replace the current or next match, then select the following match (wraps at document end). */
 export function replaceAndAdvance(view: EditorView, spec: SearchQuery): boolean {
   if (view.state.readOnly || !spec.valid) return false;
-  const query = spec.create();
+  type CompiledSearchQuery = {
+    nextMatch(
+      state: EditorState,
+      from: number,
+      to: number,
+    ): { from: number; to: number } | null;
+    getReplacement(match: { from: number; to: number }): string;
+  };
+  const query = (spec as SearchQuery & { create(): CompiledSearchQuery }).create();
   const { from, to } = view.state.selection.main;
   let match = query.nextMatch(view.state, from, to);
   if (!match) {

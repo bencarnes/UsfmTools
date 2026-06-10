@@ -1,0 +1,19 @@
+{
+  "workspace": [
+    "./packages/usfm-parser",
+    "./packages/usfm-model",
+    "./packages/usfm-controls",
+    "./packages/usfm-parser-integration-tests"
+  ],
+  "imports": {
+    "@std/expect": "jsr:@std/expect@^1",
+    "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
+    "@std/testing/mock": "jsr:@std/testing@^1/mock"
+  },
+  "unstable": ["sloppy-imports"],
+  "tasks": {
+    "test": "deno test -A --unstable-sloppy-imports --parallel",
+    "lint": "deno lint packages/",
+    "check": "deno check --unstable-sloppy-imports packages/usfm-parser/src packages/usfm-model/src packages/usfm-controls/src"
+  }
+}

@@ -1,28 +1,9 @@
-import type { Meta, StoryObj } from "@storybook/react";
-import { withSystemTheme } from "../../../.storybook/with-theme-decorator.js";
+import type { Story, StoryDefault } from "@ladle/react";
 import { UsfmEditor } from "./UsfmEditor.js";
 
-const meta = {
+export default {
   title: "Controls/UsfmEditor",
-  component: UsfmEditor,
-  decorators: [withSystemTheme],
-  parameters: {
-    layout: "padded",
-    docs: {
-      description: {
-        component:
-          "USFM source editor. Press **Ctrl+F** for find or **Ctrl+H** for find and replace (upper-right panel).",
-      },
-    },
-  },
-  argTypes: {
-    value: { control: "text" },
-    className: { control: "text" },
-  },
-} satisfies Meta<typeof UsfmEditor>;
-
-export default meta;
-type Story = StoryObj<typeof meta>;
+} satisfies StoryDefault;
 
 const SAMPLE_GENESIS = `\\id GEN Berean Standard Bible
 \\h Genesis
@@ -55,34 +36,30 @@ const SAMPLE_PSALM = `\\id PSA
 \\q1 whose leaf does not wither,
 \\q2 and who prospers in all he does.`;
 
-export const Genesis: Story = {
-  args: {
-    value: SAMPLE_GENESIS,
-    className: "h-[500px]",
-  },
+export const Genesis: Story = (args) => <UsfmEditor {...args} />;
+Genesis.args = {
+  value: SAMPLE_GENESIS,
+  className: "h-[500px]",
 };
 
-export const Psalm: Story = {
-  args: {
-    value: SAMPLE_PSALM,
-    className: "h-[400px]",
-  },
+export const Psalm: Story = (args) => <UsfmEditor {...args} />;
+Psalm.args = {
+  value: SAMPLE_PSALM,
+  className: "h-[400px]",
 };
 
-export const Empty: Story = {
-  args: {
-    value: "",
-    className: "h-[300px]",
-  },
+export const Empty: Story = (args) => <UsfmEditor {...args} />;
+Empty.args = {
+  value: "",
+  className: "h-[300px]",
 };
 
-export const WithErrors: Story = {
-  args: {
-    value: `\\id GEN
+export const WithErrors: Story = (args) => <UsfmEditor {...args} />;
+WithErrors.args = {
+  value: `\\id GEN
 \\c 1
 \\p
 \\v 1 In the beginning \\zzz unknown marker \\nd Lord\\nd* created.
 \\v 2 Text with \\bk* orphaned end marker.`,
-    className: "h-[300px]",
-  },
+  className: "h-[300px]",
 };

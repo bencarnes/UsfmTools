@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { registerDomTestHooks } from "./deno-test-setup.ts";
+
+registerDomTestHooks();
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { render } from "./testing-react.ts";
 import { UsfmPreview } from "../src/components/usfm-preview/UsfmPreview.js";
 
 const MULTI_VERSE = "\\id GEN\n\\c 1\n\\p\n\\v 1 One. \\v 2 Two.";

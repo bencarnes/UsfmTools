@@ -1,14 +1,16 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { registerDomTestHooks } from "./deno-test-setup.ts";
+
+registerDomTestHooks({ flushTimers: true });
+import { describe, it } from "@std/testing/bdd";
+import { expect } from "@std/expect";
+import { spy } from "@std/testing/mock";
 import { createRef } from "react";
-import { cleanup, render, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, render, fireEvent, waitFor } from "./testing-react.ts";
 import {
   UsfmEditor,
   type UsfmEditorHandle,
 } from "../src/components/usfm-editor/UsfmEditor.js";
 
-afterEach(() => {
-  cleanup();
-});
 
 async function renderEditor(
   props: {
@@ -77,7 +79,7 @@ describe("UsfmEditor find and replace", () => {
   });
 
   it("replaces all matches", async () => {
-    const onChange = vi.fn();
+    const onChange = spy((_value: string) => {});
     const { container, ref } = await renderEditor({
       value: "\\id GEN\n\\p\n\\v 1 Hello Hello.",
       onChange,
@@ -96,14 +98,14 @@ describe("UsfmEditor find and replace", () => {
     const replaceAll = container.querySelector('button[title="Replace All"]') as HTMLButtonElement;
     fireEvent.click(replaceAll);
     await waitFor(() => {
-      const last = onChange.mock.calls.at(-1)?.[0] as string;
+      const last = onChange.calls.at(-1)?.args[0] as string;
       expect(last).toContain("Hi");
       expect(last).not.toContain("Hello");
     });
   });
 
   it("replace advances to the next occurrence after replacing", async () => {
-    const onChange = vi.fn();
+    const onChange = spy((_value: string) => {});
     const { container, ref } = await renderEditor({
       value: "\\id GEN\n\\p\n\\v 1 aa bb aa.",
       onChange,
@@ -123,13 +125,13 @@ describe("UsfmEditor find and replace", () => {
     const replaceBtn = container.querySelector('button[title="Replace"]') as HTMLButtonElement;
     fireEvent.click(replaceBtn);
     await waitFor(() => {
-      const last = onChange.mock.calls.at(-1)?.[0] as string;
+      const last = onChange.calls.at(-1)?.args[0] as string;
       expect(last).toMatch(/XX bb aa/);
     });
 
     fireEvent.click(replaceBtn);
     await waitFor(() => {
-      const last = onChange.mock.calls.at(-1)?.[0] as string;
+      const last = onChange.calls.at(-1)?.args[0] as string;
       expect(last).toMatch(/XX bb XX/);
     });
   });
