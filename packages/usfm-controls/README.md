@@ -404,8 +404,12 @@ cd packages/usfm-controls
 | `deno task check` | Type-check `src/` |
 | `deno task test` | Run tests (happy-dom + Testing Library) |
 | `deno task lint` | Lint sources and tests |
+| `deno task ladle` | Start [Ladle](https://ladle.dev/) dev server for component stories |
+| `deno task ladle:build` | Build a static Ladle site to `build/` |
 
 React component tests import `./testing-react.ts`, which registers happy-dom before Loading Library. CodeMirror-heavy suites call `registerDomTestHooks({ flushTimers: true })`.
+
+Component stories (`*.stories.tsx`) use Ladle’s CSF-compatible format (`@ladle/react`). Global theming is configured in `.ladle/components.tsx` (wraps stories in `ThemeScope`). Vite resolves workspace packages via aliases in `vite.config.ts`.
 
 ### Project Structure
 
@@ -413,7 +417,7 @@ React component tests import `./testing-react.ts`, which registers happy-dom bef
 packages/usfm-controls/
 ├── src/
 │   ├── fixtures/
-│   │   └── sample-bsb-genesis-usfm.ts  # Long sample USFM for Storybook (not part of the published entry)
+│   │   └── sample-bsb-genesis-usfm.ts  # Long sample USFM for Ladle stories (not part of the published entry)
 │   ├── index.ts                     # Public API exports
 │   ├── styles.css                   # Tailwind + theme tokens + preview reading styles
 │   ├── theme-tokens.ts              # Shared CSS-variable-driven control styles
@@ -447,7 +451,7 @@ packages/usfm-controls/
 │   │   │   ├── UsfmShell.tsx        # Application shell: sidebar + workspace + bottom bar
 │   │   │   ├── UsfmShell.stories.tsx
 │   │   │   ├── host.ts              # UsfmShellHost interface (file source adapter)
-│   │   │   ├── fixture-host.ts      # In-memory host for Storybook + tests
+│   │   │   ├── fixture-host.ts      # In-memory host for Ladle stories + tests
 │   │   │   ├── file-browser.tsx     # Sidebar file list tab
 │   │   │   ├── search.tsx           # Sidebar folder-wide search tab
 │   │   │   ├── errors-panel.tsx     # Bottom-bar errors tab

@@ -61,6 +61,18 @@ Run from a package directory (for example `packages/usfm-parser/`):
 | Test | `deno task test` |
 | Lint | `deno task lint` |
 
+### Component stories (usfm-controls)
+
+Interactive component development uses [Ladle](https://ladle.dev/), run via Deno from `packages/usfm-controls/`:
+
+```bash
+cd packages/usfm-controls
+deno task ladle        # dev server (default http://localhost:61000/)
+deno task ladle:build  # static build to build/
+```
+
+Stories live next to components as `*.stories.tsx`. The first run may download npm dependencies into a workspace `node_modules/` directory (gitignored).
+
 ## Contributing
 
 See **`AGENTS.md`** for tooling notes used in automated environments.

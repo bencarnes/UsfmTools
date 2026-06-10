@@ -28,6 +28,7 @@ Run from the **repository root** for the whole workspace, or from an individual 
 | Test | `deno task test` | `deno task test` |
 | Lint | `deno task lint` | `deno task lint` |
 | Check + test all | `./build.sh` | — |
+| Component stories (Ladle) | — | `deno task ladle` (in **usfm-controls**) |
 
 Package dependency order: **usfm-parser** → **usfm-model** → **usfm-controls**. Integration tests depend on **usfm-parser**.
 
@@ -37,4 +38,4 @@ Package dependency order: **usfm-parser** → **usfm-model** → **usfm-controls
 - Local workspace imports use package names such as `@usfm-tools/parser`.
 - TypeScript sources use `.js` extensions in relative imports; the workspace enables `unstable-sloppy-imports` so Deno resolves them to `.ts` files.
 - **usfm-controls** React tests use happy-dom (`tests/dom-setup.ts`, `tests/testing-react.ts`). CodeMirror-heavy suites pass `flushTimers: true` to `registerDomTestHooks()` so pending timers finish before unmount.
-- Storybook was removed during the Deno migration; component behavior is covered by the Deno test suite.
+- **usfm-controls** component stories use [Ladle](https://ladle.dev/) via Deno (`deno task ladle` / `deno task ladle:build` in `packages/usfm-controls/`). Ladle runs through Vite and needs `--node-modules-dir=auto` plus `--allow-scripts=npm:@swc/core,npm:msw` (configured in that package’s `deno.json` tasks). Config lives in `.ladle/` and `vite.config.ts`.

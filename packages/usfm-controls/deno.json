@@ -1,13 +1,16 @@
 {
   "name": "@usfm-tools/controls",
   "version": "0.1.0",
+  "nodeModulesDir": "auto",
   "exports": {
     ".": "./src/index.ts"
   },
   "tasks": {
-    "test": "deno test -A --unstable-sloppy-imports",
+    "test": "deno test -A --node-modules-dir=auto --unstable-sloppy-imports",
     "lint": "deno lint",
-    "check": "deno check --unstable-sloppy-imports src/"
+    "check": "deno check --unstable-sloppy-imports src/",
+    "ladle": "deno run -A --node-modules-dir=auto --allow-scripts=npm:@swc/core,npm:msw --unstable-sloppy-imports npm:@ladle/react@5.1.1 serve",
+    "ladle:build": "deno run -A --node-modules-dir=auto --allow-scripts=npm:@swc/core,npm:msw --unstable-sloppy-imports npm:@ladle/react@5.1.1 build"
   },
   "imports": {
     "@codemirror/autocomplete": "npm:@codemirror/autocomplete@^6.18.0",
@@ -26,7 +29,11 @@
     "@types/react-dom": "npm:@types/react-dom@^19.0.0",
     "react": "npm:react@^19.0.0",
     "react-dom": "npm:react-dom@^19.0.0",
-    "react/jsx-runtime": "npm:react@^19.0.0/jsx-runtime"
+    "react/jsx-runtime": "npm:react@^19.0.0/jsx-runtime",
+    "@ladle/react": "npm:@ladle/react@^5.1.1",
+    "vite": "npm:vite@^6.0.0",
+    "tailwindcss": "npm:tailwindcss@^3.4.0",
+    "autoprefixer": "npm:autoprefixer@^10.4.0"
   },
   "compilerOptions": {
     "strict": true,
