@@ -16,3 +16,12 @@ export type {
   UsfmBookPickerBook,
   UsfmBookPickerGroups,
 } from "./usfm-book-picker-model.js";
+
+export {
+  buildUsfmFilePickerGroups,
+} from "./usfm-file-picker-model.js";
+export type {
+  UsfmFilePickerFileInput,
+  UsfmFilePickerFile,
+  UsfmFilePickerGroups,
+} from "./usfm-file-picker-model.js";
