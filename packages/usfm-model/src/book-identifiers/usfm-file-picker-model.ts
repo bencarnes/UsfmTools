@@ -32,7 +32,10 @@ function withFileNames(
  * Standard `\\id` codes are split into Old Testament, New Testament, and other;
  * non-standard rows include unknown `\\id` codes, an empty/missing `\\id` line on
  * the first book, or **no** `\\id` at all (non-empty USFM), in input order.
- * Labels are always the supplied {@link UsfmFilePickerFileInput.name}.
+ * Labels are always the supplied {@link UsfmFilePickerFileInput.name} — table-of-contents
+ * markers are not used. Multiple files with the same standard `\\id` (for example two
+ * `GEN.usfm` copies) each appear as separate rows, ordered by the book table then input
+ * order. Files without `\\toc3` (or any `\\toc`) are grouped from `\\id` alone.
  */
 export function buildUsfmFilePickerGroups(
   files: readonly UsfmFilePickerFileInput[],

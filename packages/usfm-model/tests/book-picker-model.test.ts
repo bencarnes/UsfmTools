@@ -125,6 +125,16 @@ describe("buildUsfmBookPickerGroups", () => {
     expect(groups.nonStandard).toHaveLength(0);
   });
 
+  it("lists every file when multiple copies share the same standard \\id", () => {
+    const groups = buildUsfmBookPickerGroups([
+      { id: "draft", usfm: "\\id GEN\n\\c 1\n\\p\n" },
+      { id: "final", usfm: "\\id GEN\n\\toc3 Gen\n\\c 1\n\\p\n" },
+      { id: "backup", usfm: "\\id GEN\n\\c 1\n\\p\n" },
+    ]);
+    expect(groups.oldTestament.map((b) => b.fileId)).toEqual(["draft", "final", "backup"]);
+    expect(groups.oldTestament.map((b) => b.code)).toEqual(["GEN", "GEN", "GEN"]);
+  });
+
   it("places deuterocanon and peripherals in other", () => {
     const groups = buildUsfmBookPickerGroups([
       { id: "t", usfm: "\\id TOB\n\\toc1 Tobit\n\\c 1\n\\p\n" },

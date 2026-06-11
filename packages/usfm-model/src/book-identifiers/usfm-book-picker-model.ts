@@ -162,13 +162,21 @@ function displayLabelNonStandard(
  * Only the **first** `book` node is used when present; otherwise TOC markers are read
  * from top-level paragraphs on the document.
  */
+type PickerBookRow = UsfmBookPickerBook & { readonly inputOrder: number };
+
+function comparePickerBookRows(a: PickerBookRow, b: PickerBookRow): number {
+  const byTable = a.sortIndex - b.sortIndex;
+  return byTable !== 0 ? byTable : a.inputOrder - b.inputOrder;
+}
+
 export function buildUsfmBookPickerGroups(
   files: readonly UsfmBookPickerFileInput[],
 ): UsfmBookPickerGroups {
-  const standardPicked: UsfmBookPickerBook[] = [];
+  const standardPicked: PickerBookRow[] = [];
   const nonStandardList: UsfmBookPickerBook[] = [];
 
-  for (const file of files) {
+  for (let inputOrder = 0; inputOrder < files.length; inputOrder++) {
+    const file = files[inputOrder]!;
     const trimmed = file.usfm.trim();
     if (!trimmed) continue;
 
@@ -192,6 +200,7 @@ export function buildUsfmBookPickerGroups(
           displayLabel,
           canonGroup: meta.canonGroup,
           sortIndex: order,
+          inputOrder,
         });
       } else {
         const displayLabel = displayLabelNonStandard(rawCode, toc, file.id);
@@ -216,7 +225,7 @@ export function buildUsfmBookPickerGroups(
     }
   }
 
-  standardPicked.sort((a, b) => a.sortIndex - b.sortIndex);
+  standardPicked.sort(comparePickerBookRows);
 
   const oldTestament: UsfmBookPickerBook[] = [];
   const newTestament: UsfmBookPickerBook[] = [];

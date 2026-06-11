@@ -50,6 +50,30 @@ describe("buildUsfmFilePickerGroups", () => {
     expect(groups.nonStandard[0]?.displayLabel).toBe("hymnal.usfm");
   });
 
+  it("groups standard books without \\toc3 from \\id alone", () => {
+    const groups = buildUsfmFilePickerGroups([
+      { id: "1", name: "ROM.usfm", usfm: "\\id ROM\n\\c 1\n\\p\n" },
+      { id: "2", name: "PSA.usfm", usfm: "\\id PSA\n\\c 1\n\\p\n" },
+    ]);
+    expect(groups.oldTestament.map((b) => b.displayLabel)).toEqual(["PSA.usfm"]);
+    expect(groups.newTestament.map((b) => b.displayLabel)).toEqual(["ROM.usfm"]);
+  });
+
+  it("lists every file when multiple copies share the same standard \\id", () => {
+    const groups = buildUsfmFilePickerGroups([
+      { id: "draft", name: "GEN-draft.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n" },
+      { id: "final", name: "GEN-final.usfm", usfm: "\\id GEN\n\\toc3 Gen\n\\c 1\n\\p\n" },
+      { id: "backup", name: "GEN-backup.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n" },
+    ]);
+    expect(groups.oldTestament.map((b) => b.fileId)).toEqual(["draft", "final", "backup"]);
+    expect(groups.oldTestament.map((b) => b.displayLabel)).toEqual([
+      "GEN-draft.usfm",
+      "GEN-final.usfm",
+      "GEN-backup.usfm",
+    ]);
+    expect(groups.oldTestament.map((b) => b.code)).toEqual(["GEN", "GEN", "GEN"]);
+  });
+
   it("places deuterocanon and peripherals in other", () => {
     const groups = buildUsfmFilePickerGroups([
       { id: "t", name: "TOB.usfm", usfm: "\\id TOB\n\\toc1 Tobit\n\\c 1\n\\p\n" },

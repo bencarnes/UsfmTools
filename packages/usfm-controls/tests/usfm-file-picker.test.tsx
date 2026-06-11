@@ -96,6 +96,29 @@ describe("UsfmFilePicker", () => {
     expect(onFileSelect.calls[0]?.args).toEqual([{ fileId: "z", code: "" }]);
   });
 
+  it("renders multiple copies of the same book as separate rows", () => {
+    render(
+      <UsfmFilePicker
+        files={[
+          { id: "draft", name: "GEN-draft.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n" },
+          { id: "final", name: "GEN-final.usfm", usfm: "\\id GEN\n\\toc3 Gen\n\\c 1\n\\p\n" },
+        ]}
+      />,
+    );
+    const buttons = screen.getAllByRole("button");
+    expect(buttons).toHaveLength(2);
+    expect(buttons.map((b) => b.textContent)).toEqual(["GEN-draft.usfm", "GEN-final.usfm"]);
+  });
+
+  it("renders standard books without \\toc3", () => {
+    render(
+      <UsfmFilePicker
+        files={[{ id: "1", name: "ROM.usfm", usfm: "\\id ROM\n\\c 1\n\\p\n" }]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /Open ROM\.usfm \(ROM\)/ })).toBeTruthy();
+  });
+
   it("marks the active file with aria-current", () => {
     render(
       <UsfmFilePicker

@@ -83,6 +83,40 @@ export default {
   title: "Controls/UsfmFilePicker",
 } satisfies StoryDefault;
 
+const DUPLICATE_GEN_FILES: readonly UsfmFilePickerFileInput[] = [
+  {
+    id: "gen-draft",
+    name: "GEN-draft.usfm",
+    usfm: `\\id GEN
+\\c 1
+\\p
+`,
+  },
+  {
+    id: "gen-final",
+    name: "GEN-final.usfm",
+    usfm: `\\id GEN
+\\toc3 Gen
+\\c 1
+\\p
+`,
+  },
+];
+
+export const DuplicateBooks: Story = () => {
+  const [last, setLast] = useState<string>("(none)");
+  return (
+    <div className="max-w-md space-y-3">
+      <UsfmFilePicker
+        files={DUPLICATE_GEN_FILES}
+        onFileSelect={(d) => setLast(`${d.fileId} (${d.code || "no id"})`)}
+        className="rounded-md border border-gray-200 p-3 dark:border-gray-700"
+      />
+      <p className="text-sm text-gray-600 dark:text-gray-400">Last selection: {last}</p>
+    </div>
+  );
+};
+
 export const Default: Story = () => {
   const [last, setLast] = useState<string>("(none)");
   const [active, setActive] = useState<string | null>(null);

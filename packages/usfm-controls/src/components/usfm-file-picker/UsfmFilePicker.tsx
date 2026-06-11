@@ -114,7 +114,8 @@ function VerticalFileList({
  * Picker for USFM files: reads `\\id` from supplied file contents (no filesystem access),
  * groups Old Testament, New Testament, other standard identifiers, and non-standard entries,
  * orders standard books by the official USFM book table, and shows each file name in a
- * vertical list (including files without `\\toc3` or any table-of-contents markers).
+ * vertical list. Table-of-contents markers are ignored for labels; multiple files sharing
+ * the same standard `\\id` each appear separately, distinguished by file name.
  */
 export function UsfmFilePicker({
   files,
