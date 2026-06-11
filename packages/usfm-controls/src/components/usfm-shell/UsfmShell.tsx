@@ -30,6 +30,7 @@ import {
   SearchIcon,
 } from "./shell-icons.js";
 import { lineColumnToSourceOffset } from "./line-offsets.js";
+import type { UsfmFilePickerFileInput } from "@usfm-tools/model";
 import type { UsfmShellFileEntry, UsfmShellHost } from "./host.js";
 
 export interface UsfmShellProps {
@@ -53,7 +54,7 @@ export function UsfmShell({
   className,
 }: UsfmShellProps) {
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs([]));
-  const [files, setFiles] = useState<readonly UsfmShellFileEntry[]>([]);
+  const [files, setFiles] = useState<readonly UsfmFilePickerFileInput[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
 
   const [sidebarExpanded, setSidebarExpanded] = useState(defaultSidebarExpanded);
@@ -68,15 +69,22 @@ export function UsfmShell({
   const clientRef = useRef(createLanguageClient());
   const validateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load file list from host.
+  // Load file list and USFM bodies from host (picker grouping needs \\id from each file).
   useEffect(() => {
     let cancelled = false;
     setFilesLoading(true);
     host
       .listFiles()
-      .then((list) => {
+      .then(async (list) => {
         if (cancelled) return;
-        setFiles(list);
+        const withUsfm = await Promise.all(
+          list.map(async (entry) => ({
+            id: entry.id,
+            name: entry.name,
+            usfm: (await host.readFile(entry.id)) ?? "",
+          })),
+        );
+        if (!cancelled) setFiles(withUsfm);
       })
       .finally(() => {
         if (!cancelled) setFilesLoading(false);
@@ -168,8 +176,13 @@ export function UsfmShell({
 
   // ---- file open / focus ----
 
+  const shellFileEntries = useMemo<readonly UsfmShellFileEntry[]>(
+    () => files.map((f) => ({ id: f.id, name: f.name })),
+    [files],
+  );
+
   const openFile = useCallback(
-    async (entry: UsfmShellFileEntry, opts?: { readonly selection?: { from: number; to: number } }) => {
+    async (entry: UsfmFilePickerFileInput, opts?: { readonly selection?: { from: number; to: number } }) => {
       const existingTabId = entry.id;
 
       // If a tab with the file id already exists, focus it.
@@ -192,7 +205,7 @@ export function UsfmShell({
         return;
       }
 
-      const usfm = await host.readFile(entry.id);
+      const usfm = entry.usfm || (await host.readFile(entry.id));
       if (usfm == null) return;
       const targetGroupId = model.slots[0]?.id;
       if (!targetGroupId) return;
@@ -216,9 +229,10 @@ export function UsfmShell({
 
   const onSelectSearchResult = useCallback(
     (m: SearchMatch) => {
-      void openFile({ id: m.fileId, name: m.fileName }, { selection: { from: m.from, to: m.to } });
+      const full = files.find((f) => f.id === m.fileId);
+      if (full) void openFile(full, { selection: { from: m.from, to: m.to } });
     },
-    [openFile],
+    [files, openFile],
   );
 
   // ---- errors ----
@@ -324,7 +338,7 @@ export function UsfmShell({
               />
             ) : (
               <FileSearch
-                files={files}
+                files={shellFileEntries}
                 readFile={(id) => host.readFile(id)}
                 onSelectResult={onSelectSearchResult}
                 loadingFiles={filesLoading}

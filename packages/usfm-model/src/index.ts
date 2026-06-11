@@ -33,6 +33,7 @@ export {
   getStandardUsfmBookOrderIndex,
   getStandardUsfmBookIdentifier,
   buildUsfmBookPickerGroups,
+  buildUsfmFilePickerGroups,
 } from "./book-identifiers/index.js";
 export type {
   StandardBookIdentifier,
@@ -41,6 +42,9 @@ export type {
   UsfmBookPickerFileInput,
   UsfmBookPickerBook,
   UsfmBookPickerGroups,
+  UsfmFilePickerFileInput,
+  UsfmFilePickerFile,
+  UsfmFilePickerGroups,
 } from "./book-identifiers/index.js";
 
 export { listChapterNumbersFromBook } from "./list-chapter-numbers-from-book.js";

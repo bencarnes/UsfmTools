@@ -71,6 +71,11 @@ export type {
   UsfmBookPickerProps,
   UsfmBookPickerSelectDetail,
 } from "./components/usfm-book-picker/index.js";
+export { UsfmFilePicker } from "./components/usfm-file-picker/index.js";
+export type {
+  UsfmFilePickerProps,
+  UsfmFilePickerSelectDetail,
+} from "./components/usfm-file-picker/index.js";
 export { ChapterPicker } from "./components/chapter-picker/index.js";
 export type { ChapterPickerProps, ChapterPickerSelectDetail } from "./components/chapter-picker/index.js";
 export {
@@ -78,6 +83,7 @@ export {
   ViewModels,
   PublicationViewModel,
   buildUsfmBookPickerGroups,
+  buildUsfmFilePickerGroups,
   listChapterNumbersFromBook,
   listChapterMarkersInBook,
   chapterNumberAtOrBeforeSourceOffset,
@@ -88,6 +94,9 @@ export type {
   UsfmBookPickerFileInput,
   UsfmBookPickerBook,
   UsfmBookPickerGroups,
+  UsfmFilePickerFileInput,
+  UsfmFilePickerFile,
+  UsfmFilePickerGroups,
   ChapterMarkerInBook,
 } from "@usfm-tools/model";
 export {
