@@ -115,7 +115,8 @@ function VerticalFileList({
  * groups Old Testament, New Testament, other standard identifiers, and non-standard entries,
  * orders standard books by the official USFM book table, and shows each file name in a
  * vertical list. Table-of-contents markers are ignored for labels; multiple files sharing
- * the same standard `\\id` each appear separately, distinguished by file name.
+ * the same standard `\\id` each appear separately, distinguished by file name. Within a
+ * group, rows sort by book table order, then file name when the table index ties.
  */
 export function UsfmFilePicker({
   files,

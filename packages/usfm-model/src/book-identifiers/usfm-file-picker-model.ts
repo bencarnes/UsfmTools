@@ -17,25 +17,55 @@ export type UsfmFilePickerFile = UsfmBookPickerBook;
 
 export type UsfmFilePickerGroups = UsfmBookPickerGroups;
 
+function fileNameFor(
+  fileId: string,
+  nameById: ReadonlyMap<string, string>,
+): string {
+  return nameById.get(fileId) ?? fileId;
+}
+
 function withFileNames(
   books: readonly UsfmBookPickerBook[],
   nameById: ReadonlyMap<string, string>,
 ): UsfmFilePickerFile[] {
   return books.map((book) => ({
     ...book,
-    displayLabel: nameById.get(book.fileId) ?? book.fileId,
+    displayLabel: fileNameFor(book.fileId, nameById),
   }));
+}
+
+function compareFilePickerRows(
+  a: UsfmFilePickerFile,
+  b: UsfmFilePickerFile,
+  nameById: ReadonlyMap<string, string>,
+): number {
+  const byTable = a.sortIndex - b.sortIndex;
+  if (byTable !== 0) return byTable;
+
+  return fileNameFor(a.fileId, nameById).localeCompare(
+    fileNameFor(b.fileId, nameById),
+    undefined,
+    { sensitivity: "base" },
+  );
+}
+
+function sortFilePickerGroup(
+  books: readonly UsfmFilePickerFile[],
+  nameById: ReadonlyMap<string, string>,
+): UsfmFilePickerFile[] {
+  return [...books].sort((a, b) => compareFilePickerRows(a, b, nameById));
 }
 
 /**
  * Parses each file's USFM and groups files for the USFM file picker control.
  * Standard `\\id` codes are split into Old Testament, New Testament, and other;
  * non-standard rows include unknown `\\id` codes, an empty/missing `\\id` line on
- * the first book, or **no** `\\id` at all (non-empty USFM), in input order.
+ * the first book, or **no** `\\id` at all (non-empty USFM).
  * Labels are always the supplied {@link UsfmFilePickerFileInput.name} — table-of-contents
  * markers are not used. Multiple files with the same standard `\\id` (for example two
- * `GEN.usfm` copies) each appear as separate rows, ordered by the book table then input
- * order. Files without `\\toc3` (or any `\\toc`) are grouped from `\\id` alone.
+ * `GEN.usfm` copies) each appear as separate rows, ordered by the book table, then file
+ * name when the table index ties. Files without `\\toc3` (or any `\\toc`) are grouped
+ * from `\\id` alone.
  */
 export function buildUsfmFilePickerGroups(
   files: readonly UsfmFilePickerFileInput[],
@@ -45,10 +75,13 @@ export function buildUsfmFilePickerGroups(
     files.map((f) => ({ id: f.id, usfm: f.usfm })),
   );
 
+  const finalize = (books: readonly UsfmBookPickerBook[]) =>
+    sortFilePickerGroup(withFileNames(books, nameById), nameById);
+
   return {
-    oldTestament: withFileNames(groups.oldTestament, nameById),
-    newTestament: withFileNames(groups.newTestament, nameById),
-    other: withFileNames(groups.other, nameById),
-    nonStandard: withFileNames(groups.nonStandard, nameById),
+    oldTestament: finalize(groups.oldTestament),
+    newTestament: finalize(groups.newTestament),
+    other: finalize(groups.other),
+    nonStandard: finalize(groups.nonStandard),
   };
 }

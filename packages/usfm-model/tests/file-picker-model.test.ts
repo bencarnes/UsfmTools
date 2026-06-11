@@ -21,7 +21,7 @@ describe("buildUsfmFilePickerGroups", () => {
     expect(groups.oldTestament[0]?.displayLabel).toBe("my-psalms.usfm");
   });
 
-  it("places non-standard files in nonStandard in input order with file names", () => {
+  it("places non-standard files in nonStandard with file names", () => {
     const groups = buildUsfmFilePickerGroups([
       { id: "x", name: "custom-a.usfm", usfm: "\\id ZZZ\n\\toc1 Custom A\n\\c 1\n\\p\n" },
       { id: "y", name: "no-id.usfm", usfm: "\\no id here\n" },
@@ -29,9 +29,17 @@ describe("buildUsfmFilePickerGroups", () => {
     ]);
     expect(groups.nonStandard.map((b) => b.displayLabel)).toEqual([
       "custom-a.usfm",
-      "no-id.usfm",
       "custom-b.usfm",
+      "no-id.usfm",
     ]);
+  });
+
+  it("sorts ties by file name when book table order matches", () => {
+    const groups = buildUsfmFilePickerGroups([
+      { id: "b", name: "GEN-b.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n" },
+      { id: "a", name: "GEN-a.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n" },
+    ]);
+    expect(groups.oldTestament.map((b) => b.displayLabel)).toEqual(["GEN-a.usfm", "GEN-b.usfm"]);
   });
 
   it("includes files with no \\id as non-standard using the file name", () => {
@@ -65,11 +73,11 @@ describe("buildUsfmFilePickerGroups", () => {
       { id: "final", name: "GEN-final.usfm", usfm: "\\id GEN\n\\toc3 Gen\n\\c 1\n\\p\n" },
       { id: "backup", name: "GEN-backup.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n" },
     ]);
-    expect(groups.oldTestament.map((b) => b.fileId)).toEqual(["draft", "final", "backup"]);
+    expect(groups.oldTestament.map((b) => b.fileId)).toEqual(["backup", "draft", "final"]);
     expect(groups.oldTestament.map((b) => b.displayLabel)).toEqual([
+      "GEN-backup.usfm",
       "GEN-draft.usfm",
       "GEN-final.usfm",
-      "GEN-backup.usfm",
     ]);
     expect(groups.oldTestament.map((b) => b.code)).toEqual(["GEN", "GEN", "GEN"]);
   });
