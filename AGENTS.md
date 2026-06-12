@@ -10,6 +10,7 @@ This repository ("UsfmTools") contains TypeScript tools for processing USFM (Uni
 - `packages/usfm-model/` — application-level model on top of the parser
 - `packages/usfm-controls/` — React + CodeMirror UI controls
 - `packages/usfm-parser-integration-tests/` — integration tests against the Berean Standard Bible corpus
+- `apps/bible-edit/` — Forge desktop app hosting `UsfmShell` for local USFM folders
 - `Plan/` — Obsidian-compatible planning documents
 
 All packages under `packages/` are **Deno projects** wired together as a [Deno workspace](https://docs.deno.com/runtime/fundamentals/configuration/#workspaces) (root `deno.json`).

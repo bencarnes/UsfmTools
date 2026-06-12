@@ -28,7 +28,7 @@ test_package() {
   (cd "$dir" && deno task test)
 }
 
-echo "UsfmTools — check and test Deno workspace packages (under packages/)"
+echo "UsfmTools — check and test Deno workspace packages and apps"
 
 # Ladle (optional dev tooling) may create a workspace node_modules/ directory.
 # Remove it so Deno resolves npm: imports from its cache without invoking npm.
@@ -37,10 +37,12 @@ rm -rf "$ROOT/node_modules" "$ROOT"/packages/*/node_modules
 check_package "packages/usfm-parser"
 check_package "packages/usfm-model"
 check_package "packages/usfm-controls"
+check_package "apps/bible-edit"
 test_package "packages/usfm-parser"
 test_package "packages/usfm-model"
 test_package "packages/usfm-controls"
 test_package "packages/usfm-parser-integration-tests"
+test_package "apps/bible-edit"
 
 echo ""
 echo "Done. Packages export TypeScript source via deno.json exports. Run tasks from individual packages/ paths as needed."

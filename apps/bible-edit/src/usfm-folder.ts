@@ -1,37 +1,33 @@
 import { getPath } from "runtime:app";
-import { exists, mkdir, readDir, readTextFile, type DirEntry } from "runtime:fs";
+import { exists, mkdir, readDir, readTextFile } from "runtime:fs";
 import type { UsfmShellFileEntry } from "@usfm-tools/controls";
+import { resolveInitialFolderPath } from "./resolve-initial-folder.js";
 import { loadSession, saveSession } from "./session.js";
-
-const USFM_SUFFIX = ".usfm";
-const SAMPLE_CORPUS = "./bibles/bsb/usfm";
-
-function folderLabel(folderPath: string): string {
-  const trimmed = folderPath.replace(/\/+$/, "");
-  const slash = trimmed.lastIndexOf("/");
-  return slash >= 0 ? trimmed.slice(slash + 1) : trimmed;
-}
-
-function isUsfmFile(name: string): boolean {
-  return name.toLowerCase().endsWith(USFM_SUFFIX);
-}
+import {
+  folderLabel,
+  isFileInFolder,
+  listUsfmEntries,
+  SAMPLE_CORPUS,
+} from "./usfm-utils.js";
 
 export async function resolveInitialUsfmFolder(): Promise<string | null> {
   const session = await loadSession();
-  if (session.usfmFolder && (await exists(session.usfmFolder))) {
-    return session.usfmFolder;
-  }
-
-  if (await exists(SAMPLE_CORPUS)) {
-    return SAMPLE_CORPUS;
-  }
-
   const appData = await getPath("appData");
   const library = `${appData}/usfm`;
-  if (!(await exists(library))) {
+
+  const folderPath = resolveInitialFolderPath({
+    sessionFolder: session.usfmFolder,
+    sessionFolderExists: session.usfmFolder ? await exists(session.usfmFolder) : false,
+    sampleCorpusExists: await exists(SAMPLE_CORPUS),
+    sampleCorpusPath: SAMPLE_CORPUS,
+    appDataLibraryPath: library,
+  });
+
+  if (folderPath === library && !(await exists(library))) {
     await mkdir(library, { recursive: true });
   }
-  return library;
+
+  return folderPath;
 }
 
 export class UsfmFolderHost {
@@ -64,17 +60,11 @@ export class UsfmFolderHost {
   async listFiles(): Promise<readonly UsfmShellFileEntry[]> {
     if (!this.#folderPath) return [];
     const entries = await readDir(this.#folderPath);
-    return entries
-      .filter((entry: DirEntry) => entry.isFile && isUsfmFile(entry.name))
-      .map((entry: DirEntry) => ({
-        id: `${this.#folderPath}/${entry.name}`,
-        name: entry.name,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return listUsfmEntries(this.#folderPath, entries);
   }
 
   async readFile(fileId: string): Promise<string | null> {
-    if (!this.#folderPath || !fileId.startsWith(`${this.#folderPath}/`)) {
+    if (!this.#folderPath || !isFileInFolder(this.#folderPath, fileId)) {
       return null;
     }
     try {

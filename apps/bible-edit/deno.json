@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "exports": "./src/main.ts",
   "tasks": {
+    "test": "deno test -A --unstable-sloppy-imports",
     "check": "deno check --unstable-sloppy-imports src/main.ts web/main.tsx web/ipc.ts",
     "build:web": "deno run -A --node-modules-dir=auto --unstable-sloppy-imports npm:vite@6.0.0 build",
     "dev:web": "deno run -A --node-modules-dir=auto --unstable-sloppy-imports npm:vite@6.0.0 build --watch"
