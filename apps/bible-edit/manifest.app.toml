@@ -1,0 +1,47 @@
+# Bible Edit — Forge desktop shell for UsfmShell
+[app]
+name = "Bible Edit"
+identifier = "com.usfmtools.bible-edit"
+version = "0.1.0"
+description = "Edit USFM scripture files with UsfmShell"
+
+[windows]
+width = 1280
+height = 860
+resizable = true
+title = "Bible Edit"
+
+# Uncomment and add assets/icon.png (1024×1024 PNG) before running `forge bundle`.
+# [bundle]
+# icon = "assets/icon"
+
+# Personal data (session + settings) lives under the Forge app-data directory.
+# USFM read/write is limited to the folder saved in session.json plus the bundled
+# sample corpus at ./bibles/** used during development. Forge manifests are static,
+# so folders outside these roots require adding matching globs here before release.
+[permissions.fs]
+read = [
+  "~/.config/com.usfmtools.bible-edit/**",
+  "~/.local/share/com.usfmtools.bible-edit/**",
+  "~/Library/Application Support/com.usfmtools.bible-edit/**",
+  "~/AppData/Local/com.usfmtools.bible-edit/**",
+  "~/AppData/Roaming/com.usfmtools.bible-edit/**",
+  "./bibles/**",
+]
+write = [
+  "~/.config/com.usfmtools.bible-edit/session.json",
+  "~/.config/com.usfmtools.bible-edit/settings.json",
+  "~/.local/share/com.usfmtools.bible-edit/session.json",
+  "~/.local/share/com.usfmtools.bible-edit/settings.json",
+  "~/Library/Application Support/com.usfmtools.bible-edit/session.json",
+  "~/Library/Application Support/com.usfmtools.bible-edit/settings.json",
+  "~/AppData/Local/com.usfmtools.bible-edit/session.json",
+  "~/AppData/Local/com.usfmtools.bible-edit/settings.json",
+  "~/AppData/Roaming/com.usfmtools.bible-edit/session.json",
+  "~/AppData/Roaming/com.usfmtools.bible-edit/settings.json",
+  "./bibles/**",
+]
+
+[permissions.ui]
+dialogs = true
+channels = ["bible-edit:*"]

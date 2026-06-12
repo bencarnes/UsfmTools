@@ -3,7 +3,8 @@
     "./packages/usfm-parser",
     "./packages/usfm-model",
     "./packages/usfm-controls",
-    "./packages/usfm-parser-integration-tests"
+    "./packages/usfm-parser-integration-tests",
+    "./apps/bible-edit"
   ],
   "imports": {
     "@std/expect": "jsr:@std/expect@^1",

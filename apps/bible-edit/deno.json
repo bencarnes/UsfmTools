@@ -1,0 +1,31 @@
+{
+  "name": "@usfm-tools/bible-edit",
+  "version": "0.1.0",
+  "exports": "./src/main.ts",
+  "tasks": {
+    "check": "deno check --unstable-sloppy-imports src/main.ts web/main.tsx web/ipc.ts",
+    "build:web": "deno run -A --node-modules-dir=auto --unstable-sloppy-imports npm:vite@6.0.0 build",
+    "dev:web": "deno run -A --node-modules-dir=auto --unstable-sloppy-imports npm:vite@6.0.0 build --watch"
+  },
+  "imports": {
+    "@usfm-tools/controls": "../../packages/usfm-controls/src/index.ts",
+    "@usfm-tools/model": "../../packages/usfm-model/src/index.ts",
+    "@usfm-tools/parser": "../../packages/usfm-parser/src/index.ts",
+    "@vitejs/plugin-react": "npm:@vitejs/plugin-react@^4.7.0",
+    "react": "npm:react@^19.0.0",
+    "react-dom/client": "npm:react@^19.0.0/client",
+    "react/jsx-runtime": "npm:react@^19.0.0/jsx-runtime",
+    "tailwindcss": "npm:tailwindcss@^3.4.0",
+    "autoprefixer": "npm:autoprefixer@^10.4.0",
+    "vite": "npm:vite@^6.0.0",
+    "@types/react": "npm:@types/react@^19.0.0",
+    "@types/react-dom": "npm:@types/react-dom@^19.0.0"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "lib": ["dom", "dom.iterable", "esnext", "deno.ns"],
+    "types": ["@types/react", "@types/react-dom", "./src/forge-runtime.d.ts"]
+  }
+}

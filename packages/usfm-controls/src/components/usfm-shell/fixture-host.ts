@@ -65,6 +65,9 @@ export function createFixtureUsfmShellHost(options: FixtureUsfmShellHostOptions 
     async readFile(id: string) {
       return byId.get(id) ?? null;
     },
+    async pickFolder() {
+      // Fixture host has a fixed in-memory corpus; folder picking is a no-op.
+    },
     async loadSettings() {
       return settings;
     },

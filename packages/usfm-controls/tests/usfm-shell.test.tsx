@@ -24,6 +24,9 @@ function makeHost(
       const f = files.find((x) => x.id === id);
       return f ? f.usfm : null;
     },
+    async pickFolder() {
+      // Test host keeps a fixed corpus.
+    },
     async loadSettings() {
       return store.value;
     },

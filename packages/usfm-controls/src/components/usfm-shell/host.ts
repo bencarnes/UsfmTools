@@ -25,6 +25,11 @@ export interface UsfmShellHost extends SettingsHost {
    * Called when the user opens a file and when global search needs the body.
    */
   readFile(fileId: string): Promise<string | null>;
+  /**
+   * Prompt the user to choose the folder that supplies USFM files for the shell.
+   * Implementations update {@link label} and the file list when a new folder is chosen.
+   */
+  pickFolder(): Promise<void>;
 }
 
 export interface UsfmShellFileEntry {

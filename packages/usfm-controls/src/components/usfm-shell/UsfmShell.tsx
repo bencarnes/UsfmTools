@@ -56,6 +56,8 @@ export function UsfmShell({
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs([]));
   const [files, setFiles] = useState<readonly UsfmFilePickerFileInput[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
+  const [folderLabel, setFolderLabel] = useState(host.label);
+  const [pickingFolder, setPickingFolder] = useState(false);
 
   const [sidebarExpanded, setSidebarExpanded] = useState(defaultSidebarExpanded);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("files");
@@ -68,6 +70,24 @@ export function UsfmShell({
 
   const clientRef = useRef(createLanguageClient());
   const validateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const reloadFiles = useCallback(async () => {
+    setFilesLoading(true);
+    try {
+      const list = await host.listFiles();
+      const withUsfm = await Promise.all(
+        list.map(async (entry) => ({
+          id: entry.id,
+          name: entry.name,
+          usfm: (await host.readFile(entry.id)) ?? "",
+        })),
+      );
+      setFiles(withUsfm);
+      setFolderLabel(host.label);
+    } finally {
+      setFilesLoading(false);
+    }
+  }, [host]);
 
   // Load file list and USFM bodies from host (picker grouping needs \\id from each file).
   useEffect(() => {
@@ -84,7 +104,10 @@ export function UsfmShell({
             usfm: (await host.readFile(entry.id)) ?? "",
           })),
         );
-        if (!cancelled) setFiles(withUsfm);
+        if (!cancelled) {
+          setFiles(withUsfm);
+          setFolderLabel(host.label);
+        }
       })
       .finally(() => {
         if (!cancelled) setFilesLoading(false);
@@ -93,6 +116,16 @@ export function UsfmShell({
       cancelled = true;
     };
   }, [host]);
+
+  const handlePickFolder = useCallback(async () => {
+    setPickingFolder(true);
+    try {
+      await host.pickFolder();
+      await reloadFiles();
+    } finally {
+      setPickingFolder(false);
+    }
+  }, [host, reloadFiles]);
 
   // Track first active tab as the focused tab when the workspace is non-empty.
   useEffect(() => {
@@ -334,7 +367,9 @@ export function UsfmShell({
                 activeFileId={activeFileIdForBrowser}
                 onOpenFile={(entry) => void openFile(entry)}
                 loading={filesLoading}
-                label={host.label}
+                label={folderLabel}
+                onPickFolder={handlePickFolder}
+                pickingFolder={pickingFolder}
               />
             ) : (
               <FileSearch
