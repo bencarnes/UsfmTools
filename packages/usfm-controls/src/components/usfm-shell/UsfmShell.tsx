@@ -72,6 +72,7 @@ export function UsfmShell({
 
   const clientRef = useRef(createLanguageClient());
   const validateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveDebounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Load file list and USFM bodies from host (picker grouping needs \\id from each file).
   useEffect(() => {
@@ -169,9 +170,22 @@ export function UsfmShell({
     setFocusedTabId(tabId);
   }, []);
 
-  const handleUpdateTabValue = useCallback((tabId: string, value: string) => {
-    setModel((p) => workspaceSetTabValue(p, tabId, value));
-  }, []);
+  const handleUpdateTabValue = useCallback(
+    (tabId: string, value: string) => {
+      setModel((p) => workspaceSetTabValue(p, tabId, value));
+      if (!host.writeFile) return;
+      const pending = saveDebounceRef.current.get(tabId);
+      if (pending) clearTimeout(pending);
+      saveDebounceRef.current.set(
+        tabId,
+        setTimeout(() => {
+          saveDebounceRef.current.delete(tabId);
+          void host.writeFile!(tabId, value);
+        }, 500),
+      );
+    },
+    [host],
+  );
 
   const handleCloseTab = useCallback(
     (groupId: string, tabId: string) => {

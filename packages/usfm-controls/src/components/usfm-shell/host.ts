@@ -40,6 +40,11 @@ export interface UsfmShellHost extends SettingsHost {
    * Called when the user opens a file and when global search needs the body.
    */
   readFile(fileId: string): Promise<string | null>;
+  /**
+   * Persist edited USFM for a file. When provided, the shell debounces saves on tab edits.
+   * Desktop hosts implement this through a Go/Tauri file service with an allowlist.
+   */
+  writeFile?(fileId: string, content: string): Promise<void>;
 }
 
 export interface UsfmShellFileEntry {
