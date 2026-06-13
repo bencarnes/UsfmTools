@@ -33,8 +33,9 @@ import {
   SearchIcon,
 } from "./shell-icons.js";
 import { lineColumnToSourceOffset } from "./line-offsets.js";
-import type { UsfmFilePickerFileInput } from "@usfm-tools/model";
+import type { UsfmFilePickerGroups } from "@usfm-tools/model";
 import type { UsfmShellFileEntry, UsfmShellHost, UsfmShellRecentFolder } from "./host.js";
+import { buildUsfmFilePickerCatalog, EMPTY_FILE_CATALOG } from "./file-catalog.js";
 
 export interface UsfmShellProps {
   readonly host: UsfmShellHost;
@@ -81,7 +82,8 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   ref,
 ) {
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs([]));
-  const [files, setFiles] = useState<readonly UsfmFilePickerFileInput[]>([]);
+  const [fileEntries, setFileEntries] = useState<readonly UsfmShellFileEntry[]>([]);
+  const [fileCatalog, setFileCatalog] = useState<UsfmFilePickerGroups>(EMPTY_FILE_CATALOG);
   const [filesLoading, setFilesLoading] = useState(true);
   const [folderRevision, setFolderRevision] = useState(0);
   const [recentFolders, setRecentFolders] = useState<readonly UsfmShellRecentFolder[]>([]);
@@ -128,7 +130,6 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
       if (host.writeFile) {
         await host.writeFile(tabId, tab.value);
       }
-      setFiles((prev) => prev.map((f) => (f.id === tabId ? { ...f, usfm: tab.value } : f)));
       setModel((p) => workspaceMarkTabSaved(p, tabId));
     },
     [host],
@@ -198,7 +199,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, []);
 
-  // Load file list and USFM bodies from host (picker grouping needs \\id from each file).
+  // Load file list and build sidebar picker groups (reads each file once; bodies are not cached).
   useEffect(() => {
     let cancelled = false;
     setFilesLoading(true);
@@ -211,14 +212,9 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
       .listFiles()
       .then(async (list) => {
         if (cancelled) return;
-        const withUsfm = await Promise.all(
-          list.map(async (entry) => ({
-            id: entry.id,
-            name: entry.name,
-            usfm: (await host.readFile(entry.id)) ?? "",
-          })),
-        );
-        if (!cancelled) setFiles(withUsfm);
+        setFileEntries(list);
+        const catalog = await buildUsfmFilePickerCatalog(list, (id) => host.readFile(id));
+        if (!cancelled) setFileCatalog(catalog);
       })
       .finally(() => {
         if (!cancelled) setFilesLoading(false);
@@ -317,13 +313,8 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
 
   // ---- file open / focus ----
 
-  const shellFileEntries = useMemo<readonly UsfmShellFileEntry[]>(
-    () => files.map((f) => ({ id: f.id, name: f.name })),
-    [files],
-  );
-
   const openFile = useCallback(
-    async (entry: UsfmFilePickerFileInput, opts?: { readonly selection?: { from: number; to: number } }) => {
+    async (entry: UsfmShellFileEntry, opts?: { readonly selection?: { from: number; to: number } }) => {
       const existingTabId = entry.id;
 
       // If a tab with the file id already exists, focus it.
@@ -346,7 +337,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
         return;
       }
 
-      const usfm = (await host.readFile(entry.id)) ?? entry.usfm ?? null;
+      const usfm = await host.readFile(entry.id);
       if (usfm == null) return;
       const targetGroupId = model.slots[0]?.id;
       if (!targetGroupId) return;
@@ -370,10 +361,10 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
 
   const onSelectSearchResult = useCallback(
     (m: SearchMatch) => {
-      const full = files.find((f) => f.id === m.fileId);
-      if (full) void openFile(full, { selection: { from: m.from, to: m.to } });
+      const entry = fileEntries.find((f) => f.id === m.fileId);
+      if (entry) void openFile(entry, { selection: { from: m.from, to: m.to } });
     },
-    [files, openFile],
+    [fileEntries, openFile],
   );
 
   // ---- errors ----
@@ -387,7 +378,8 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
     [focusedTabId, focusedValue],
   );
 
-  const activeFileIdForBrowser = focusedTab && files.some((f) => f.id === focusedTab.id) ? focusedTab.id : null;
+  const activeFileIdForBrowser =
+    focusedTab && fileEntries.some((f) => f.id === focusedTab.id) ? focusedTab.id : null;
 
   const sidebarTabs = useMemo<readonly { id: SidebarTab; label: string; Icon: (p: { label?: string }) => ReactElement }[]>(
     () => [
@@ -471,7 +463,8 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
           <div className="flex min-h-0 w-64 flex-col bg-white dark:bg-gray-900" data-testid="usfm-shell-sidebar-panel">
             {sidebarTab === "files" ? (
               <FileBrowser
-                files={files}
+                fileEntries={fileEntries}
+                catalog={fileCatalog}
                 activeFileId={activeFileIdForBrowser}
                 onOpenFile={(entry) => void openFile(entry)}
                 loading={filesLoading}
@@ -483,7 +476,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
               />
             ) : (
               <FileSearch
-                files={shellFileEntries}
+                files={fileEntries}
                 readFile={(id) => host.readFile(id)}
                 onSelectResult={onSelectSearchResult}
                 loadingFiles={filesLoading}

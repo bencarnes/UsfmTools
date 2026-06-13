@@ -1,12 +1,13 @@
-import type { UsfmFilePickerFileInput } from "@usfm-tools/model";
+import type { UsfmFilePickerGroups } from "@usfm-tools/model";
 import { UsfmFilePicker } from "../usfm-file-picker/index.js";
 import { FolderSelector } from "./folder-selector.js";
-import type { UsfmShellRecentFolder } from "./host.js";
+import type { UsfmShellFileEntry, UsfmShellRecentFolder } from "./host.js";
 
 export interface FileBrowserProps {
-  readonly files: readonly UsfmFilePickerFileInput[];
+  readonly fileEntries: readonly UsfmShellFileEntry[];
+  readonly catalog: UsfmFilePickerGroups;
   readonly activeFileId: string | null;
-  readonly onOpenFile: (entry: UsfmFilePickerFileInput) => void;
+  readonly onOpenFile: (entry: UsfmShellFileEntry) => void;
   readonly loading: boolean;
   readonly folderLabel: string;
   readonly folderPath: string;
@@ -16,7 +17,8 @@ export interface FileBrowserProps {
 }
 
 export function FileBrowser({
-  files,
+  fileEntries,
+  catalog,
   activeFileId,
   onOpenFile,
   loading,
@@ -31,14 +33,14 @@ export function FileBrowser({
       <div className="min-h-0 flex-1 overflow-auto p-2">
         {loading ? (
           <div className="px-1 py-2 text-sm text-gray-500 dark:text-gray-400">Loading…</div>
-        ) : files.length === 0 ? (
+        ) : fileEntries.length === 0 ? (
           <div className="px-1 py-2 text-sm text-gray-500 dark:text-gray-400">No files in folder</div>
         ) : (
           <UsfmFilePicker
-            files={files}
+            groups={catalog}
             activeFileId={activeFileId}
             onFileSelect={({ fileId }) => {
-              const entry = files.find((f) => f.id === fileId);
+              const entry = fileEntries.find((f) => f.id === fileId);
               if (entry) onOpenFile(entry);
             }}
             fileTestIdPrefix="usfm-shell-file"
