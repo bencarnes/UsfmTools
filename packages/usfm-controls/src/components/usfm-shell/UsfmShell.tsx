@@ -128,6 +128,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
       if (host.writeFile) {
         await host.writeFile(tabId, tab.value);
       }
+      setFiles((prev) => prev.map((f) => (f.id === tabId ? { ...f, usfm: tab.value } : f)));
       setModel((p) => workspaceMarkTabSaved(p, tabId));
     },
     [host],
@@ -345,7 +346,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
         return;
       }
 
-      const usfm = entry.usfm || (await host.readFile(entry.id));
+      const usfm = (await host.readFile(entry.id)) ?? entry.usfm ?? null;
       if (usfm == null) return;
       const targetGroupId = model.slots[0]?.id;
       if (!targetGroupId) return;

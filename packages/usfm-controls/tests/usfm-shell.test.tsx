@@ -278,6 +278,31 @@ describe("UsfmShell", () => {
     expect(resolved === "light" || resolved === "dark").toBe(true);
   });
 
+  it("reopens file content from the host instead of a stale sidebar cache", async () => {
+    const disk = new Map<string, string>([["f://a", "\\id GEN\n\\c 1\n\\p\n\\v 1 original"]]);
+    const host = makeHost([]);
+    host.listFiles = async () => [{ id: "f://a", name: "A.usfm" }];
+    host.readFile = async (id) => disk.get(id) ?? null;
+    host.writeFile = async (id, content) => {
+      disk.set(id, content);
+    };
+
+    render(<UsfmShell host={host} />);
+    await waitFor(() => screen.getByTestId("usfm-shell-file-A.usfm"));
+    fireEvent.click(screen.getByTestId("usfm-shell-file-A.usfm"));
+    await waitFor(() => screen.getByRole("tab", { name: /A\.usfm/i }));
+
+    disk.set("f://a", "\\id GEN\n\\c 1\n\\p\n\\v 1 saved on disk");
+    fireEvent.click(screen.getByRole("button", { name: /^close tab$/i }));
+    await waitFor(() => expect(screen.queryByRole("tab", { name: /A\.usfm/i })).toBeNull());
+
+    fireEvent.click(screen.getByTestId("usfm-shell-file-A.usfm"));
+    await waitFor(() => screen.getByRole("tab", { name: /A\.usfm/i }));
+    await waitFor(() => {
+      expect(document.querySelector(".cm-content")?.textContent).toContain("saved on disk");
+    });
+  });
+
   it("reports no unsaved changes when all tabs are clean", async () => {
     const shellRef = createRef<UsfmShellHandle>();
     const host = makeHost([
