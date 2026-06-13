@@ -1,5 +1,4 @@
 import { useRef, type CSSProperties } from "react";
-import type { BookNode } from "@usfm-tools/parser";
 import { ChapterPicker } from "../chapter-picker/ChapterPicker.js";
 import type { ChapterPickerSelectDetail } from "../chapter-picker/ChapterPicker.js";
 import { ChevronDownIcon } from "../icons/chevron-down-icon.js";
@@ -13,7 +12,8 @@ export interface ChapterNavigatorProps {
   readonly navChapterText: string;
   readonly hasChapters: boolean;
   readonly atLastChapter: boolean;
-  readonly firstBook: BookNode | undefined;
+  readonly hasBookId: boolean;
+  readonly chapterNumbers: readonly string[];
   readonly buttonStyle: CSSProperties;
   readonly onPrevChapter: () => void;
   readonly onNextChapter: () => void;
@@ -24,7 +24,8 @@ export function ChapterNavigator({
   navChapterText,
   hasChapters,
   atLastChapter,
-  firstBook,
+  hasBookId,
+  chapterNumbers,
   buttonStyle,
   onPrevChapter,
   onNextChapter,
@@ -100,8 +101,8 @@ export function ChapterNavigator({
             ...themedPopoverSurface,
           }}
         >
-          {firstBook ? (
-            <ChapterPicker book={firstBook} onChapterSelect={onPicked} />
+          {hasBookId ? (
+            <ChapterPicker chapterNumbers={chapterNumbers} onChapterSelect={onPicked} />
           ) : (
             <span style={{ fontSize: "0.85rem", color: "var(--usfm-fg-muted)" }}>No \\id book in source.</span>
           )}

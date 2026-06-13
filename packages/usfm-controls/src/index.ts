@@ -90,6 +90,8 @@ export {
   buildUsfmFilePickerGroups,
   listChapterNumbersFromBook,
   listChapterMarkersInBook,
+  listChapterMarkersInUsfm,
+  bookIdMarkerOffsetInUsfm,
   chapterNumberAtOrBeforeSourceOffset,
 } from "@usfm-tools/model";
 export type {

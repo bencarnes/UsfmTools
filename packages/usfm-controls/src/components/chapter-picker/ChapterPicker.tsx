@@ -1,7 +1,5 @@
-import { useMemo, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import { themedControlButton } from "../../theme-tokens.js";
-import type { BookNode } from "@usfm-tools/parser";
-import { listChapterNumbersFromBook } from "@usfm-tools/model";
 
 export interface ChapterPickerSelectDetail {
   /** Chapter number string exactly as on the corresponding `\\c` marker in USFM. */
@@ -9,8 +7,11 @@ export interface ChapterPickerSelectDetail {
 }
 
 export interface ChapterPickerProps {
-  /** Parsed USFM book node (`\\id` …); chapter markers are read from its children. */
-  readonly book: BookNode;
+  /**
+   * Chapter number strings exactly as on the corresponding `\\c` markers in USFM,
+   * in document order.
+   */
+  readonly chapterNumbers: readonly string[];
   readonly onChapterSelect?: (detail: ChapterPickerSelectDetail) => void;
   readonly className?: string;
 }
@@ -56,8 +57,8 @@ function chapterButtonAriaLabel(chapterNumber: string): string {
  * Chapter labels are shown **verbatim** and in **document order** (no sorting,
  * deduplication, or numeric interpretation).
  */
-export function ChapterPicker({ book, onChapterSelect, className }: ChapterPickerProps) {
-  const chapters = useMemo(() => listChapterNumbersFromBook(book), [book]);
+export function ChapterPicker({ chapterNumbers, onChapterSelect, className }: ChapterPickerProps) {
+  const chapters = chapterNumbers;
 
   return (
     <div
