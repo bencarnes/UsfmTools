@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { renderPreviewHtml } from "@usfm-tools/model";
 
 /** Storybook (and URL state) may supply boolean controls as strings. */
@@ -16,6 +16,11 @@ export interface UsfmPreviewProps {
    * each verse appears on its own preview line.
    */
   versePerLine?: boolean;
+  /**
+   * Milliseconds to wait after the last `value` change before re-rendering the preview.
+   * Use in split editor+preview layouts to avoid re-parsing on every keystroke.
+   */
+  updateDebounceMs?: number;
   className?: string;
 }
 
@@ -23,12 +28,27 @@ export interface UsfmPreviewProps {
  * Read-only preview of USFM as continuous scripture HTML (similar to a Bible app).
  * Style the output via the `usfm-*` CSS class hooks (see package README).
  */
-export function UsfmPreview({ value, versePerLine, className }: UsfmPreviewProps) {
+export function UsfmPreview({
+  value,
+  versePerLine,
+  updateDebounceMs = 0,
+  className,
+}: UsfmPreviewProps) {
   const versePerLineOn = normalizeVersePerLine(versePerLine);
+  const [renderValue, setRenderValue] = useState(value);
+
+  useEffect(() => {
+    if (updateDebounceMs <= 0) {
+      setRenderValue(value);
+      return;
+    }
+    const timer = setTimeout(() => setRenderValue(value), updateDebounceMs);
+    return () => clearTimeout(timer);
+  }, [value, updateDebounceMs]);
 
   const html = useMemo(
-    () => renderPreviewHtml(value, { versePerLine: versePerLineOn }),
-    [value, versePerLineOn],
+    () => renderPreviewHtml(renderValue, { versePerLine: versePerLineOn }),
+    [renderValue, versePerLineOn],
   );
 
   return (
