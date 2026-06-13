@@ -4,7 +4,7 @@ Fixes to reduce lag when editing large books (e.g. Psalms), especially with the 
 
 ## Todo
 
-- [ ] **Stop full parsing in `UsfmPane` on every keystroke** — `firstBookFromUsfm` calls `parse(usfm)` whenever `value` changes (~16 ms on Psalms). Replace with a lightweight `\c` marker scan, cached/incremental marker list, or debounced refresh separate from editor `onChange`.
+- [x] **Stop full parsing in `UsfmPane` on every keystroke** — `firstBookFromUsfm` calls `parse(usfm)` whenever `value` changes (~16 ms on Psalms). Replace with a lightweight `\c` marker scan, cached/incremental marker list, or debounced refresh separate from editor `onChange`.
 - [ ] **Stop lifting the full document string to React on every keystroke** — keep document state in CodeMirror; debounce or ref-sync to the workspace model for save/dirty tracking only.
 - [ ] **Unify validation** — share one debounced full-document parse between the CodeMirror linter and the shell errors panel instead of two independent parses (~250–300 ms apart).
 - [x] **Pause scroll sync while typing** — defer split-pane scroll sync until typing idle, or sync only on explicit scroll; avoid `querySelectorAll` over the full preview DOM every ~120 ms while the cursor moves.

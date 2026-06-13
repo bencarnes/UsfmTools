@@ -55,3 +55,7 @@ export {
   chapterNumberAtOrBeforeSourceOffset,
 } from "./list-chapter-markers-in-book.js";
 export type { ChapterMarkerInBook } from "./list-chapter-markers-in-book.js";
+export {
+  bookIdMarkerOffsetInUsfm,
+  listChapterMarkersInUsfm,
+} from "./list-chapter-markers-in-usfm.js";
