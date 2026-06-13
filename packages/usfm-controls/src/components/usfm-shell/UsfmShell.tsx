@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef, type ReactElement } from "react";
 import { createLanguageClient } from "../../language-service/service.js";
 import type { Diagnostic } from "../../language-service/protocol.js";
 import { UsfmWorkspace } from "../usfm-workspace/UsfmWorkspace.js";
@@ -13,8 +13,11 @@ import {
   workspaceRequestTabSelection,
   SETTINGS_TAB_ID,
   workspaceSetTabValue,
+  workspaceMarkTabSaved,
+  workspaceListDirtyEditorTabs,
   type UsfmWorkspaceModel,
 } from "../usfm-workspace/workspace-model.js";
+import { UnsavedChangesDialog } from "./unsaved-changes-dialog.js";
 import { SettingsProvider } from "../settings-pane/settings-context.js";
 import { FileBrowser } from "./file-browser.js";
 import { FileSearch, type SearchMatch } from "./search.js";
@@ -30,8 +33,9 @@ import {
   SearchIcon,
 } from "./shell-icons.js";
 import { lineColumnToSourceOffset } from "./line-offsets.js";
-import type { UsfmFilePickerFileInput } from "@usfm-tools/model";
+import type { UsfmFilePickerGroups } from "@usfm-tools/model";
 import type { UsfmShellFileEntry, UsfmShellHost, UsfmShellRecentFolder } from "./host.js";
+import { buildUsfmFilePickerCatalog, EMPTY_FILE_CATALOG } from "./file-catalog.js";
 
 export interface UsfmShellProps {
   readonly host: UsfmShellHost;
@@ -42,19 +46,44 @@ export interface UsfmShellProps {
   readonly className?: string;
 }
 
+export interface UsfmShellHandle {
+  /** Returns false when the user cancels; true when all dirty tabs were saved or discarded. */
+  confirmExit(): Promise<boolean>;
+  hasUnsavedChanges(): boolean;
+}
+
+type UnsavedCloseChoice = "save" | "discard" | "cancel";
+
+type PendingTabClose = {
+  readonly kind: "tab";
+  readonly groupId: string;
+  readonly tabId: string;
+};
+
+type PendingAppClose = {
+  readonly kind: "app";
+  readonly remainingTabIds: readonly string[];
+};
+
+type PendingClose = PendingTabClose | PendingAppClose;
+
 type SidebarTab = "files" | "search";
 type BottomTab = "errors";
 
 const VALIDATE_DEBOUNCE_MS = 250;
 
-export function UsfmShell({
-  host,
-  defaultSidebarExpanded = true,
-  defaultBottomExpanded = true,
-  className,
-}: UsfmShellProps) {
+export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function UsfmShell(
+  {
+    host,
+    defaultSidebarExpanded = true,
+    defaultBottomExpanded = true,
+    className,
+  },
+  ref,
+) {
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs([]));
-  const [files, setFiles] = useState<readonly UsfmFilePickerFileInput[]>([]);
+  const [fileEntries, setFileEntries] = useState<readonly UsfmShellFileEntry[]>([]);
+  const [fileCatalog, setFileCatalog] = useState<UsfmFilePickerGroups>(EMPTY_FILE_CATALOG);
   const [filesLoading, setFilesLoading] = useState(true);
   const [folderRevision, setFolderRevision] = useState(0);
   const [recentFolders, setRecentFolders] = useState<readonly UsfmShellRecentFolder[]>([]);
@@ -72,9 +101,105 @@ export function UsfmShell({
 
   const clientRef = useRef(createLanguageClient());
   const validateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saveDebounceRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const modelRef = useRef(model);
+  modelRef.current = model;
 
-  // Load file list and USFM bodies from host (picker grouping needs \\id from each file).
+  const [closePrompt, setClosePrompt] = useState<{
+    readonly fileName: string;
+    readonly pending: PendingClose;
+  } | null>(null);
+  const closeChoiceRef = useRef<((choice: UnsavedCloseChoice) => void) | null>(null);
+
+  const askUnsavedClose = useCallback((fileName: string, pending: PendingClose) => {
+    return new Promise<UnsavedCloseChoice>((resolve) => {
+      closeChoiceRef.current = resolve;
+      setClosePrompt({ fileName, pending });
+    });
+  }, []);
+
+  const finishClosePrompt = useCallback((choice: UnsavedCloseChoice) => {
+    closeChoiceRef.current?.(choice);
+    closeChoiceRef.current = null;
+    setClosePrompt(null);
+  }, []);
+
+  const saveTabById = useCallback(
+    async (tabId: string) => {
+      const tab = modelRef.current.tabsById[tabId];
+      if (!tab || tab.kind === "settings") return;
+      if (host.writeFile) {
+        await host.writeFile(tabId, tab.value);
+      }
+      setModel((p) => workspaceMarkTabSaved(p, tabId));
+    },
+    [host],
+  );
+
+  const closeTabNow = useCallback((groupId: string, tabId: string) => {
+    setModel((p) => workspaceCloseTab(p, groupId, tabId));
+    if (focusedTabId === tabId) setFocusedTabId(null);
+  }, [focusedTabId]);
+
+  const handleSaveTab = useCallback(
+    (tabId: string) => {
+      void saveTabById(tabId);
+    },
+    [saveTabById],
+  );
+
+  const handleCloseTab = useCallback(
+    (groupId: string, tabId: string) => {
+      const tab = modelRef.current.tabsById[tabId];
+      if (!tab || tab.kind === "settings" || !tab.dirty) {
+        closeTabNow(groupId, tabId);
+        return;
+      }
+      void (async () => {
+        const choice = await askUnsavedClose(tab.fileName, { kind: "tab", groupId, tabId });
+        if (choice === "cancel") return;
+        if (choice === "save") await saveTabById(tabId);
+        closeTabNow(groupId, tabId);
+      })();
+    },
+    [askUnsavedClose, closeTabNow, saveTabById],
+  );
+
+  const confirmExit = useCallback(async (): Promise<boolean> => {
+    let remaining = workspaceListDirtyEditorTabs(modelRef.current).map((tab) => tab.id);
+    while (remaining.length > 0) {
+      const tabId = remaining[0]!;
+      const tab = modelRef.current.tabsById[tabId];
+      if (!tab) {
+        remaining = remaining.slice(1);
+        continue;
+      }
+      const choice = await askUnsavedClose(tab.fileName, { kind: "app", remainingTabIds: remaining });
+      if (choice === "cancel") return false;
+      if (choice === "save") await saveTabById(tabId);
+      remaining = remaining.slice(1);
+    }
+    return true;
+  }, [askUnsavedClose, saveTabById]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      confirmExit,
+      hasUnsavedChanges: () => workspaceListDirtyEditorTabs(modelRef.current).length > 0,
+    }),
+    [confirmExit],
+  );
+
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (workspaceListDirtyEditorTabs(modelRef.current).length === 0) return;
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+
+  // Load file list and build sidebar picker groups (reads each file once; bodies are not cached).
   useEffect(() => {
     let cancelled = false;
     setFilesLoading(true);
@@ -87,14 +212,9 @@ export function UsfmShell({
       .listFiles()
       .then(async (list) => {
         if (cancelled) return;
-        const withUsfm = await Promise.all(
-          list.map(async (entry) => ({
-            id: entry.id,
-            name: entry.name,
-            usfm: (await host.readFile(entry.id)) ?? "",
-          })),
-        );
-        if (!cancelled) setFiles(withUsfm);
+        setFileEntries(list);
+        const catalog = await buildUsfmFilePickerCatalog(list, host);
+        if (!cancelled) setFileCatalog(catalog);
       })
       .finally(() => {
         if (!cancelled) setFilesLoading(false);
@@ -170,30 +290,9 @@ export function UsfmShell({
     setFocusedTabId(tabId);
   }, []);
 
-  const handleUpdateTabValue = useCallback(
-    (tabId: string, value: string) => {
-      setModel((p) => workspaceSetTabValue(p, tabId, value));
-      if (!host.writeFile) return;
-      const pending = saveDebounceRef.current.get(tabId);
-      if (pending) clearTimeout(pending);
-      saveDebounceRef.current.set(
-        tabId,
-        setTimeout(() => {
-          saveDebounceRef.current.delete(tabId);
-          void host.writeFile!(tabId, value);
-        }, 500),
-      );
-    },
-    [host],
-  );
-
-  const handleCloseTab = useCallback(
-    (groupId: string, tabId: string) => {
-      setModel((p) => workspaceCloseTab(p, groupId, tabId));
-      if (focusedTabId === tabId) setFocusedTabId(null);
-    },
-    [focusedTabId],
-  );
+  const handleUpdateTabValue = useCallback((tabId: string, value: string) => {
+    setModel((p) => workspaceSetTabValue(p, tabId, value));
+  }, []);
 
   const handleReorderTabInGroup = useCallback(
     (groupId: string, tabId: string, toIndex: number) =>
@@ -214,13 +313,8 @@ export function UsfmShell({
 
   // ---- file open / focus ----
 
-  const shellFileEntries = useMemo<readonly UsfmShellFileEntry[]>(
-    () => files.map((f) => ({ id: f.id, name: f.name })),
-    [files],
-  );
-
   const openFile = useCallback(
-    async (entry: UsfmFilePickerFileInput, opts?: { readonly selection?: { from: number; to: number } }) => {
+    async (entry: UsfmShellFileEntry, opts?: { readonly selection?: { from: number; to: number } }) => {
       const existingTabId = entry.id;
 
       // If a tab with the file id already exists, focus it.
@@ -243,7 +337,7 @@ export function UsfmShell({
         return;
       }
 
-      const usfm = entry.usfm || (await host.readFile(entry.id));
+      const usfm = await host.readFile(entry.id);
       if (usfm == null) return;
       const targetGroupId = model.slots[0]?.id;
       if (!targetGroupId) return;
@@ -267,10 +361,10 @@ export function UsfmShell({
 
   const onSelectSearchResult = useCallback(
     (m: SearchMatch) => {
-      const full = files.find((f) => f.id === m.fileId);
-      if (full) void openFile(full, { selection: { from: m.from, to: m.to } });
+      const entry = fileEntries.find((f) => f.id === m.fileId);
+      if (entry) void openFile(entry, { selection: { from: m.from, to: m.to } });
     },
-    [files, openFile],
+    [fileEntries, openFile],
   );
 
   // ---- errors ----
@@ -284,7 +378,8 @@ export function UsfmShell({
     [focusedTabId, focusedValue],
   );
 
-  const activeFileIdForBrowser = focusedTab && files.some((f) => f.id === focusedTab.id) ? focusedTab.id : null;
+  const activeFileIdForBrowser =
+    focusedTab && fileEntries.some((f) => f.id === focusedTab.id) ? focusedTab.id : null;
 
   const sidebarTabs = useMemo<readonly { id: SidebarTab; label: string; Icon: (p: { label?: string }) => ReactElement }[]>(
     () => [
@@ -368,7 +463,8 @@ export function UsfmShell({
           <div className="flex min-h-0 w-64 flex-col bg-white dark:bg-gray-900" data-testid="usfm-shell-sidebar-panel">
             {sidebarTab === "files" ? (
               <FileBrowser
-                files={files}
+                fileEntries={fileEntries}
+                catalog={fileCatalog}
                 activeFileId={activeFileIdForBrowser}
                 onOpenFile={(entry) => void openFile(entry)}
                 loading={filesLoading}
@@ -380,7 +476,7 @@ export function UsfmShell({
               />
             ) : (
               <FileSearch
-                files={shellFileEntries}
+                files={fileEntries}
                 readFile={(id) => host.readFile(id)}
                 onSelectResult={onSelectSearchResult}
                 loadingFiles={filesLoading}
@@ -400,6 +496,7 @@ export function UsfmShell({
             tabsById={model.tabsById}
             onActivateTab={handleActivateTab}
             onUpdateTabValue={handleUpdateTabValue}
+            onSaveTab={handleSaveTab}
             onCloseTab={handleCloseTab}
             onReorderTabInGroup={handleReorderTabInGroup}
             onMoveTabToGroup={handleMoveTabToGroup}
@@ -477,7 +574,28 @@ export function UsfmShell({
           ) : null}
         </section>
       </div>
+      {closePrompt ? (
+        <UnsavedChangesDialog
+          fileName={closePrompt.fileName}
+          onCancel={() => finishClosePrompt("cancel")}
+          onDiscard={() => finishClosePrompt("discard")}
+          onSave={() => {
+            const pending = closePrompt.pending;
+            void (async () => {
+              if (pending.kind === "tab") {
+                await saveTabById(pending.tabId);
+              } else {
+                const tabId = pending.remainingTabIds[0];
+                if (tabId) await saveTabById(tabId);
+              }
+              finishClosePrompt("save");
+            })();
+          }}
+        />
+      ) : null}
       </div>
     </SettingsProvider>
   );
-}
+});
+
+UsfmShell.displayName = "UsfmShell";

@@ -4,7 +4,8 @@ registerDomTestHooks({ flushTimers: true });
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { cleanup, fireEvent, render, screen, waitFor } from "./testing-react.ts";
-import { UsfmShell } from "../src/components/usfm-shell/UsfmShell.js";
+import { createRef } from "react";
+import { UsfmShell, type UsfmShellHandle } from "../src/components/usfm-shell/UsfmShell.js";
 import { createFixtureUsfmShellHost } from "../src/components/usfm-shell/fixture-host.js";
 import type { UsfmShellHost } from "../src/components/usfm-shell/host.js";
 import type { ApplicationSettings } from "../src/components/settings-pane/settings-model.js";
@@ -14,10 +15,11 @@ import { lineColumnToSourceOffset, sourceOffsetToLineColumn } from "../src/compo
 function makeHost(
   files: readonly { id: string; name: string; usfm: string }[],
   settingsStore?: { value: ApplicationSettings | null },
+  writeLog?: { id: string; content: string }[],
 ): UsfmShellHost {
   const store = settingsStore ?? { value: null };
   const folderPath = "/test/folder";
-  return {
+  const host: UsfmShellHost = {
     label: "Test folder",
     folderPath,
     async listRecentFolders() {
@@ -39,6 +41,12 @@ function makeHost(
       store.value = next;
     },
   };
+  if (writeLog) {
+    host.writeFile = async (id, content) => {
+      writeLog.push({ id, content });
+    };
+  }
+  return host;
 }
 
 describe("UsfmShell — line-offset helpers", () => {
@@ -268,5 +276,41 @@ describe("UsfmShell", () => {
     await waitFor(() => screen.getByTestId("theme-scope"));
     const resolved = screen.getByTestId("theme-scope").getAttribute("data-theme");
     expect(resolved === "light" || resolved === "dark").toBe(true);
+  });
+
+  it("reopens file content from the host instead of a stale sidebar cache", async () => {
+    const disk = new Map<string, string>([["f://a", "\\id GEN\n\\c 1\n\\p\n\\v 1 original"]]);
+    const host = makeHost([]);
+    host.listFiles = async () => [{ id: "f://a", name: "A.usfm" }];
+    host.readFile = async (id) => disk.get(id) ?? null;
+    host.writeFile = async (id, content) => {
+      disk.set(id, content);
+    };
+
+    render(<UsfmShell host={host} />);
+    await waitFor(() => screen.getByTestId("usfm-shell-file-A.usfm"));
+    fireEvent.click(screen.getByTestId("usfm-shell-file-A.usfm"));
+    await waitFor(() => screen.getByRole("tab", { name: /A\.usfm/i }));
+
+    disk.set("f://a", "\\id GEN\n\\c 1\n\\p\n\\v 1 saved on disk");
+    fireEvent.click(screen.getByRole("button", { name: /^close tab$/i }));
+    await waitFor(() => expect(screen.queryByRole("tab", { name: /A\.usfm/i })).toBeNull());
+
+    fireEvent.click(screen.getByTestId("usfm-shell-file-A.usfm"));
+    await waitFor(() => screen.getByRole("tab", { name: /A\.usfm/i }));
+    await waitFor(() => {
+      expect(document.querySelector(".cm-content")?.textContent).toContain("saved on disk");
+    });
+  });
+
+  it("reports no unsaved changes when all tabs are clean", async () => {
+    const shellRef = createRef<UsfmShellHandle>();
+    const host = makeHost([
+      { id: "f://a", name: "A.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n\\v 1 hi" },
+    ]);
+    render(<UsfmShell ref={shellRef} host={host} />);
+    await waitFor(() => screen.getByTestId("usfm-shell-file-A.usfm"));
+    expect(shellRef.current?.hasUnsavedChanges()).toBe(false);
+    await expect(shellRef.current!.confirmExit()).resolves.toBe(true);
   });
 });

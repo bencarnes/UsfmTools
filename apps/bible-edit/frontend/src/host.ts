@@ -7,6 +7,7 @@ import {
   OpenFolder,
   PickFolder,
   ReadFile,
+  ReadFilePickerHeader,
   SaveSettings,
   WriteFile,
 } from "../wailsjs/go/main/App.js";
@@ -55,6 +56,13 @@ export function createWailsUsfmShellHost(): UsfmShellHost {
     async readFile(fileId: string) {
       try {
         return await ReadFile(fileId);
+      } catch {
+        return null;
+      }
+    },
+    async readFilePickerHeader(fileId: string) {
+      try {
+        return await ReadFilePickerHeader(fileId);
       } catch {
         return null;
       }

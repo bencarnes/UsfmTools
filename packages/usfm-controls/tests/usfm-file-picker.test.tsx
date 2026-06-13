@@ -5,6 +5,7 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spy } from "@std/testing/mock";
 import { render, screen, fireEvent } from "./testing-react.ts";
+import { buildUsfmFilePickerGroups } from "@usfm-tools/model";
 import { UsfmFilePicker } from "../src/components/usfm-file-picker/UsfmFilePicker.js";
 
 describe("UsfmFilePicker", () => {
@@ -131,5 +132,13 @@ describe("UsfmFilePicker", () => {
     );
     expect(screen.getByRole("button", { name: /Open MAT\.usfm/ }).getAttribute("aria-current")).toBe("true");
     expect(screen.getByRole("button", { name: /Open GEN\.usfm/ }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("renders from pre-built groups without file bodies", () => {
+    const groups = buildUsfmFilePickerGroups([
+      { id: "g", name: "GEN.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n" },
+    ]);
+    render(<UsfmFilePicker groups={groups} />);
+    expect(screen.getByRole("button", { name: /Open GEN\.usfm \(GEN\)/ })).toBeTruthy();
   });
 });

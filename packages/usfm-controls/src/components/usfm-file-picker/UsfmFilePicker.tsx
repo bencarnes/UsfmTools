@@ -4,6 +4,7 @@ import {
   buildUsfmFilePickerGroups,
   type UsfmFilePickerFile,
   type UsfmFilePickerFileInput,
+  type UsfmFilePickerGroups,
 } from "@usfm-tools/model";
 
 export interface UsfmFilePickerSelectDetail {
@@ -13,8 +14,13 @@ export interface UsfmFilePickerSelectDetail {
 }
 
 export interface UsfmFilePickerProps {
-  /** One USFM file per entry; filesystem paths are not read here. */
-  readonly files: readonly UsfmFilePickerFileInput[];
+  /**
+   * One USFM file per entry; filesystem paths are not read here.
+   * Supply either `files` (parsed on the client) or pre-built `groups`.
+   */
+  readonly files?: readonly UsfmFilePickerFileInput[];
+  /** Pre-built picker groups (for example from a one-time folder index). */
+  readonly groups?: UsfmFilePickerGroups;
   /** Highlights the active file when set. */
   readonly activeFileId?: string | null;
   /** Fired when the user activates a file (click or keyboard on the button). */
@@ -120,17 +126,21 @@ function VerticalFileList({
  */
 export function UsfmFilePicker({
   files,
+  groups,
   activeFileId,
   onFileSelect,
   fileTestIdPrefix,
   className,
 }: UsfmFilePickerProps): React.JSX.Element {
-  const groups = useMemo(() => buildUsfmFilePickerGroups(files), [files]);
+  const resolvedGroups = useMemo(() => {
+    if (groups) return groups;
+    return buildUsfmFilePickerGroups(files ?? []);
+  }, [groups, files]);
 
-  const showOld = groups.oldTestament.length > 0;
-  const showNew = groups.newTestament.length > 0;
-  const showOther = groups.other.length > 0;
-  const showNonStandard = groups.nonStandard.length > 0;
+  const showOld = resolvedGroups.oldTestament.length > 0;
+  const showNew = resolvedGroups.newTestament.length > 0;
+  const showOther = resolvedGroups.other.length > 0;
+  const showNonStandard = resolvedGroups.nonStandard.length > 0;
 
   return (
     <div
@@ -139,7 +149,7 @@ export function UsfmFilePicker({
     >
       {showOld ? (
         <VerticalFileList
-          files={groups.oldTestament}
+          files={resolvedGroups.oldTestament}
           activeFileId={activeFileId}
           onFileSelect={onFileSelect}
           fileTestIdPrefix={fileTestIdPrefix}
@@ -149,7 +159,7 @@ export function UsfmFilePicker({
         <>
           {showOld ? <hr style={dividerStyle} aria-hidden /> : null}
           <VerticalFileList
-            files={groups.newTestament}
+            files={resolvedGroups.newTestament}
             activeFileId={activeFileId}
             onFileSelect={onFileSelect}
             fileTestIdPrefix={fileTestIdPrefix}
@@ -160,7 +170,7 @@ export function UsfmFilePicker({
         <>
           {showOld || showNew ? <hr style={dividerStyle} aria-hidden /> : null}
           <VerticalFileList
-            files={groups.other}
+            files={resolvedGroups.other}
             activeFileId={activeFileId}
             onFileSelect={onFileSelect}
             fileTestIdPrefix={fileTestIdPrefix}
@@ -171,7 +181,7 @@ export function UsfmFilePicker({
         <>
           {showOld || showNew || showOther ? <hr style={dividerStyle} aria-hidden /> : null}
           <VerticalFileList
-            files={groups.nonStandard}
+            files={resolvedGroups.nonStandard}
             activeFileId={activeFileId}
             onFileSelect={onFileSelect}
             fileTestIdPrefix={fileTestIdPrefix}

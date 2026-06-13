@@ -34,6 +34,8 @@ export {
   getStandardUsfmBookIdentifier,
   buildUsfmBookPickerGroups,
   buildUsfmFilePickerGroups,
+  scanUsfmPickerHeader,
+  scanUsfmPickerHeaderFromText,
 } from "./book-identifiers/index.js";
 export type {
   StandardBookIdentifier,

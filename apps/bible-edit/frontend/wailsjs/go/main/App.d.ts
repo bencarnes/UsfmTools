@@ -3,6 +3,8 @@
 import {main} from '../models';
 import {session} from '../models';
 
+export function AllowQuitAndExit():Promise<void>;
+
 export function GetHostInfo():Promise<main.HostInfo>;
 
 export function ListRecentFolders():Promise<Array<session.RecentFolder>>;
@@ -16,6 +18,8 @@ export function OpenFolder(arg1:string):Promise<void>;
 export function PickFolder():Promise<void>;
 
 export function ReadFile(arg1:string):Promise<string>;
+
+export function ReadFilePickerHeader(arg1:string):Promise<string>;
 
 export function SaveSettings(arg1:session.ApplicationSettings):Promise<void>;
 

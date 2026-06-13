@@ -11,8 +11,12 @@ export interface UsfmWorkspaceTabState {
   /** Pane kind for this tab. Omitted (or `editor`) renders a USFM editor pane. */
   readonly kind?: UsfmWorkspaceTabKind;
   /**
-   * Stub for future save integration. When true, the tab close affordance uses a circle (dirty)
-   * instead of an × (clean), similar to VS Code.
+   * Last persisted content for this tab. Editor `value` edits update `dirty` until saved.
+   */
+  readonly savedValue: string;
+  /**
+   * When true, `value` differs from `savedValue` and the tab close affordance uses a circle
+   * instead of an ×, similar to VS Code.
    */
   readonly dirty: boolean;
   /**
@@ -40,6 +44,8 @@ export interface UsfmWorkspaceInitialTab {
   readonly id?: string;
   readonly fileName: string;
   readonly value: string;
+  /** Last saved body; defaults to `value`. */
+  readonly savedValue?: string;
   readonly dirty?: boolean;
   /** Slot index in row-major order (0 = top-left). Defaults to 0. */
   readonly groupIndex?: number;
@@ -60,6 +66,7 @@ export interface UsfmWorkspaceProps {
   readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
   readonly onActivateTab: (groupId: string, tabId: string) => void;
   readonly onUpdateTabValue: (tabId: string, value: string) => void;
+  readonly onSaveTab?: (tabId: string) => void;
   readonly onCloseTab: (groupId: string, tabId: string) => void;
   readonly onReorderTabInGroup: (groupId: string, tabId: string, toIndex: number) => void;
   readonly onMoveTabToGroup: (detail: {
@@ -158,7 +165,9 @@ export function buildWorkspaceModelFromInitialTabs(
   for (const t of initialTabs) {
     const id = t.id ?? newWorkspaceId("tab");
     const gi = t.groupIndex ?? 0;
-    tabsById[id] = { id, fileName: t.fileName, value: t.value, dirty: t.dirty ?? false };
+    const savedValue = t.savedValue ?? t.value;
+    const dirty = t.dirty ?? t.value !== savedValue;
+    tabsById[id] = { id, fileName: t.fileName, value: t.value, savedValue, dirty };
     if (!groupBuckets.has(gi)) groupBuckets.set(gi, []);
     groupBuckets.get(gi)!.push(id);
   }
@@ -239,12 +248,31 @@ export function workspaceActivateTab(model: UsfmWorkspaceModel, groupId: string,
 export function workspaceSetTabValue(model: UsfmWorkspaceModel, tabId: string, value: string): UsfmWorkspaceModel {
   const cur = model.tabsById[tabId];
   if (!cur || cur.value === value) return model;
+  const dirty = cur.kind === "settings" ? false : value !== cur.savedValue;
   return asModel(
     model.gridRows,
     model.gridCols,
     model.slots.map(cloneGroup),
-    { ...model.tabsById, [tabId]: { ...cur, value } },
+    { ...model.tabsById, [tabId]: { ...cur, value, dirty } },
   );
+}
+
+/** Mark a tab's current `value` as saved (clears `dirty`). */
+export function workspaceMarkTabSaved(model: UsfmWorkspaceModel, tabId: string): UsfmWorkspaceModel {
+  const cur = model.tabsById[tabId];
+  if (!cur || cur.kind === "settings") return model;
+  if (!cur.dirty && cur.savedValue === cur.value) return model;
+  return asModel(
+    model.gridRows,
+    model.gridCols,
+    model.slots.map(cloneGroup),
+    { ...model.tabsById, [tabId]: { ...cur, savedValue: cur.value, dirty: false } },
+  );
+}
+
+/** Editor tabs with unsaved changes (excludes the settings tab). */
+export function workspaceListDirtyEditorTabs(model: UsfmWorkspaceModel): UsfmWorkspaceTabState[] {
+  return Object.values(model.tabsById).filter((tab) => tab.kind !== "settings" && tab.dirty);
 }
 
 export function workspaceCloseTab(model: UsfmWorkspaceModel, groupId: string, tabId: string): UsfmWorkspaceModel {
@@ -342,18 +370,24 @@ export function workspaceAppendTab(
       readonly fileName: string;
       readonly value: string;
       readonly dirty?: boolean;
+      readonly savedValue?: string;
       readonly kind?: UsfmWorkspaceTabKind;
     };
     readonly activate?: boolean;
   },
 ): UsfmWorkspaceModel {
   const id = options.tab.id ?? newWorkspaceId("tab");
+  const kind = options.tab.kind ?? "editor";
+  const savedValue = options.tab.savedValue ?? options.tab.value;
+  const dirty =
+    kind === "settings" ? false : (options.tab.dirty ?? options.tab.value !== savedValue);
   const tab: UsfmWorkspaceTabState = {
     id,
     fileName: options.tab.fileName,
     value: options.tab.value,
-    kind: options.tab.kind ?? "editor",
-    dirty: options.tab.dirty ?? false,
+    kind,
+    savedValue,
+    dirty,
   };
   const activate = options.activate !== false;
   const si = findSlotIndex(model.slots, options.groupId);
@@ -398,6 +432,12 @@ export function workspaceOpenSettingsTab(
   if (!groupId) return model;
   return workspaceAppendTab(model, {
     groupId,
-    tab: { id: SETTINGS_TAB_ID, fileName: "Settings", value: "", kind: "settings" },
+    tab: {
+      id: SETTINGS_TAB_ID,
+      fileName: "Settings",
+      value: "",
+      savedValue: "",
+      kind: "settings",
+    },
   });
 }

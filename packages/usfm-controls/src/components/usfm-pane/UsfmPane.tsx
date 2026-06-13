@@ -37,6 +37,7 @@ import {
 import { ScrollSyncToggleButton } from "./scroll-sync-toggle.js";
 import { nextViewMode, ViewModeCycleButton, type UsfmPaneViewMode } from "./view-mode-toggle.js";
 import { FindToolbarButton } from "./find-toolbar-button.js";
+import { SaveToolbarButton } from "./save-toolbar-button.js";
 import { themedControlButton } from "../../theme-tokens.js";
 
 export type { UsfmPaneViewMode };
@@ -45,6 +46,10 @@ export interface UsfmPaneProps {
   /** Full-book USFM (controlled). Multiple panes may share the same string reference updates. */
   readonly value: string;
   readonly onChange?: (value: string) => void;
+  /** When set, the toolbar save control and editor Ctrl+S invoke this callback. */
+  readonly onSave?: () => void;
+  /** When true, the tab has unsaved edits and the save control is enabled. */
+  readonly dirty?: boolean;
   /**
    * When set together with `toolbarActive`, chapter navigation, scroll sync, and view mode render
    * into this host element (for example the strip to the right of editor tabs).
@@ -101,6 +106,8 @@ function firstBookFromUsfm(usfm: string): BookNode | undefined {
 export function UsfmPane({
   value,
   onChange,
+  onSave,
+  dirty = false,
   toolbarMount,
   toolbarActive = true,
   defaultViewMode = "split",
@@ -355,6 +362,12 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
         onOpenFind={() => editorRef.current?.openFind()}
       />
 
+      <SaveToolbarButton
+        disabled={!dirty || !onSave}
+        buttonStyle={btnBase}
+        onSave={() => onSave?.()}
+      />
+
       <ViewModeCycleButton
         viewMode={viewMode}
         buttonStyle={btnBase}
@@ -394,6 +407,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
             ref={editorRef}
             value={value}
             onChange={onChange}
+            onSave={onSave}
             onViewportAnchorChange={onEditorViewportAnchor}
             className="flex-1 min-h-0 h-full border-0 rounded-none"
           />
@@ -416,6 +430,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 ref={editorRef}
                 value={value}
                 onChange={onChange}
+                onSave={onSave}
                 onViewportAnchorChange={onEditorViewportAnchor}
                 className="flex-1 min-h-0 h-full border-0 rounded-none"
               />

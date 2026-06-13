@@ -1,3 +1,4 @@
+import { scanUsfmPickerHeaderFromText } from "@usfm-tools/model";
 import { SAMPLE_BSB_GENESIS_USFM, SAMPLE_EXO_SNIPPET_USFM } from "../../fixtures/sample-bsb-genesis-usfm.js";
 import type { ApplicationSettings } from "../settings-pane/settings-model.js";
 import type { UsfmShellFileEntry, UsfmShellHost, UsfmShellRecentFolder } from "./host.js";
@@ -141,6 +142,11 @@ export function createFixtureUsfmShellHost(options: FixtureUsfmShellHostOptions 
     },
     async readFile(id: string) {
       return byId.get(id) ?? null;
+    },
+    async readFilePickerHeader(id: string) {
+      const full = byId.get(id);
+      if (full == null) return null;
+      return scanUsfmPickerHeaderFromText(full).headerUsfm;
     },
     async loadSettings() {
       return settings;

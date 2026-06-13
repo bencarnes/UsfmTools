@@ -25,6 +25,7 @@ declare module "@usfm-tools/controls" {
     pickFolder(): Promise<void>;
     listFiles(): Promise<readonly UsfmShellFileEntry[]>;
     readFile(fileId: string): Promise<string | null>;
+    readFilePickerHeader?(fileId: string): Promise<string | null>;
     writeFile?(fileId: string, content: string): Promise<void>;
     loadSettings(): Promise<ApplicationSettings | null>;
     saveSettings(settings: ApplicationSettings): Promise<void>;
