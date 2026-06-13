@@ -20,6 +20,10 @@ export interface UsfmEditorHandle {
   scrollSourceOffsetIntoView(offset: number): void;
   /** Document offset nearest the top of the viewport, or `null` if the editor is not mounted. */
   getTopVisibleSourceOffset(): number | null;
+  /** Current document text (includes edits not yet emitted through `onChange`). */
+  getDocument(): string;
+  /** Emit any pending debounced `onChange` immediately and return the current document text. */
+  flushChange(): string;
   /** Move the cursor/selection to the given source range and scroll it into view. */
   selectSourceRange(from: number, to?: number): void;
   /** Convert a 1-based line / 0-based column to a clamped source offset, or `null` if no view. */
@@ -33,6 +37,15 @@ export interface UsfmEditorHandle {
 export interface UsfmEditorProps {
   value?: string;
   onChange?: (value: string) => void;
+  /**
+   * When positive, delays lifting the full document string to React until this many
+   * milliseconds after the last edit. `0` emits on every change (default).
+   */
+  onChangeDebounceMs?: number;
+  /** Fired on the first document edit while the parent still considers the tab clean. */
+  onDirty?: () => void;
+  /** Fired on every document edit (before any `onChange` debounce). */
+  onDocumentChange?: () => void;
   /** When set, Ctrl+S / Cmd+S triggers this callback instead of the browser save dialog. */
   onSave?: () => void;
   className?: string;
@@ -44,19 +57,65 @@ export interface UsfmEditorProps {
 }
 
 export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function UsfmEditor(
-  { value = "", onChange, onSave, onViewportAnchorChange, className },
+  {
+    value = "",
+    onChange,
+    onChangeDebounceMs = 0,
+    onDirty,
+    onDocumentChange,
+    onSave,
+    onViewportAnchorChange,
+    className,
+  },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  const onDirtyRef = useRef(onDirty);
+  const onDocumentChangeRef = useRef(onDocumentChange);
   const onSaveRef = useRef(onSave);
   const onViewportAnchorChangeRef = useRef(onViewportAnchorChange);
   const viewportDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const changeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastEmittedRef = useRef(value);
+  const dirtyReportedRef = useRef(false);
 
   onChangeRef.current = onChange;
+  onDirtyRef.current = onDirty;
+  onDocumentChangeRef.current = onDocumentChange;
   onSaveRef.current = onSave;
   onViewportAnchorChangeRef.current = onViewportAnchorChange;
+
+  const readDocument = () => viewRef.current?.state.doc.toString() ?? "";
+
+  const emitChange = (content: string) => {
+    lastEmittedRef.current = content;
+    onChangeRef.current?.(content);
+  };
+
+  const emitPendingChange = () => {
+    if (changeDebounceRef.current) {
+      clearTimeout(changeDebounceRef.current);
+      changeDebounceRef.current = null;
+    }
+    const content = readDocument();
+    emitChange(content);
+    return content;
+  };
+
+  const scheduleChange = (content: string) => {
+    if (!onChangeRef.current) return;
+    if (onChangeDebounceMs <= 0) {
+      emitChange(content);
+      return;
+    }
+    if (changeDebounceRef.current) clearTimeout(changeDebounceRef.current);
+    changeDebounceRef.current = setTimeout(() => {
+      changeDebounceRef.current = null;
+      emitChange(content);
+    }, onChangeDebounceMs);
+  };
 
   useImperativeHandle(ref, () => ({
     scrollSourceOffsetIntoView(offset: number) {
@@ -75,6 +134,12 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
       const x = rect.left + rect.width / 2;
       const y = rect.top + 4;
       return view.posAtCoords({ x, y }, false) ?? 0;
+    },
+    getDocument() {
+      return readDocument();
+    },
+    flushChange() {
+      return emitPendingChange();
     },
     selectSourceRange(from: number, to?: number) {
       const view = viewRef.current;
@@ -126,8 +191,13 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     };
 
     const updateListener = EditorView.updateListener.of((update) => {
-      if (update.docChanged && onChangeRef.current) {
-        onChangeRef.current(update.state.doc.toString());
+      if (update.docChanged) {
+        onDocumentChangeRef.current?.();
+        if (!dirtyReportedRef.current) {
+          dirtyReportedRef.current = true;
+          onDirtyRef.current?.();
+        }
+        scheduleChange(update.state.doc.toString());
       }
       // Typing moves the selection every keystroke; skip viewport sync then so split-pane
       // scroll alignment does not walk the preview DOM on each character.
@@ -147,6 +217,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
               key: "Mod-s",
               preventDefault: true,
               run: () => {
+                emitPendingChange();
                 onSaveRef.current?.();
                 return true;
               },
@@ -216,20 +287,29 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
       view.scrollDOM.removeEventListener("scroll", scheduleViewportReport);
       if (viewportDebounceRef.current) clearTimeout(viewportDebounceRef.current);
       viewportDebounceRef.current = null;
+      if (changeDebounceRef.current) clearTimeout(changeDebounceRef.current);
+      changeDebounceRef.current = null;
       view.destroy();
       viewRef.current = null;
     };
   }, []);
 
+  useEffect(() => {
+    dirtyReportedRef.current = false;
+  }, [value]);
+
   // Update content when value prop changes externally
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
+    if (value === lastEmittedRef.current) return;
     const currentContent = view.state.doc.toString();
     if (currentContent !== value) {
       view.dispatch({
         changes: { from: 0, to: currentContent.length, insert: value },
       });
+      lastEmittedRef.current = value;
+      dirtyReportedRef.current = false;
     }
   }, [value]);
 

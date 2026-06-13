@@ -66,7 +66,8 @@ export interface UsfmWorkspaceProps {
   readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
   readonly onActivateTab: (groupId: string, tabId: string) => void;
   readonly onUpdateTabValue: (tabId: string, value: string) => void;
-  readonly onSaveTab?: (tabId: string) => void;
+  readonly onMarkTabDirty?: (tabId: string) => void;
+  readonly onSaveTab?: (tabId: string, value: string) => void;
   readonly onCloseTab: (groupId: string, tabId: string) => void;
   readonly onReorderTabInGroup: (groupId: string, tabId: string, toIndex: number) => void;
   readonly onMoveTabToGroup: (detail: {
@@ -254,6 +255,18 @@ export function workspaceSetTabValue(model: UsfmWorkspaceModel, tabId: string, v
     model.gridCols,
     model.slots.map(cloneGroup),
     { ...model.tabsById, [tabId]: { ...cur, value, dirty } },
+  );
+}
+
+/** Mark an editor tab dirty without lifting the latest document text into React state. */
+export function workspaceSetTabDirty(model: UsfmWorkspaceModel, tabId: string): UsfmWorkspaceModel {
+  const cur = model.tabsById[tabId];
+  if (!cur || cur.kind === "settings" || cur.dirty) return model;
+  return asModel(
+    model.gridRows,
+    model.gridCols,
+    model.slots.map(cloneGroup),
+    { ...model.tabsById, [tabId]: { ...cur, dirty: true } },
   );
 }
 

@@ -12,6 +12,7 @@ import {
   workspaceReorderTabInGroup,
   workspaceSetGridLayout,
   workspaceSetTabValue,
+  workspaceSetTabDirty,
   type UsfmWorkspaceInitialTab,
   type UsfmWorkspaceModel,
 } from "./workspace-model.js";
@@ -51,6 +52,7 @@ function WorkspaceFromModel({
       className="h-full min-h-0"
       onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
       onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
+      onMarkTabDirty={(tabId) => setModel((p) => workspaceSetTabDirty(p, tabId))}
       onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
       onReorderTabInGroup={(groupId, tabId, toIndex) =>
         setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))

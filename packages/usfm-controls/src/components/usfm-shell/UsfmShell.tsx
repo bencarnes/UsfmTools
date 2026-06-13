@@ -13,6 +13,7 @@ import {
   workspaceRequestTabSelection,
   SETTINGS_TAB_ID,
   workspaceSetTabValue,
+  workspaceSetTabDirty,
   workspaceMarkTabSaved,
   workspaceListDirtyEditorTabs,
   type UsfmWorkspaceModel,
@@ -124,13 +125,14 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   }, []);
 
   const saveTabById = useCallback(
-    async (tabId: string) => {
+    async (tabId: string, valueOverride?: string) => {
       const tab = modelRef.current.tabsById[tabId];
       if (!tab || tab.kind === "settings") return;
+      const body = valueOverride ?? tab.value;
       if (host.writeFile) {
-        await host.writeFile(tabId, tab.value);
+        await host.writeFile(tabId, body);
       }
-      setModel((p) => workspaceMarkTabSaved(p, tabId));
+      setModel((p) => workspaceMarkTabSaved(workspaceSetTabValue(p, tabId, body), tabId));
     },
     [host],
   );
@@ -141,11 +143,15 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   }, [focusedTabId]);
 
   const handleSaveTab = useCallback(
-    (tabId: string) => {
-      void saveTabById(tabId);
+    (tabId: string, value: string) => {
+      void saveTabById(tabId, value);
     },
     [saveTabById],
   );
+
+  const handleMarkTabDirty = useCallback((tabId: string) => {
+    setModel((p) => workspaceSetTabDirty(p, tabId));
+  }, []);
 
   const handleCloseTab = useCallback(
     (groupId: string, tabId: string) => {
@@ -496,6 +502,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             tabsById={model.tabsById}
             onActivateTab={handleActivateTab}
             onUpdateTabValue={handleUpdateTabValue}
+            onMarkTabDirty={handleMarkTabDirty}
             onSaveTab={handleSaveTab}
             onCloseTab={handleCloseTab}
             onReorderTabInGroup={handleReorderTabInGroup}
