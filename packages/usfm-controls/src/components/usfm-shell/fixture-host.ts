@@ -1,6 +1,6 @@
 import { SAMPLE_BSB_GENESIS_USFM, SAMPLE_EXO_SNIPPET_USFM } from "../../fixtures/sample-bsb-genesis-usfm.js";
 import type { ApplicationSettings } from "../settings-pane/settings-model.js";
-import type { UsfmShellFileEntry, UsfmShellHost } from "./host.js";
+import type { UsfmShellFileEntry, UsfmShellHost, UsfmShellRecentFolder } from "./host.js";
 
 const LEV_USFM = `\\id LEV
 \\c 1
@@ -33,17 +33,39 @@ interface FixtureFile {
   readonly usfm: string;
 }
 
-const DEFAULT_FILES: readonly FixtureFile[] = [
-  { entry: { id: "fake://bible/GEN.usfm", name: "GEN.usfm" }, usfm: SAMPLE_BSB_GENESIS_USFM },
-  { entry: { id: "fake://bible/EXO.usfm", name: "EXO.usfm" }, usfm: SAMPLE_EXO_SNIPPET_USFM },
-  { entry: { id: "fake://bible/LEV.usfm", name: "LEV.usfm" }, usfm: LEV_USFM },
-  { entry: { id: "fake://bible/NUM.usfm", name: "NUM.usfm" }, usfm: NUM_USFM },
-  { entry: { id: "fake://bible/PSA.usfm", name: "PSA.usfm" }, usfm: PSA_BAD_USFM },
+interface FixtureFolder {
+  readonly path: string;
+  readonly label: string;
+  readonly files: readonly FixtureFile[];
+}
+
+const DEFAULT_FOLDERS: readonly FixtureFolder[] = [
+  {
+    path: "/fake/bible/sample",
+    label: "Sample bible folder",
+    files: [
+      { entry: { id: "fake://bible/GEN.usfm", name: "GEN.usfm" }, usfm: SAMPLE_BSB_GENESIS_USFM },
+      { entry: { id: "fake://bible/EXO.usfm", name: "EXO.usfm" }, usfm: SAMPLE_EXO_SNIPPET_USFM },
+      { entry: { id: "fake://bible/LEV.usfm", name: "LEV.usfm" }, usfm: LEV_USFM },
+      { entry: { id: "fake://bible/NUM.usfm", name: "NUM.usfm" }, usfm: NUM_USFM },
+      { entry: { id: "fake://bible/PSA.usfm", name: "PSA.usfm" }, usfm: PSA_BAD_USFM },
+    ],
+  },
+  {
+    path: "/fake/bible/compact",
+    label: "Compact bible folder",
+    files: [
+      { entry: { id: "fake://compact/GEN.usfm", name: "GEN.usfm" }, usfm: SAMPLE_BSB_GENESIS_USFM },
+      { entry: { id: "fake://compact/EXO.usfm", name: "EXO.usfm" }, usfm: SAMPLE_EXO_SNIPPET_USFM },
+    ],
+  },
 ];
 
 export interface FixtureUsfmShellHostOptions {
   readonly label?: string;
+  readonly folderPath?: string;
   readonly files?: readonly FixtureFile[];
+  readonly folders?: readonly FixtureFolder[];
   /** Initial persisted settings. Defaults to `null` (the pane then falls back to defaults). */
   readonly settings?: ApplicationSettings;
 }
@@ -53,14 +75,69 @@ export interface FixtureUsfmShellHostOptions {
  * microtask so callers exercise the async path. Intended for Storybook and tests.
  */
 export function createFixtureUsfmShellHost(options: FixtureUsfmShellHostOptions = {}): UsfmShellHost {
-  const files = options.files ?? DEFAULT_FILES;
-  const byId = new Map(files.map((f) => [f.entry.id, f.usfm] as const));
+  const folders = options.folders ?? DEFAULT_FOLDERS;
+  const initialFolder =
+    folders.find((f) => f.path === options.folderPath) ??
+    (options.files
+      ? {
+          path: options.folderPath ?? "/fake/bible/custom",
+          label: options.label ?? "Sample bible folder",
+          files: options.files,
+        }
+      : folders[0]!);
+
+  let currentFolder: FixtureFolder = initialFolder;
+  const recentPaths: string[] = [currentFolder.path];
+  const byId = new Map(currentFolder.files.map((f) => [f.entry.id, f.usfm] as const));
   // In-memory settings store; persists for the lifetime of this host instance.
   let settings: ApplicationSettings | null = options.settings ?? null;
-  return {
-    label: options.label ?? "Sample bible folder",
+
+  const syncFileIndex = () => {
+    byId.clear();
+    for (const f of currentFolder.files) {
+      byId.set(f.entry.id, f.usfm);
+    }
+  };
+
+  const rememberFolder = (path: string) => {
+    const next = [path, ...recentPaths.filter((p) => p !== path)];
+    recentPaths.length = 0;
+    recentPaths.push(...next);
+  };
+
+  const host: UsfmShellHost = {
+    get label() {
+      return currentFolder.label;
+    },
+    get folderPath() {
+      return currentFolder.path;
+    },
+    async listRecentFolders() {
+      return recentPaths
+        .map((path) => folders.find((f) => f.path === path))
+        .filter((f): f is FixtureFolder => f != null)
+        .map(
+          (f): UsfmShellRecentFolder => ({
+            path: f.path,
+            label: f.label,
+          }),
+        );
+    },
+    async openFolder(path: string) {
+      const folder = folders.find((f) => f.path === path);
+      if (!folder) return;
+      currentFolder = folder;
+      syncFileIndex();
+      rememberFolder(path);
+    },
+    async pickFolder() {
+      const next = folders.find((f) => f.path !== currentFolder.path) ?? currentFolder;
+      currentFolder = next;
+      syncFileIndex();
+      rememberFolder(next.path);
+    },
     async listFiles() {
-      return files.map((f) => f.entry);
+      return currentFolder.files.map((f) => f.entry);
     },
     async readFile(id: string) {
       return byId.get(id) ?? null;
@@ -72,4 +149,6 @@ export function createFixtureUsfmShellHost(options: FixtureUsfmShellHostOptions 
       settings = next;
     },
   };
+
+  return host;
 }

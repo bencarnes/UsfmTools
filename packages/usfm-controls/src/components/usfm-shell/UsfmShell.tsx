@@ -31,7 +31,7 @@ import {
 } from "./shell-icons.js";
 import { lineColumnToSourceOffset } from "./line-offsets.js";
 import type { UsfmFilePickerFileInput } from "@usfm-tools/model";
-import type { UsfmShellFileEntry, UsfmShellHost } from "./host.js";
+import type { UsfmShellFileEntry, UsfmShellHost, UsfmShellRecentFolder } from "./host.js";
 
 export interface UsfmShellProps {
   readonly host: UsfmShellHost;
@@ -56,6 +56,10 @@ export function UsfmShell({
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs([]));
   const [files, setFiles] = useState<readonly UsfmFilePickerFileInput[]>([]);
   const [filesLoading, setFilesLoading] = useState(true);
+  const [folderRevision, setFolderRevision] = useState(0);
+  const [recentFolders, setRecentFolders] = useState<readonly UsfmShellRecentFolder[]>([]);
+  const [folderLabel, setFolderLabel] = useState(host.label);
+  const [folderPath, setFolderPath] = useState(host.folderPath);
 
   const [sidebarExpanded, setSidebarExpanded] = useState(defaultSidebarExpanded);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("files");
@@ -73,6 +77,11 @@ export function UsfmShell({
   useEffect(() => {
     let cancelled = false;
     setFilesLoading(true);
+    setFolderLabel(host.label);
+    setFolderPath(host.folderPath);
+    void host.listRecentFolders().then((recent) => {
+      if (!cancelled) setRecentFolders(recent);
+    });
     host
       .listFiles()
       .then(async (list) => {
@@ -92,7 +101,22 @@ export function UsfmShell({
     return () => {
       cancelled = true;
     };
-  }, [host]);
+  }, [host, folderRevision]);
+
+  const refreshFolder = useCallback(() => {
+    setFolderRevision((v) => v + 1);
+  }, []);
+
+  const handleOpenFolder = useCallback(
+    (path: string) => {
+      void host.openFolder(path).then(refreshFolder);
+    },
+    [host, refreshFolder],
+  );
+
+  const handlePickFolder = useCallback(() => {
+    void host.pickFolder().then(refreshFolder);
+  }, [host, refreshFolder]);
 
   // Track first active tab as the focused tab when the workspace is non-empty.
   useEffect(() => {
@@ -334,7 +358,11 @@ export function UsfmShell({
                 activeFileId={activeFileIdForBrowser}
                 onOpenFile={(entry) => void openFile(entry)}
                 loading={filesLoading}
-                label={host.label}
+                folderLabel={folderLabel}
+                folderPath={folderPath}
+                recentFolders={recentFolders}
+                onOpenFolder={handleOpenFolder}
+                onPickFolder={handlePickFolder}
               />
             ) : (
               <FileSearch

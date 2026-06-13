@@ -61,6 +61,7 @@ export type {
   UsfmShellProps,
   UsfmShellHost,
   UsfmShellFileEntry,
+  UsfmShellRecentFolder,
   FixtureUsfmShellHostOptions,
   SearchMatch as UsfmShellSearchMatch,
 } from "./components/usfm-shell/index.js";

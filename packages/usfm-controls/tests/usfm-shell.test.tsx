@@ -5,6 +5,7 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { cleanup, fireEvent, render, screen, waitFor } from "./testing-react.ts";
 import { UsfmShell } from "../src/components/usfm-shell/UsfmShell.js";
+import { createFixtureUsfmShellHost } from "../src/components/usfm-shell/fixture-host.js";
 import type { UsfmShellHost } from "../src/components/usfm-shell/host.js";
 import type { ApplicationSettings } from "../src/components/settings-pane/settings-model.js";
 import { lineColumnToSourceOffset, sourceOffsetToLineColumn } from "../src/components/usfm-shell/line-offsets.js";
@@ -15,8 +16,15 @@ function makeHost(
   settingsStore?: { value: ApplicationSettings | null },
 ): UsfmShellHost {
   const store = settingsStore ?? { value: null };
+  const folderPath = "/test/folder";
   return {
     label: "Test folder",
+    folderPath,
+    async listRecentFolders() {
+      return [{ path: folderPath, label: "Test folder" }];
+    },
+    async openFolder() {},
+    async pickFolder() {},
     async listFiles() {
       return files.map((f) => ({ id: f.id, name: f.name }));
     },
@@ -61,6 +69,54 @@ describe("UsfmShell", () => {
     // The file-browser tab is selected by default.
     const filesTab = screen.getByTestId("usfm-shell-sidebar-tab-files");
     expect(filesTab.getAttribute("aria-selected")).toBe("true");
+    // Folder name is shown in the bottom selector, not as a top heading.
+    expect(screen.getByTestId("usfm-shell-folder-selector-label").textContent).toBe("Test folder");
+    expect(screen.queryByText("Test folder", { selector: ".uppercase" })).toBeNull();
+  });
+
+  it("shows the folder path as a tooltip and exposes recent/open controls", async () => {
+    const host = makeHost([
+      { id: "f://a", name: "A.usfm", usfm: "\\id GEN" },
+    ]);
+    render(<UsfmShell host={host} />);
+    await waitFor(() => screen.getByTestId("usfm-shell-folder-selector"));
+    const label = screen.getByTestId("usfm-shell-folder-selector-label");
+    expect(label.getAttribute("title")).toBe("/test/folder");
+    expect(screen.getByTestId("usfm-shell-folder-selector-recent").getAttribute("title")).toBe(
+      "open recent folder",
+    );
+    expect(screen.getByTestId("usfm-shell-folder-selector-open").getAttribute("title")).toBe(
+      "Open new folder",
+    );
+  });
+
+  it("switches folders from the recent dropdown and open-new-folder button", async () => {
+    const host = createFixtureUsfmShellHost();
+    render(<UsfmShell host={host} />);
+    await waitFor(() => screen.getByTestId("usfm-shell-file-GEN.usfm"));
+    expect(screen.getByTestId("usfm-shell-folder-selector-label").textContent).toBe(
+      "Sample bible folder",
+    );
+
+    fireEvent.click(screen.getByTestId("usfm-shell-folder-selector-open"));
+    await waitFor(() =>
+      expect(screen.getByTestId("usfm-shell-folder-selector-label").textContent).toBe(
+        "Compact bible folder",
+      ),
+    );
+    expect(screen.getByTestId("usfm-shell-folder-selector-label").getAttribute("title")).toBe(
+      "/fake/bible/compact",
+    );
+
+    fireEvent.click(screen.getByTestId("usfm-shell-folder-selector-recent"));
+    const recentOption = await screen.findByRole("option", { name: /Sample bible folder/i });
+    fireEvent.click(recentOption);
+    await waitFor(() =>
+      expect(screen.getByTestId("usfm-shell-folder-selector-label").textContent).toBe(
+        "Sample bible folder",
+      ),
+    );
+    await waitFor(() => screen.getByTestId("usfm-shell-file-PSA.usfm"));
   });
 
   it("opens a file as a workspace tab on click", async () => {

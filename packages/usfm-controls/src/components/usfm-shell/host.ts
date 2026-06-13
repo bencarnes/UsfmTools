@@ -8,12 +8,27 @@ import type { SettingsHost } from "../settings-pane/settings-model.js";
  *
  * Also persists application settings via {@link SettingsHost}.
  */
+export interface UsfmShellRecentFolder {
+  /** Absolute path of the folder. */
+  readonly path: string;
+  /** Display name (typically the folder basename). */
+  readonly label: string;
+}
+
 export interface UsfmShellHost extends SettingsHost {
   /**
    * Stable, human-readable label for the source — for example a folder name.
-   * Shown above the file browser tab.
+   * Shown in the file browser folder selector.
    */
   readonly label: string;
+  /** Absolute path of the currently opened folder (shown as a tooltip). */
+  readonly folderPath: string;
+  /** Recently opened folders, most recent first. */
+  listRecentFolders(): Promise<readonly UsfmShellRecentFolder[]>;
+  /** Switch to a folder by absolute path. */
+  openFolder(path: string): Promise<void>;
+  /** Prompt the user to pick a new folder to open. */
+  pickFolder(): Promise<void>;
   /**
    * Return the list of USFM files in the currently selected folder. Just enough
    * info to populate the browser and run global search; full contents are loaded

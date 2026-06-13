@@ -106,3 +106,12 @@ export function ExpandUpIcon({ label }: { readonly label?: string }) {
     </Svg>
   );
 }
+
+/** Plus — open new folder. */
+export function PlusIcon({ label }: { readonly label?: string }) {
+  return (
+    <Svg label={label}>
+      <path d="M12 5v14M5 12h14" />
+    </Svg>
+  );
+}
