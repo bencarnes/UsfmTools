@@ -213,7 +213,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
       .then(async (list) => {
         if (cancelled) return;
         setFileEntries(list);
-        const catalog = await buildUsfmFilePickerCatalog(list, (id) => host.readFile(id));
+        const catalog = await buildUsfmFilePickerCatalog(list, host);
         if (!cancelled) setFileCatalog(catalog);
       })
       .finally(() => {

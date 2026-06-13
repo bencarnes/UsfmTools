@@ -34,6 +34,10 @@ export function ReadFile(arg1) {
   return window['go']['main']['App']['ReadFile'](arg1);
 }
 
+export function ReadFilePickerHeader(arg1) {
+  return window['go']['main']['App']['ReadFilePickerHeader'](arg1);
+}
+
 export function SaveSettings(arg1) {
   return window['go']['main']['App']['SaveSettings'](arg1);
 }

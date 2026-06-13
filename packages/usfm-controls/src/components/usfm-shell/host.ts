@@ -41,6 +41,12 @@ export interface UsfmShellHost extends SettingsHost {
    */
   readFile(fileId: string): Promise<string | null>;
   /**
+   * Read only the lines needed to index a file in the sidebar picker (through `\id` /
+   * `\toc*` metadata, stopping before the first `\c` chapter marker). When omitted, the
+   * shell scans {@link readFile} output in memory.
+   */
+  readFilePickerHeader?(fileId: string): Promise<string | null>;
+  /**
    * Persist edited USFM for a file. When provided, the shell saves on explicit user action
    * (toolbar Save or Ctrl+S) instead of auto-saving on every edit.
    */

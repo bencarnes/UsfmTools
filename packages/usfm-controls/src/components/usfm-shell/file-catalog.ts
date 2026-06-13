@@ -1,5 +1,12 @@
-import { buildUsfmFilePickerGroups, type UsfmFilePickerGroups } from "@usfm-tools/model";
-import type { UsfmShellFileEntry } from "./host.js";
+import {
+  buildUsfmFilePickerGroups,
+  scanUsfmPickerHeaderFromText,
+  type UsfmFilePickerGroups,
+} from "@usfm-tools/model";
+import type { UsfmShellFileEntry, UsfmShellHost } from "./host.js";
+
+type FileCatalogHost = Pick<UsfmShellHost, "readFile"> &
+  Partial<Pick<UsfmShellHost, "readFilePickerHeader">>;
 
 export const EMPTY_FILE_CATALOG: UsfmFilePickerGroups = {
   oldTestament: [],
@@ -8,20 +15,33 @@ export const EMPTY_FILE_CATALOG: UsfmFilePickerGroups = {
   nonStandard: [],
 };
 
+async function readPickerHeaderUsfm(
+  fileId: string,
+  host: FileCatalogHost,
+): Promise<string> {
+  if (host.readFilePickerHeader) {
+    return (await host.readFilePickerHeader(fileId)) ?? "";
+  }
+  const full = await host.readFile(fileId);
+  if (full == null) return "";
+  return scanUsfmPickerHeaderFromText(full).headerUsfm;
+}
+
 /**
- * Read each file once to build sidebar picker groups. Full USFM bodies are not retained —
- * only the grouped picker rows needed for the file browser.
+ * Index each file for the sidebar picker by reading only pre-chapter metadata (`\id`,
+ * `\toc*`, and related header markers), stopping before the first `\c` chapter line.
+ * Full USFM bodies are not retained — only grouped picker rows.
  */
 export async function buildUsfmFilePickerCatalog(
   entries: readonly UsfmShellFileEntry[],
-  readFile: (fileId: string) => Promise<string | null>,
+  host: FileCatalogHost,
 ): Promise<UsfmFilePickerGroups> {
   if (entries.length === 0) return EMPTY_FILE_CATALOG;
   const inputs = await Promise.all(
     entries.map(async (entry) => ({
       id: entry.id,
       name: entry.name,
-      usfm: (await readFile(entry.id)) ?? "",
+      usfm: await readPickerHeaderUsfm(entry.id, host),
     })),
   );
   return buildUsfmFilePickerGroups(inputs);

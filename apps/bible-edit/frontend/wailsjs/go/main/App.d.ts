@@ -19,6 +19,8 @@ export function PickFolder():Promise<void>;
 
 export function ReadFile(arg1:string):Promise<string>;
 
+export function ReadFilePickerHeader(arg1:string):Promise<string>;
+
 export function SaveSettings(arg1:session.ApplicationSettings):Promise<void>;
 
 export function SessionPath():Promise<string>;

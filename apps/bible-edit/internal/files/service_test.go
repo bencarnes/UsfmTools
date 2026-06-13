@@ -3,8 +3,30 @@ package files
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestServiceReadPickerHeaderStopsBeforeChapter(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewService()
+	usfmPath := filepath.Join(dir, "GEN.usfm")
+	content := "\\id GEN\n\\toc3 Gen\n\\c 1\n\\p\n\\v 1 Hello world."
+	if err := svc.Write(usfmPath, []byte(content)); err != nil {
+		t.Fatalf("write usfm: %v", err)
+	}
+
+	header, err := svc.ReadPickerHeader(usfmPath)
+	if err != nil {
+		t.Fatalf("read picker header: %v", err)
+	}
+	if header != "\\id GEN\n\\toc3 Gen" {
+		t.Fatalf("header = %q", header)
+	}
+	if strings.Contains(header, "Hello") {
+		t.Fatalf("chapter body leaked into header: %q", header)
+	}
+}
 
 func TestServiceReadWriteAllowlist(t *testing.T) {
 	dir := t.TempDir()

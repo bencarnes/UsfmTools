@@ -178,6 +178,11 @@ func (a *App) ReadFile(path string) (string, error) {
 	return string(raw), nil
 }
 
+// ReadFilePickerHeader reads only the pre-chapter metadata used to index a file in the sidebar.
+func (a *App) ReadFilePickerHeader(path string) (string, error) {
+	return a.files.ReadPickerHeader(path)
+}
+
 // WriteFile writes an allowlisted USFM or session file.
 func (a *App) WriteFile(path string, content string) error {
 	return a.files.Write(path, []byte(content))
