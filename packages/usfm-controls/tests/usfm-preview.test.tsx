@@ -1,9 +1,9 @@
 import { registerDomTestHooks } from "./deno-test-setup.ts";
 
-registerDomTestHooks();
+registerDomTestHooks({ flushTimers: true });
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { render } from "./testing-react.ts";
+import { render, waitFor } from "./testing-react.ts";
 import { UsfmPreview } from "../src/components/usfm-preview/UsfmPreview.js";
 
 const MULTI_VERSE = "\\id GEN\n\\c 1\n\\p\n\\v 1 One. \\v 2 Two.";
@@ -51,5 +51,22 @@ describe("UsfmPreview", () => {
 
     rerender(<UsfmPreview value={MULTI_VERSE} versePerLine={false} />);
     expect(container.querySelectorAll("p.usfm-line").length).toBe(1);
+  });
+
+  it("debounces preview regeneration when updateDebounceMs is set", async () => {
+    const initial = "\\id GEN\n\\c 1\n\\p\n\\v 1 First.";
+    const updated = "\\id GEN\n\\c 1\n\\p\n\\v 1 Second.";
+
+    const { container, rerender } = render(
+      <UsfmPreview value={initial} updateDebounceMs={50} />,
+    );
+    expect(container.textContent).toContain("First");
+
+    rerender(<UsfmPreview value={updated} updateDebounceMs={50} />);
+    expect(container.textContent).toContain("First");
+
+    await waitFor(() => {
+      expect(container.textContent).toContain("Second");
+    });
   });
 });

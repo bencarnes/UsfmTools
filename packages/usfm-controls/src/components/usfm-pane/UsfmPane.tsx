@@ -40,6 +40,9 @@ import { FindToolbarButton } from "./find-toolbar-button.js";
 import { SaveToolbarButton } from "./save-toolbar-button.js";
 import { themedControlButton } from "../../theme-tokens.js";
 
+/** Delay preview HTML regeneration while typing in split editor+preview mode. */
+const PREVIEW_UPDATE_DEBOUNCE_MS = 1500;
+
 export type { UsfmPaneViewMode };
 
 export interface UsfmPaneProps {
@@ -448,7 +451,11 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 className="flex-1 min-h-0 overflow-auto border-l border-gray-200 p-3 dark:border-gray-700"
                 onScroll={onPreviewScroll}
               >
-                <UsfmPreview value={value} versePerLine={versePerLine} />
+                <UsfmPreview
+                  value={value}
+                  versePerLine={versePerLine}
+                  updateDebounceMs={PREVIEW_UPDATE_DEBOUNCE_MS}
+                />
               </div>
             </div>
           </div>
