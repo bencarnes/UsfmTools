@@ -343,7 +343,8 @@ interface EditorGroupPanelProps {
   readonly onActivateTab: (groupId: string, tabId: string) => void;
   readonly onCloseTab: (groupId: string, tabId: string) => void;
   readonly onUpdateValue: (tabId: string, value: string) => void;
-  readonly onSaveValue?: (tabId: string) => void;
+  readonly onMarkTabDirty?: (tabId: string) => void;
+  readonly onSaveValue?: (tabId: string, value: string) => void;
   readonly onMoveTabWithinGroup: (groupId: string, tabId: string, toIndex: number) => void;
   readonly onDropTabFromOtherGroup: (
     targetGroupId: string,
@@ -359,6 +360,7 @@ function EditorGroupPanel({
   onActivateTab,
   onCloseTab,
   onUpdateValue,
+  onMarkTabDirty,
   onSaveValue,
   onMoveTabWithinGroup,
   onDropTabFromOtherGroup,
@@ -418,7 +420,8 @@ function EditorGroupPanel({
                 <UsfmPane
                   value={tab.value}
                   onChange={(v) => onUpdateValue(tid, v)}
-                  onSave={onSaveValue ? () => onSaveValue(tid) : undefined}
+                  onDirty={onMarkTabDirty ? () => onMarkTabDirty(tid) : undefined}
+                  onSave={onSaveValue ? (content) => onSaveValue(tid, content) : undefined}
                   dirty={tab.dirty}
                   toolbarMount={toolbarEl}
                   toolbarActive={active}
@@ -444,6 +447,7 @@ interface WorkspaceGridRowProps {
   readonly onActivateTab: UsfmWorkspaceProps["onActivateTab"];
   readonly onCloseTab: UsfmWorkspaceProps["onCloseTab"];
   readonly onUpdateTabValue: UsfmWorkspaceProps["onUpdateTabValue"];
+  readonly onMarkTabDirty?: UsfmWorkspaceProps["onMarkTabDirty"];
   readonly onSaveTab?: UsfmWorkspaceProps["onSaveTab"];
   readonly onReorderTabInGroup: UsfmWorkspaceProps["onReorderTabInGroup"];
   readonly onDropTabFromOtherGroup: (
@@ -464,6 +468,7 @@ function WorkspaceGridRow({
   onActivateTab,
   onCloseTab,
   onUpdateTabValue,
+  onMarkTabDirty,
   onSaveTab,
   onReorderTabInGroup,
   onDropTabFromOtherGroup,
@@ -510,6 +515,7 @@ function WorkspaceGridRow({
               onActivateTab={onActivateTab}
               onCloseTab={onCloseTab}
               onUpdateValue={onUpdateTabValue}
+              onMarkTabDirty={onMarkTabDirty}
               onSaveValue={onSaveTab}
               onMoveTabWithinGroup={onReorderTabInGroup}
               onDropTabFromOtherGroup={onDropTabFromOtherGroup}
@@ -528,6 +534,7 @@ export function UsfmWorkspace({
   tabsById,
   onActivateTab,
   onUpdateTabValue,
+  onMarkTabDirty,
   onSaveTab,
   onCloseTab,
   onReorderTabInGroup,
@@ -611,6 +618,7 @@ export function UsfmWorkspace({
                 onActivateTab={onActivateTab}
                 onCloseTab={onCloseTab}
                 onUpdateTabValue={onUpdateTabValue}
+                onMarkTabDirty={onMarkTabDirty}
                 onSaveTab={onSaveTab}
                 onReorderTabInGroup={onReorderTabInGroup}
                 onDropTabFromOtherGroup={onDropTabFromOtherGroup}

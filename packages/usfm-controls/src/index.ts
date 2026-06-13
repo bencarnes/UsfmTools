@@ -34,6 +34,7 @@ export {
   workspaceRequestTabSelection,
   workspaceSetGridLayout,
   workspaceSetTabValue,
+  workspaceSetTabDirty,
   workspaceMarkTabSaved,
   workspaceListDirtyEditorTabs,
   SETTINGS_TAB_ID,

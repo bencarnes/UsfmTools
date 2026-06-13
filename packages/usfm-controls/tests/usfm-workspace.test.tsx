@@ -14,6 +14,7 @@ import {
   workspaceReorderTabInGroup,
   workspaceSetGridLayout,
   workspaceSetTabValue,
+  workspaceSetTabDirty,
   workspaceMarkTabSaved,
   type UsfmWorkspaceInitialTab,
   type UsfmWorkspaceModel,
@@ -38,11 +39,11 @@ function Harness({
       tabsById={model.tabsById}
       onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
       onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
-      onSaveTab={(tabId) => {
+      onMarkTabDirty={(tabId) => setModel((p) => workspaceSetTabDirty(p, tabId))}
+      onSaveTab={(tabId, content) => {
         setModel((p) => {
-          const tab = p.tabsById[tabId];
-          if (tab) writeLog?.push({ id: tabId, content: tab.value });
-          return workspaceMarkTabSaved(p, tabId);
+          writeLog?.push({ id: tabId, content });
+          return workspaceMarkTabSaved(workspaceSetTabValue(p, tabId, content), tabId);
         });
       }}
       onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
@@ -77,6 +78,15 @@ describe("UsfmWorkspace", () => {
       />,
     );
     expect(screen.getByRole("button", { name: /close tab \(unsaved/i })).toBeTruthy();
+  });
+
+  it("workspaceSetTabDirty marks an editor tab dirty without changing value", () => {
+    const m0 = buildWorkspaceModelFromInitialTabs([
+      { id: "a", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
+    ]);
+    const marked = workspaceSetTabDirty(m0, "a");
+    expect(marked.tabsById["a"]?.dirty).toBe(true);
+    expect(marked.tabsById["a"]?.value).toBe(m0.tabsById["a"]?.value);
   });
 
   it("workspaceSetTabValue marks editor tabs dirty when value differs from savedValue", () => {

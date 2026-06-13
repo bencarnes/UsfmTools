@@ -45,6 +45,8 @@ const PREVIEW_UPDATE_DEBOUNCE_MS = 1500;
 const SCROLL_SYNC_TYPING_IDLE_MS = 500;
 /** Defer chapter-marker rescans while typing in split mode (markers rarely change per keystroke). */
 const NAV_MARKERS_DEBOUNCE_MS = 300;
+/** Defer lifting the full document string to React while typing in the workspace. */
+const EDITOR_VALUE_SYNC_DEBOUNCE_MS = 500;
 
 export type { UsfmPaneViewMode };
 
@@ -52,8 +54,10 @@ export interface UsfmPaneProps {
   /** Full-book USFM (controlled). Multiple panes may share the same string reference updates. */
   readonly value: string;
   readonly onChange?: (value: string) => void;
-  /** When set, the toolbar save control and editor Ctrl+S invoke this callback. */
-  readonly onSave?: () => void;
+  /** Fired on the first edit while `dirty` is still false (before debounced `onChange`). */
+  readonly onDirty?: () => void;
+  /** When set, the toolbar save control and editor Ctrl+S invoke this callback with the current document text. */
+  readonly onSave?: (value: string) => void;
   /** When true, the tab has unsaved edits and the save control is enabled. */
   readonly dirty?: boolean;
   /**
@@ -105,6 +109,7 @@ const toolbarRowStyle: CSSProperties = {
 export function UsfmPane({
   value,
   onChange,
+  onDirty,
   onSave,
   dirty = false,
   toolbarMount,
@@ -210,13 +215,19 @@ export function UsfmPane({
     }, SCROLL_SYNC_TYPING_IDLE_MS);
   }, [viewMode, scrollSyncEnabled, syncPreviewToEditorOffset]);
 
-  const handleEditorChange = useCallback(
-    (next: string) => {
-      onChange?.(next);
-      scheduleIdleScrollSync();
-    },
-    [onChange, scheduleIdleScrollSync],
-  );
+  const handleDirty = useCallback(() => {
+    if (!dirty) onDirty?.();
+  }, [dirty, onDirty]);
+
+  const handleSave = useCallback(() => {
+    const content = editorRef.current?.flushChange() ?? value;
+    onSave?.(content);
+  }, [onSave, value]);
+
+  useEffect(() => {
+    if (toolbarActive) return;
+    editorRef.current?.flushChange();
+  }, [toolbarActive]);
 
   const syncEditorToPreviewTop = useCallback(() => {
     if (viewMode !== "split") return;
@@ -411,7 +422,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
       <SaveToolbarButton
         disabled={!dirty || !onSave}
         buttonStyle={btnBase}
-        onSave={() => onSave?.()}
+        onSave={() => handleSave()}
       />
 
       <ViewModeCycleButton
@@ -452,8 +463,11 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
           <UsfmEditor
             ref={editorRef}
             value={value}
-            onChange={handleEditorChange}
-            onSave={onSave}
+            onChange={onChange}
+            onChangeDebounceMs={EDITOR_VALUE_SYNC_DEBOUNCE_MS}
+            onDirty={handleDirty}
+            onDocumentChange={scheduleIdleScrollSync}
+            onSave={handleSave}
             onViewportAnchorChange={onEditorViewportAnchor}
             className="flex-1 min-h-0 h-full border-0 rounded-none"
           />
@@ -475,8 +489,11 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
               <UsfmEditor
                 ref={editorRef}
                 value={value}
-                onChange={handleEditorChange}
-                onSave={onSave}
+                onChange={onChange}
+                onChangeDebounceMs={EDITOR_VALUE_SYNC_DEBOUNCE_MS}
+                onDirty={handleDirty}
+                onDocumentChange={scheduleIdleScrollSync}
+                onSave={handleSave}
                 onViewportAnchorChange={onEditorViewportAnchor}
                 className="flex-1 min-h-0 h-full border-0 rounded-none"
               />
