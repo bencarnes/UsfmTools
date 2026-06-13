@@ -42,6 +42,10 @@ import { themedControlButton } from "../../theme-tokens.js";
 
 /** Delay preview HTML regeneration while typing in split editor+preview mode. */
 const PREVIEW_UPDATE_DEBOUNCE_MS = 1500;
+/** Defer scroll sync until typing pauses in split mode. */
+const SCROLL_SYNC_TYPING_IDLE_MS = 500;
+/** Defer chapter-marker rescans while typing in split mode (markers rarely change per keystroke). */
+const NAV_MARKERS_DEBOUNCE_MS = 300;
 
 export type { UsfmPaneViewMode };
 
@@ -131,8 +135,36 @@ export function UsfmPane({
   const syncLockRef = useRef(false);
   const splitDragRef = useRef<{ startX: number; startPct: number } | null>(null);
   const previewScrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingIdleScrollSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [previewValue, setPreviewValue] = useState(value);
+  const [navSource, setNavSource] = useState(value);
 
-  const firstBook = useMemo(() => firstBookFromUsfm(value), [value]);
+  useEffect(() => {
+    if (viewMode !== "split") {
+      setPreviewValue(value);
+      return;
+    }
+    const timer = setTimeout(() => setPreviewValue(value), PREVIEW_UPDATE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [value, viewMode]);
+
+  useEffect(() => {
+    if (viewMode !== "split") {
+      setNavSource(value);
+      return;
+    }
+    const timer = setTimeout(() => setNavSource(value), NAV_MARKERS_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [value, viewMode]);
+
+  useEffect(() => {
+    return () => {
+      if (typingIdleScrollSyncRef.current) clearTimeout(typingIdleScrollSyncRef.current);
+    };
+  }, []);
+
+  const markerSource = viewMode === "split" ? navSource : value;
+  const firstBook = useMemo(() => firstBookFromUsfm(markerSource), [markerSource]);
   const markers: readonly ChapterMarkerInBook[] = useMemo(
     () => (firstBook ? listChapterMarkersInBook(firstBook) : []),
     [firstBook],
@@ -174,6 +206,26 @@ export function UsfmPane({
       releaseSyncLockSoon();
     },
     [viewMode, hasChapters, scrollSyncEnabled, value, bookStartOffset, markers, releaseSyncLockSoon],
+  );
+
+  const scheduleIdleScrollSync = useCallback(() => {
+    if (viewMode !== "split" || !scrollSyncEnabled) return;
+    if (typingIdleScrollSyncRef.current) clearTimeout(typingIdleScrollSyncRef.current);
+    typingIdleScrollSyncRef.current = setTimeout(() => {
+      typingIdleScrollSyncRef.current = null;
+      const offset = editorRef.current?.getTopVisibleSourceOffset();
+      if (offset == null) return;
+      setEditorTopOffset(offset);
+      syncPreviewToEditorOffset(offset);
+    }, SCROLL_SYNC_TYPING_IDLE_MS);
+  }, [viewMode, scrollSyncEnabled, syncPreviewToEditorOffset]);
+
+  const handleEditorChange = useCallback(
+    (next: string) => {
+      onChange?.(next);
+      scheduleIdleScrollSync();
+    },
+    [onChange, scheduleIdleScrollSync],
   );
 
   const syncEditorToPreviewTop = useCallback(() => {
@@ -409,7 +461,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
           <UsfmEditor
             ref={editorRef}
             value={value}
-            onChange={onChange}
+            onChange={handleEditorChange}
             onSave={onSave}
             onViewportAnchorChange={onEditorViewportAnchor}
             className="flex-1 min-h-0 h-full border-0 rounded-none"
@@ -432,7 +484,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
               <UsfmEditor
                 ref={editorRef}
                 value={value}
-                onChange={onChange}
+                onChange={handleEditorChange}
                 onSave={onSave}
                 onViewportAnchorChange={onEditorViewportAnchor}
                 className="flex-1 min-h-0 h-full border-0 rounded-none"
@@ -451,11 +503,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 className="flex-1 min-h-0 overflow-auto border-l border-gray-200 p-3 dark:border-gray-700"
                 onScroll={onPreviewScroll}
               >
-                <UsfmPreview
-                  value={value}
-                  versePerLine={versePerLine}
-                  updateDebounceMs={PREVIEW_UPDATE_DEBOUNCE_MS}
-                />
+                <UsfmPreview value={previewValue} versePerLine={versePerLine} />
               </div>
             </div>
           </div>

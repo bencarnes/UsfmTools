@@ -129,7 +129,9 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
       if (update.docChanged && onChangeRef.current) {
         onChangeRef.current(update.state.doc.toString());
       }
-      if (update.selectionSet) scheduleViewportReport();
+      // Typing moves the selection every keystroke; skip viewport sync then so split-pane
+      // scroll alignment does not walk the preview DOM on each character.
+      if (update.selectionSet && !update.docChanged) scheduleViewportReport();
     });
 
     const state = EditorState.create({
