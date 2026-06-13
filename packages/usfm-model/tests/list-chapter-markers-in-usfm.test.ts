@@ -45,8 +45,13 @@ describe("listChapterMarkersInUsfm", () => {
     expect(listChapterMarkersInUsfm("\\c 1\n\\p\n\\v 1")).toEqual([]);
   });
 
+  it("matches parse() with CRLF line endings", () => {
+    expectScanMatchesParse("\\id GEN\r\n\\mt Genesis\r\n\\c 1\r\n\\p\r\n\\v 1\r\n\\c 2\r\n\\p\r\n");
+  });
+
   it("matches parse() for Berean Psalms", async () => {
-    const usfm = await Deno.readTextFile("/workspace/bibles/bsb/usfm/PSA.usfm");
+    const psaPath = new URL("../../../bibles/bsb/usfm/PSA.usfm", import.meta.url);
+    const usfm = await Deno.readTextFile(psaPath);
     expectScanMatchesParse(usfm);
   });
 });
