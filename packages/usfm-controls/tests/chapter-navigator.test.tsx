@@ -4,13 +4,8 @@ registerDomTestHooks();
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { spy } from "@std/testing/mock";
-import { cleanup, render, screen, fireEvent } from "./testing-react.ts";
-import { parse } from "@usfm-tools/parser";
+import { render, screen, fireEvent } from "./testing-react.ts";
 import { ChapterNavigator } from "../src/components/usfm-pane/chapter-navigator.js";
-
-
-const book = parse("\\id GEN\n\\c 1\n\\p\n\\v 1 Hello.\n\\c 2\n\\p\n\\v 1 More.").document
-  .children[0] as import("@usfm-tools/parser").BookNode;
 
 describe("ChapterNavigator", () => {
   it("shows prev/next tooltips and a chapter dropdown without a Chapters label", () => {
@@ -19,7 +14,8 @@ describe("ChapterNavigator", () => {
         navChapterText="1"
         hasChapters
         atLastChapter={false}
-        firstBook={book}
+        hasBookId
+        chapterNumbers={["1", "2"]}
         buttonStyle={{}}
         onPrevChapter={() => {}}
         onNextChapter={() => {}}
@@ -39,7 +35,8 @@ describe("ChapterNavigator", () => {
         navChapterText="1"
         hasChapters
         atLastChapter={false}
-        firstBook={book}
+        hasBookId
+        chapterNumbers={["1", "2"]}
         buttonStyle={{}}
         onPrevChapter={() => {}}
         onNextChapter={() => {}}

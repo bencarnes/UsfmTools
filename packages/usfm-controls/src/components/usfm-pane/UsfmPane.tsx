@@ -8,11 +8,10 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import type { BookNode } from "@usfm-tools/parser";
-import { parse } from "@usfm-tools/parser";
 import {
+  bookIdMarkerOffsetInUsfm,
   chapterNumberAtOrBeforeSourceOffset,
-  listChapterMarkersInBook,
+  listChapterMarkersInUsfm,
   type ChapterMarkerInBook,
 } from "@usfm-tools/model";
 import type { ChapterPickerSelectDetail } from "../chapter-picker/ChapterPicker.js";
@@ -99,13 +98,6 @@ const toolbarRowStyle: CSSProperties = {
   flexShrink: 0,
 };
 
-function firstBookFromUsfm(usfm: string): BookNode | undefined {
-  const { document } = parse(usfm);
-  const node = document.children.find((c) => c.type === "book");
-  if (!node || node.type !== "book") return undefined;
-  return node as BookNode;
-}
-
 export function UsfmPane({
   value,
   onChange,
@@ -132,11 +124,12 @@ export function UsfmPane({
   const splitDragRef = useRef<{ startX: number; startPct: number } | null>(null);
   const previewScrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const firstBook = useMemo(() => firstBookFromUsfm(value), [value]);
   const markers: readonly ChapterMarkerInBook[] = useMemo(
-    () => (firstBook ? listChapterMarkersInBook(firstBook) : []),
-    [firstBook],
+    () => listChapterMarkersInUsfm(value),
+    [value],
   );
+  const chapterNumbers = useMemo(() => markers.map((m) => m.number), [markers]);
+  const hasBookId = useMemo(() => bookIdMarkerOffsetInUsfm(value) != null, [value]);
 
   const navChapterText = useMemo(() => {
     if (viewMode === "preview") return previewTopChapter ?? "—";
@@ -146,10 +139,7 @@ export function UsfmPane({
 
   const hasChapters = markers.length > 0;
 
-  const bookStartOffset = useMemo(() => {
-    const off = firstBook?.position?.offset;
-    return typeof off === "number" ? off : 0;
-  }, [firstBook]);
+  const bookStartOffset = useMemo(() => bookIdMarkerOffsetInUsfm(value) ?? 0, [value]);
 
   const releaseSyncLockSoon = useCallback(() => {
     window.setTimeout(() => {
@@ -345,7 +335,8 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
         navChapterText={navChapterText}
         hasChapters={hasChapters}
         atLastChapter={atLastChapter}
-        firstBook={firstBook}
+        hasBookId={hasBookId}
+        chapterNumbers={chapterNumbers}
         buttonStyle={btnBase}
         onPrevChapter={onPrevChapter}
         onNextChapter={onNextChapter}
