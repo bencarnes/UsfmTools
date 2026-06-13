@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { renderPreviewHtml } from "@usfm-tools/model";
 
 /** Storybook (and URL state) may supply boolean controls as strings. */
@@ -28,7 +28,7 @@ export interface UsfmPreviewProps {
  * Read-only preview of USFM as continuous scripture HTML (similar to a Bible app).
  * Style the output via the `usfm-*` CSS class hooks (see package README).
  */
-export function UsfmPreview({
+export const UsfmPreview = memo(function UsfmPreview({
   value,
   versePerLine,
   updateDebounceMs = 0,
@@ -58,4 +58,4 @@ export function UsfmPreview({
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
-}
+});
