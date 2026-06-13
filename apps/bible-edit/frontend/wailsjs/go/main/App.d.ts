@@ -3,6 +3,8 @@
 import {main} from '../models';
 import {session} from '../models';
 
+export function AllowQuitAndExit():Promise<void>;
+
 export function GetHostInfo():Promise<main.HostInfo>;
 
 export function ListRecentFolders():Promise<Array<session.RecentFolder>>;
