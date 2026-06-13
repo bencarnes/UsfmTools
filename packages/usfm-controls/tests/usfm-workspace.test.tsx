@@ -14,13 +14,20 @@ import {
   workspaceReorderTabInGroup,
   workspaceSetGridLayout,
   workspaceSetTabValue,
+  workspaceMarkTabSaved,
   type UsfmWorkspaceInitialTab,
   type UsfmWorkspaceModel,
 } from "../src/components/usfm-workspace/workspace-model.js";
 import { UsfmWorkspace } from "../src/components/usfm-workspace/UsfmWorkspace.js";
 
 
-function Harness({ initialTabs }: { readonly initialTabs: readonly UsfmWorkspaceInitialTab[] }) {
+function Harness({
+  initialTabs,
+  writeLog,
+}: {
+  readonly initialTabs: readonly UsfmWorkspaceInitialTab[];
+  readonly writeLog?: { id: string; content: string }[];
+}) {
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs(initialTabs));
 
   return (
@@ -31,6 +38,13 @@ function Harness({ initialTabs }: { readonly initialTabs: readonly UsfmWorkspace
       tabsById={model.tabsById}
       onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
       onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
+      onSaveTab={(tabId) => {
+        setModel((p) => {
+          const tab = p.tabsById[tabId];
+          if (tab) writeLog?.push({ id: tabId, content: tab.value });
+          return workspaceMarkTabSaved(p, tabId);
+        });
+      }}
       onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
       onReorderTabInGroup={(groupId, tabId, toIndex) =>
         setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
@@ -63,6 +77,40 @@ describe("UsfmWorkspace", () => {
       />,
     );
     expect(screen.getByRole("button", { name: /close tab \(unsaved/i })).toBeTruthy();
+  });
+
+  it("workspaceSetTabValue marks editor tabs dirty when value differs from savedValue", () => {
+    const m0 = buildWorkspaceModelFromInitialTabs([
+      { id: "a", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
+    ]);
+    const edited = workspaceSetTabValue(m0, "a", "\\id GEN\n\\c 1\n\\p\n\\v 1 changed");
+    expect(edited.tabsById["a"]?.dirty).toBe(true);
+    const saved = workspaceMarkTabSaved(edited, "a");
+    expect(saved.tabsById["a"]?.dirty).toBe(false);
+    expect(saved.tabsById["a"]?.savedValue).toBe("\\id GEN\n\\c 1\n\\p\n\\v 1 changed");
+  });
+
+  it("enables save on the toolbar when the tab is dirty", () => {
+    const writeLog: { id: string; content: string }[] = [];
+    render(
+      <Harness
+        initialTabs={[
+          {
+            id: "t-save",
+            fileName: "GEN.usfm",
+            value: "\\id GEN\n\\c 1\n\\p\n\\v 1 changed",
+            savedValue: "\\id GEN\n\\c 1\n\\p\n\\v 1 clean",
+            dirty: true,
+          },
+        ]}
+        writeLog={writeLog}
+      />,
+    );
+    const save = screen.getByTestId("usfm-pane-save");
+    expect((save as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(save);
+    expect(writeLog[0]?.content).toContain("changed");
+    expect(screen.queryByRole("button", { name: /close tab \(unsaved/i })).toBeNull();
   });
 
   it("updates toolbar controls when switching tabs", () => {

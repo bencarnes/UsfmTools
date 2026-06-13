@@ -23,5 +23,7 @@ export {
   workspaceRequestTabSelection,
   workspaceSetGridLayout,
   workspaceSetTabValue,
+  workspaceMarkTabSaved,
+  workspaceListDirtyEditorTabs,
   SETTINGS_TAB_ID,
 } from "./workspace-model.js";

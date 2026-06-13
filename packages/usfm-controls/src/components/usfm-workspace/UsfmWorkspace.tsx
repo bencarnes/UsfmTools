@@ -257,10 +257,11 @@ function TabStrip({
                 type="button"
                 draggable
                 onDragStart={(ev) => onDragStartTab(ev, tid)}
-                className="min-w-0 flex-1 truncate px-1 py-1.5 text-left"
+                className={`min-w-0 flex-1 truncate px-1 py-1.5 text-left ${tab.dirty ? "italic" : ""}`}
                 onClick={() => onActivate(tid)}
                 aria-selected={active}
                 role="tab"
+                title={tab.dirty ? `${tab.fileName} (unsaved)` : tab.fileName}
               >
                 {tab.fileName}
               </button>
@@ -276,7 +277,7 @@ function TabStrip({
                 {tab.dirty ? (
                   <span
                     className="inline-block h-3.5 w-3.5 rounded-full border-2 border-gray-600 dark:border-gray-400"
-                    title="Unsaved (stub)"
+                    title="Unsaved changes"
                   />
                 ) : (
                   <span aria-hidden>×</span>
@@ -342,6 +343,7 @@ interface EditorGroupPanelProps {
   readonly onActivateTab: (groupId: string, tabId: string) => void;
   readonly onCloseTab: (groupId: string, tabId: string) => void;
   readonly onUpdateValue: (tabId: string, value: string) => void;
+  readonly onSaveValue?: (tabId: string) => void;
   readonly onMoveTabWithinGroup: (groupId: string, tabId: string, toIndex: number) => void;
   readonly onDropTabFromOtherGroup: (
     targetGroupId: string,
@@ -357,6 +359,7 @@ function EditorGroupPanel({
   onActivateTab,
   onCloseTab,
   onUpdateValue,
+  onSaveValue,
   onMoveTabWithinGroup,
   onDropTabFromOtherGroup,
 }: EditorGroupPanelProps) {
@@ -415,6 +418,8 @@ function EditorGroupPanel({
                 <UsfmPane
                   value={tab.value}
                   onChange={(v) => onUpdateValue(tid, v)}
+                  onSave={onSaveValue ? () => onSaveValue(tid) : undefined}
+                  dirty={tab.dirty}
                   toolbarMount={toolbarEl}
                   toolbarActive={active}
                   selectionRequest={tab.selectionRequest}
@@ -439,6 +444,7 @@ interface WorkspaceGridRowProps {
   readonly onActivateTab: UsfmWorkspaceProps["onActivateTab"];
   readonly onCloseTab: UsfmWorkspaceProps["onCloseTab"];
   readonly onUpdateTabValue: UsfmWorkspaceProps["onUpdateTabValue"];
+  readonly onSaveTab?: UsfmWorkspaceProps["onSaveTab"];
   readonly onReorderTabInGroup: UsfmWorkspaceProps["onReorderTabInGroup"];
   readonly onDropTabFromOtherGroup: (
     targetGroupId: string,
@@ -458,6 +464,7 @@ function WorkspaceGridRow({
   onActivateTab,
   onCloseTab,
   onUpdateTabValue,
+  onSaveTab,
   onReorderTabInGroup,
   onDropTabFromOtherGroup,
 }: WorkspaceGridRowProps) {
@@ -503,6 +510,7 @@ function WorkspaceGridRow({
               onActivateTab={onActivateTab}
               onCloseTab={onCloseTab}
               onUpdateValue={onUpdateTabValue}
+              onSaveValue={onSaveTab}
               onMoveTabWithinGroup={onReorderTabInGroup}
               onDropTabFromOtherGroup={onDropTabFromOtherGroup}
             />
@@ -520,6 +528,7 @@ export function UsfmWorkspace({
   tabsById,
   onActivateTab,
   onUpdateTabValue,
+  onSaveTab,
   onCloseTab,
   onReorderTabInGroup,
   onMoveTabToGroup,
@@ -602,6 +611,7 @@ export function UsfmWorkspace({
                 onActivateTab={onActivateTab}
                 onCloseTab={onCloseTab}
                 onUpdateTabValue={onUpdateTabValue}
+                onSaveTab={onSaveTab}
                 onReorderTabInGroup={onReorderTabInGroup}
                 onDropTabFromOtherGroup={onDropTabFromOtherGroup}
               />

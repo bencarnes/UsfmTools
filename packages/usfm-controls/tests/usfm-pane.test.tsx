@@ -4,6 +4,7 @@ registerDomTestHooks();
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { cleanup, render, screen, fireEvent, waitFor } from "./testing-react.ts";
+import { spy } from "@std/testing/mock";
 import { UsfmPane } from "../src/components/usfm-pane/UsfmPane.js";
 import { VIEW_MODE_LABELS } from "../src/components/usfm-pane/view-mode-toggle.js";
 
@@ -72,6 +73,22 @@ describe("UsfmPane", () => {
     expect(screen.getByRole("button", { name: "Find in document" }).hasAttribute("disabled")).toBe(
       true,
     );
+  });
+
+  it("shows a save button that is enabled only when dirty", () => {
+    const onSave = spy(() => {});
+    render(
+      <UsfmPane
+        value={"\\id GEN\n\\c 1\n\\p\n\\v 1 Hello."}
+        defaultViewMode="edit"
+        dirty
+        onSave={onSave}
+      />,
+    );
+    const save = screen.getByTestId("usfm-pane-save");
+    expect((save as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(save);
+    expect(onSave.calls.length).toBe(1);
   });
 
   it("cycles view mode when the toolbar control is clicked", () => {

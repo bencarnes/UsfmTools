@@ -5,7 +5,7 @@ import {
   useRef,
 } from "react";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
-import { EditorState, EditorSelection } from "@codemirror/state";
+import { EditorState, EditorSelection, Prec } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { usfmHighlighter, usfmLinter, usfmAutocomplete } from "./codemirror-usfm.js";
@@ -33,6 +33,8 @@ export interface UsfmEditorHandle {
 export interface UsfmEditorProps {
   value?: string;
   onChange?: (value: string) => void;
+  /** When set, Ctrl+S / Cmd+S triggers this callback instead of the browser save dialog. */
+  onSave?: () => void;
   className?: string;
   /**
    * Fired (debounced ~120ms after scroll or selection-driven viewport changes) with the
@@ -42,16 +44,18 @@ export interface UsfmEditorProps {
 }
 
 export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function UsfmEditor(
-  { value = "", onChange, onViewportAnchorChange, className },
+  { value = "", onChange, onSave, onViewportAnchorChange, className },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  const onSaveRef = useRef(onSave);
   const onViewportAnchorChangeRef = useRef(onViewportAnchorChange);
   const viewportDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   onChangeRef.current = onChange;
+  onSaveRef.current = onSave;
   onViewportAnchorChangeRef.current = onViewportAnchorChange;
 
   useImperativeHandle(ref, () => ({
@@ -135,6 +139,18 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
         history(),
         bracketMatching(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
+        Prec.highest(
+          keymap.of([
+            {
+              key: "Mod-s",
+              preventDefault: true,
+              run: () => {
+                onSaveRef.current?.();
+                return true;
+              },
+            },
+          ]),
+        ),
         usfmHighlighter,
         usfmLinter,
         usfmAutocomplete,

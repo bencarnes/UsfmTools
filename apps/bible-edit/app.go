@@ -31,6 +31,7 @@ type App struct {
 	files       *files.Service
 	sessionPath string
 	data        session.Data
+	allowQuit   bool
 }
 
 // NewApp creates the application backend.
@@ -196,6 +197,21 @@ func (a *App) SaveSettings(settings session.ApplicationSettings) error {
 	copy := settings
 	a.data.Settings = &copy
 	return a.persistSession()
+}
+
+// AllowQuitAndExit bypasses the close guard and quits the application.
+func (a *App) AllowQuitAndExit() {
+	a.allowQuit = true
+	runtime.Quit(a.ctx)
+}
+
+// BeforeClose is invoked when the user attempts to close the window.
+func (a *App) BeforeClose(ctx context.Context) bool {
+	if a.allowQuit {
+		return false
+	}
+	runtime.EventsEmit(ctx, "window:close-requested")
+	return true
 }
 
 // SessionPath returns the absolute path of the session file (for debugging).

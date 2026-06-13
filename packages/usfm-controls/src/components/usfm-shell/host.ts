@@ -41,8 +41,8 @@ export interface UsfmShellHost extends SettingsHost {
    */
   readFile(fileId: string): Promise<string | null>;
   /**
-   * Persist edited USFM for a file. When provided, the shell debounces saves on tab edits.
-   * Desktop hosts implement this through a Go/Tauri file service with an allowlist.
+   * Persist edited USFM for a file. When provided, the shell saves on explicit user action
+   * (toolbar Save or Ctrl+S) instead of auto-saving on every edit.
    */
   writeFile?(fileId: string, content: string): Promise<void>;
 }

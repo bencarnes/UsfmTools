@@ -34,6 +34,8 @@ export {
   workspaceRequestTabSelection,
   workspaceSetGridLayout,
   workspaceSetTabValue,
+  workspaceMarkTabSaved,
+  workspaceListDirtyEditorTabs,
   SETTINGS_TAB_ID,
 } from "./components/usfm-workspace/index.js";
 export { SettingsPane, SettingsProvider, useSettings } from "./components/settings-pane/index.js";
@@ -59,6 +61,7 @@ export type {
 export { UsfmShell, createFixtureUsfmShellHost } from "./components/usfm-shell/index.js";
 export type {
   UsfmShellProps,
+  UsfmShellHandle,
   UsfmShellHost,
   UsfmShellFileEntry,
   UsfmShellRecentFolder,
