@@ -137,6 +137,8 @@ export function UsfmPane({
   const [scrollSyncEnabled, setScrollSyncEnabled] = useState(defaultScrollSyncEnabled);
 
   const editorRef = useRef<UsfmEditorHandle>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const splitHostRef = useRef<HTMLDivElement>(null);
   const syncLockRef = useRef(false);
@@ -231,8 +233,8 @@ export function UsfmPane({
   }, [scheduleIdleScrollSync, onValidationDocumentChange]);
 
   const registerDocumentReader = useCallback(() => {
-    return editorRef.current?.getDocument() ?? value;
-  }, [value]);
+    return editorRef.current?.getDocument() ?? valueRef.current;
+  }, []);
 
   useEffect(() => {
     if (!onRegisterDocumentReader) return;

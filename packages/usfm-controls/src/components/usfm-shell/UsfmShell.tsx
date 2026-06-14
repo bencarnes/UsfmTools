@@ -270,7 +270,8 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
     if (!tab || tab.kind === "settings") return;
 
     if (validateDebounceRef.current) clearTimeout(validateDebounceRef.current);
-    setValidating(true);
+    const showLoading = !diagnosticsByTabRef.current.has(tabId);
+    if (showLoading) setValidating(true);
     validateDebounceRef.current = setTimeout(() => {
       validateDebounceRef.current = null;
       const gen = ++validateGenerationRef.current;
@@ -293,9 +294,8 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
 
   const handleRegisterDocumentReader = useCallback((tabId: string, reader: () => string) => {
     documentReadersRef.current.set(tabId, reader);
-    if (tabId === focusedTabIdRef.current) scheduleValidation(tabId);
     return () => documentReadersRef.current.delete(tabId);
-  }, [scheduleValidation]);
+  }, []);
 
   const getDiagnosticsForTab = useCallback((tabId: string): readonly Diagnostic[] => {
     if (tabId === focusedTabId) return diagnostics;
@@ -617,7 +617,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
                   activeFileName={focusedFileName}
                   diagnostics={diagnostics}
                   onSelectDiagnostic={onSelectDiagnostic}
-                  loading={validating}
+                  loading={validating && diagnostics.length === 0}
                 />
               ) : null}
             </div>
