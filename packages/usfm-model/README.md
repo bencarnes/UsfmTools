@@ -44,6 +44,8 @@ Helpers such as **`isStandardUsfmBookIdentifier`**, **`normalizeUsfmBookCode`**,
 
 For UI that lists available books from in-memory USFM files, **`buildUsfmBookPickerGroups(files)`** parses each file’s USFM (via the bundled parser), reads `\\toc1` / `\\toc2` / `\\toc3`, and returns four collections: **`oldTestament`**, **`newTestament`**, and **`other`** (standard codes outside OT/NT), each sorted by the official table order, plus **`nonStandard`**. The latter includes files whose first `\\id` code is not in the standard list, files with a **missing or empty** `\\id` line on the first book, and files **with no `\\id` at all** (non-empty USFM): for those, TOC markers are read from **top-level** paragraphs on the document, and **`code`** is an empty string when there is no id token. Order within **`nonStandard`** follows the input **`files`** array. Old/New Testament titles prefer `\\toc3` with code fallback; other standard books and non-standard rows use `\\toc1`, then `\\toc2`, then `\\toc3`, then the `\\id` code, then the file **`id`** when no code and no toc text. The **`UsfmBookPicker`** React control in **`@usfm-tools/controls`** consumes this function.
 
+**`buildUsfmFilePickerGroups(files)`** uses the same grouping rules but is keyed by file **`id`** / **`name`** (for folder sidebars). **`UsfmFilePicker`** in **`@usfm-tools/controls`** and **`UsfmShell`**’s file browser consume it.
+
 ```typescript
 import { buildUsfmBookPickerGroups } from "@usfm-tools/model";
 
@@ -56,7 +58,7 @@ const { oldTestament, newTestament, other, nonStandard } = buildUsfmBookPickerGr
 
 ### Chapter numbers on a book (`listChapterNumbersFromBook`)
 
-**`listChapterNumbersFromBook(book)`** walks a parsed **`BookNode`** and returns every **`\\c`** chapter number string in **document order**. Values are taken verbatim from the AST (no sorting, deduplication, or numeric parsing), so non–Western Arabic numerals, gaps, or duplicate markers are preserved exactly as encoded. The **`ChapterPicker`** control in **`@usfm-tools/controls`** uses this helper.
+**`listChapterNumbersFromBook(book)`** walks a parsed **`BookNode`** and returns every **`\\c`** chapter number string in **document order**. Values are taken verbatim from the AST (no sorting, deduplication, or numeric parsing), so non–Western Arabic numerals, gaps, or duplicate markers are preserved exactly as encoded. Pass the result to **`ChapterPicker`** as **`chapterNumbers`**, or use **`listChapterMarkersInUsfm`** when you only have raw USFM text.
 
 ```typescript
 import { parse, listChapterNumbersFromBook } from "@usfm-tools/model";
@@ -66,17 +68,27 @@ const book = document.children.find((n) => n.type === "book")!;
 const chapters = listChapterNumbersFromBook(book); // ["10", "2"]
 ```
 
-### Chapter markers with source offsets (`listChapterMarkersInBook`, `chapterNumberAtOrBeforeSourceOffset`)
+### Chapter markers with source offsets (`listChapterMarkersInBook`, `listChapterMarkersInUsfm`, `chapterNumberAtOrBeforeSourceOffset`)
 
-**`listChapterMarkersInBook(book)`** returns `{ number, markerOffset }[]` for each chapter child on a **`BookNode`** that has a parser **`position`** (the offset is the start of the `\\c` marker in the USFM source). **`chapterNumberAtOrBeforeSourceOffset(markers, sourceOffset)`** returns the chapter **number** for the last marker whose offset is still at or before **`sourceOffset`**, or **`null`** when the offset lies before the first chapter marker or the book has no chapters. Together these support full-file tools such as **`UsfmPane`** and **`UsfmWorkspace`** in **`@usfm-tools/controls`**.
+**`listChapterMarkersInBook(book)`** returns `{ number, markerOffset }[]` for each chapter child on a **`BookNode`** that has a parser **`position`** (the offset is the start of the `\\c` marker in the USFM source). Use this when you already have a parsed AST.
+
+**`listChapterMarkersInUsfm(usfm)`** scans raw USFM for `\\c` markers without a full parse — fast enough to refresh on debounced editor updates in **`UsfmPane`**. **`bookIdMarkerOffsetInUsfm(usfm)`** locates the first `\\id` marker the same way.
+
+**`chapterNumberAtOrBeforeSourceOffset(markers, sourceOffset)`** returns the chapter **number** for the last marker whose offset is still at or before **`sourceOffset`**, or **`null`** when the offset lies before the first chapter marker or the book has no chapters.
 
 ```typescript
-import { parse, listChapterMarkersInBook, chapterNumberAtOrBeforeSourceOffset } from "@usfm-tools/model";
+import {
+  parse,
+  listChapterMarkersInBook,
+  listChapterMarkersInUsfm,
+  chapterNumberAtOrBeforeSourceOffset,
+} from "@usfm-tools/model";
 
 const { document } = parse("\\id GEN\\n\\c 1\\n\\p\\n\\v 1\\n\\c 2\\n\\p\\n\\v 1");
 const book = document.children.find((n) => n.type === "book")!;
-const markers = listChapterMarkersInBook(book as import("@usfm-tools/parser").BookNode);
-chapterNumberAtOrBeforeSourceOffset(markers, markers[1]!.markerOffset); // "2"
+const fromAst = listChapterMarkersInBook(book as import("@usfm-tools/parser").BookNode);
+const fromText = listChapterMarkersInUsfm("\\id GEN\\n\\c 1\\n\\p\\n\\v 1\\n\\c 2\\n\\p\\n\\v 1");
+chapterNumberAtOrBeforeSourceOffset(fromText, fromText[1]!.markerOffset); // "2"
 ```
 
 ### HTML rendering (`renderPreviewHtml`)
@@ -114,16 +126,20 @@ cd packages/usfm-model
 ```
 packages/usfm-model/
 ├── src/
-│   ├── index.ts                    # Public API
-│   ├── book-identifiers/           # Standard \\id codes + buildUsfmBookPickerGroups
+│   ├── index.ts                         # Public API
+│   ├── book-identifiers/                # Standard \\id codes + picker group builders
+│   ├── list-chapter-numbers-from-book.ts
+│   ├── list-chapter-markers-in-book.ts  # Offsets from a parsed BookNode
+│   ├── list-chapter-markers-in-usfm.ts  # Lightweight \\c scan on raw USFM
 │   ├── view-models/
-│   │   └── publication-preview.ts  # PublicationViewModel + ViewModels.Publication alias
+│   │   └── publication-preview.ts       # PublicationViewModel + ViewModels.Publication alias
 │   └── renderer/
-│       ├── render-preview-html.ts  # renderPreviewHtml(usfm, options?)
+│       ├── render-preview-html.ts       # renderPreviewHtml(usfm, options?)
 │       └── index.ts
 ├── tests/
 │   ├── model.test.ts
 │   ├── book-picker-model.test.ts
+│   ├── list-chapter-markers-in-usfm.test.ts
 │   ├── publication-preview.test.ts
 │   └── render-preview-html.test.ts
 └── deno.json

@@ -7,7 +7,7 @@ This parser tokenizes and parses USFM source text into a structured AST (Abstrac
 ## Features
 
 - Full USFM 3.x marker support (paragraphs, characters, footnotes, cross-references, tables, milestones, figures, sidebars)
-- Dual output format: ESM and CommonJS bundles with TypeScript declarations
+- TypeScript source exports via `deno.json` (Deno workspace member; no separate npm `dist/` bundle)
 - Detailed position tracking for all AST nodes
 - Graceful error recovery (non-strict mode) or fail-fast (strict mode)
 - Zero runtime dependencies

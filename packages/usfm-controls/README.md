@@ -4,8 +4,8 @@ React UI controls for editing USFM scripture text, built on [CodeMirror 6](https
 
 ## Features
 
-- **Syntax highlighting** — color-coded markers, verse/chapter numbers, attributes
-- **Error diagnostics** — red squiggles under parse errors with hover messages
+- **Syntax highlighting** — viewport-scoped token coloring (markers, verse/chapter numbers, attributes); only the visible range is classified after typing pauses
+- **Error diagnostics** — unified validation in **`UsfmShell`** feeds both the errors panel and editor squiggles from one debounced parse
 - **Autocomplete** — type `\` to get a filtered list of USFM markers with descriptions; navigate with arrows, accept with Tab
 - **Find and replace** — **Ctrl+F** / **Ctrl+H** open a VS Code–style search widget in the upper-right (built on [`@codemirror/search`](https://codemirror.net/docs/ref/#search)); chevron toggles the replace row; icon buttons for match case (**Aa**), whole word (**ab**), and regex (**.\***)
 - **Async language service** — LSP-inspired message protocol for clean separation between editor UI and language intelligence
@@ -60,6 +60,7 @@ function App() {
 |------|------|-------------|
 | `value` | `string` | USFM source to render |
 | `versePerLine` | `boolean` | When true, split paragraphs that contain multiple `\\v` milestones so each verse appears on its own preview line (default `false`) |
+| `updateDebounceMs` | `number` | Milliseconds to wait after the last `value` change before re-rendering (default `0`). **`UsfmPane`** passes `1500` in split mode so preview HTML is not rebuilt on every keystroke |
 | `className` | `string` | CSS class on the root wrapper |
 
 ### UsfmBookPicker
@@ -94,7 +95,9 @@ const files = [
 
 **`UsfmPane`** is a full-book editor surface: a body that switches between **Edit**, **Preview**, and **Edit + Preview** (split with a draggable splitter). By default it includes an **inline toolbar** (chapter navigation, a **scroll-sync** icon toggle with up/down arrows — bold when on, a **find** button that opens the editor search bar, and a single **view-mode** button that cycles edit → preview → split) above the body. The view-mode icon shows the **next** mode (eye for Preview, document-with-pencil for Edit, both icons for Edit + Preview). When embedded in **`UsfmWorkspace`**, pass **`toolbarMount`** (a host element to the right of the tabs) and **`toolbarActive`** so only the selected tab’s controls render there, similar to VS Code.
 
-The editor and preview share the same controlled **`value`** / **`onChange`** pair, so **several panes can edit one file** when the parent shares state. Chapter navigation uses **`listChapterMarkersInBook`** from **`@usfm-tools/model`** for marker offsets; the current chapter is a compact dropdown (with **`ChapterPicker`** inside) flanked by previous/next buttons with tooltips. In split mode, scrolling one side debounces (~120ms) and aligns the other to the **same chapter** (approximate co-viewing; line-level sync is not guaranteed). The navigator stays visible for front matter without **`\\c`** markers; arrows and the menu are inert when there are no chapters.
+The editor and preview share a controlled **`value`** / **`onChange`** pair when embedded in **`UsfmWorkspace`** or **`UsfmShell`**. In those layouts the live document stays in CodeMirror; **`onChange`** is debounced (500 ms) so React workspace state is not updated on every keystroke. Chapter navigation uses the lightweight **`listChapterMarkersInUsfm`** scan (not a full parse) on a debounced source string in split mode. The current chapter is a compact dropdown (with **`ChapterPicker`** inside) flanked by previous/next buttons with tooltips.
+
+In split mode, preview HTML regeneration is debounced (1.5 s). Scroll sync between editor and preview is **paused while typing** and resumes after 500 ms idle; when active, scrolling one side aligns the other to the **same chapter** (approximate co-viewing; line-level sync is not guaranteed). The navigator stays visible for front matter without **`\\c`** markers; arrows and the menu are inert when there are no chapters.
 
 ```tsx
 import { useState } from "react";
@@ -109,7 +112,11 @@ function App() {
 | Prop | Type | Description |
 |------|------|-------------|
 | `value` | `string` | Full USFM file body (controlled) |
-| `onChange` | `(value: string) => void` | Optional; same contract as **`UsfmEditor`** |
+| `onChange` | `(value: string) => void` | Optional; debounced when used from **`UsfmWorkspace`** / **`UsfmShell`** |
+| `onDirty` | `() => void` | Optional; first edit while the tab is still clean |
+| `onSave` | `(value: string) => void` | Optional; toolbar Save / Ctrl+S with flushed editor buffer |
+| `dirty` | `boolean` | When true, the save control is enabled |
+| `diagnostics` | `Diagnostic[]` | Optional; parse diagnostics from **`UsfmShell`** unified validation |
 | `toolbarMount` | `HTMLElement \| null` | When set with **`toolbarActive`**, renders the chapter / sync / view toolbar into this node |
 | `toolbarActive` | `boolean` | When false, this pane does not occupy **`toolbarMount`** (inactive tab) |
 | `defaultViewMode` | `"edit" \| "preview" \| "split"` | Initial layout (default **`split`**) |
@@ -135,6 +142,8 @@ import {
   workspaceReorderTabInGroup,
   workspaceSetGridLayout,
   workspaceSetTabValue,
+  workspaceSetTabDirty,
+  workspaceMarkTabSaved,
 } from "@usfm-tools/controls";
 
 function App() {
@@ -156,6 +165,10 @@ function App() {
         tabsById={model.tabsById}
         onActivateTab={(groupId, tabId) => setModel((m) => workspaceActivateTab(m, groupId, tabId))}
         onUpdateTabValue={(tabId, value) => setModel((m) => workspaceSetTabValue(m, tabId, value))}
+        onMarkTabDirty={(tabId) => setModel((m) => workspaceSetTabDirty(m, tabId))}
+        onSaveTab={(tabId, value) => {
+          setModel((m) => workspaceMarkTabSaved(workspaceSetTabValue(m, tabId, value), tabId));
+        }}
         onCloseTab={(groupId, tabId) => setModel((m) => workspaceCloseTab(m, groupId, tabId))}
         onReorderTabInGroup={(groupId, tabId, toIndex) =>
           setModel((m) => workspaceReorderTabInGroup(m, groupId, tabId, toIndex))
@@ -174,7 +187,9 @@ function App() {
 | `slots` | `UsfmWorkspaceEditorGroupState[]` | Row-major groups for the current grid (**`id`**, **`tabIds`**, **`activeTabId`**) |
 | `tabsById` | `Record<string, UsfmWorkspaceTabState>` | Tab id → **`fileName`**, **`value`**, **`dirty`** |
 | `onActivateTab` | `(groupId, tabId) => void` | User selected a tab |
-| `onUpdateTabValue` | `(tabId, value) => void` | Editor content changed |
+| `onUpdateTabValue` | `(tabId, value) => void` | Editor content changed (debounced from the pane) |
+| `onMarkTabDirty` | `(tabId) => void` | Optional; first edit on a clean tab without updating `value` |
+| `onSaveTab` | `(tabId, value) => void` | Optional; explicit save with flushed editor buffer |
 | `onCloseTab` | `(groupId, tabId) => void` | User closed a tab |
 | `onReorderTabInGroup` | `(groupId, tabId, toIndex) => void` | Reorder within the same strip |
 | `onMoveTabToGroup` | `(detail) => void` | Move tab to another slot (**`toGroupId`**, **`insertIndex`**, **`fromGroupId`**) |
@@ -193,13 +208,19 @@ const host = createFixtureUsfmShellHost();
 
 **Sidebar.** Vertical icon tabs (document icon = file browser, magnifying-glass icon = search) on the left of the sidebar; the file browser is the default tab. A chevron button toggles the sidebar between **minimized** (icons only) and **expanded** (icons + tab panel). A **gear** button at the bottom of the icon rail opens the **`SettingsPane`** as a singleton workspace tab (see **SettingsPane** above). Clicking a file opens it as a new editor tab — or focuses the existing tab if the file is already open. Search uses regular-expression matching with **`Aa`** (match case), **`ab`** (whole word), and **`.*`** (regex) toggle buttons modeled after the editor's find bar; clicking a result opens (or focuses) the file and selects the matched range in the editor.
 
-**Bottom bar.** A horizontal icon-tab strip with a single tab today — a bug icon for **Errors**. The errors panel re-runs the USFM language service against the currently active editor's content, lists each diagnostic as **`line:column`** + message, and moves the editor caret to that line/column when a row is clicked. A chevron button toggles the bottom panel between expanded and collapsed (tabs only).
+**Bottom bar.** A horizontal icon-tab strip with a single tab today — a bug icon for **Errors**. The shell runs **one** debounced validation (300 ms after typing stops) against the focused editor’s live buffer and shares the result with both the errors list and editor squiggles. Each diagnostic is shown as **`line:column`** + message; clicking a row moves the caret to that position. A chevron button toggles the bottom panel between expanded and collapsed (tabs only).
 
 ```ts
 interface UsfmShellHost extends SettingsHost {
   readonly label: string;
+  readonly folderPath: string;
+  listRecentFolders(): Promise<readonly UsfmShellRecentFolder[]>;
+  openFolder(path: string): Promise<void>;
+  pickFolder(): Promise<void>;
   listFiles(): Promise<readonly UsfmShellFileEntry[]>;
   readFile(fileId: string): Promise<string | null>;
+  readFilePickerHeader?(fileId: string): Promise<string | null>;
+  writeFile?(fileId: string, content: string): Promise<void>;
   // from SettingsHost — persist application settings (see SettingsPane):
   loadSettings(): Promise<ApplicationSettings | null>;
   saveSettings(settings: ApplicationSettings): Promise<void>;
@@ -212,10 +233,12 @@ interface UsfmShellFileEntry {
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `host` | `UsfmShellHost` | File-system adapter — list files in the current folder, read a file's USFM by id |
+| `host` | `UsfmShellHost` | File-system adapter — list/open folders, list/read (and optionally write) USFM files |
 | `defaultSidebarExpanded` | `boolean` | Initial sidebar state (default `true`) |
 | `defaultBottomExpanded` | `boolean` | Initial bottom-bar state (default `true`) |
 | `className` | `string` | Optional root wrapper class (typically `h-screen` or similar) |
+
+**Imperative handle** (`ref` on **`UsfmShell`**): **`confirmExit()`** (prompts for unsaved tabs), **`hasUnsavedChanges()`**.
 
 ### SettingsPane
 
@@ -283,22 +306,32 @@ Dropdown with a **2×2 grid** trigger icon. The menu shows four squares; clickin
 | `onChange` | `(rows, cols) => void` | User picked a new layout |
 | `className` | `string` | Optional wrapper class |
 
+### UsfmFilePicker
+
+Folder-oriented file list with the same OT / NT / other / non-standard grouping as **`UsfmBookPicker`**, but keyed by file **`id`** and **`name`**. Accept either raw **`files`** (`{ id, name, usfm }[]`) or pre-built **`groups`** from **`buildUsfmFilePickerGroups`**. **`UsfmShell`**’s sidebar file browser uses this control.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `files` | `{ id, name, usfm }[]` | Optional; grouped on the client when `groups` is omitted |
+| `groups` | `UsfmFilePickerGroups` | Optional; pre-built catalog (for example from a folder index) |
+| `activeFileId` | `string \| null` | Highlights the open file |
+| `onFileSelect` | `(detail: { fileId, code }) => void` | Optional; user activated a file row |
+| `className` | `string` | CSS class on the root wrapper |
+
 ### ChapterPicker
 
-Shows every **`\\c`** chapter on a single parsed **`BookNode`**: buttons use a **fixed width** sized for three monospace **digit** cells (plus padding), **`flex-wrap`** so they flow left-to-right and wrap, and the root is **`width: 100%`** so the control tracks its parent. Labels are the raw **`ChapterNode.number`** strings in **document order** (no sorting, deduplication, or locale-specific reformatting).
+Shows chapter numbers as a **wrapping row of equal-width buttons** (labels are the raw `\\c` number strings in **document order** — no sorting or reformatting). Pass **`chapterNumbers`** from **`listChapterNumbersFromBook`** (parsed AST) or map **`listChapterMarkersInUsfm`** results to `.number`.
 
 ```tsx
 import { ChapterPicker } from "@usfm-tools/controls";
-import { parse } from "@usfm-tools/model";
+import { listChapterMarkersInUsfm } from "@usfm-tools/model";
 
-const { document } = parse("\\id PSA\n\\c 1\n\\p\n\\v 1\n\\c 2\n\\p\n\\v 1");
-const book = document.children.find((n) => n.type === "book");
-if (!book || book.type !== "book") throw new Error("Expected \\id book");
+const markers = listChapterMarkersInUsfm("\\id PSA\n\\c 1\n\\p\n\\v 1\n\\c 2\n\\p\n\\v 1");
 
 <ChapterPicker
-  book={book}
+  chapterNumbers={markers.map((m) => m.number)}
   onChapterSelect={({ chapterNumber }) => {
-    /* load chapter text, scroll editor, etc. */
+    /* scroll editor, etc. */
   }}
   className="border rounded-md p-2"
 />;
@@ -306,47 +339,50 @@ if (!book || book.type !== "book") throw new Error("Expected \\id book");
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `book` | `BookNode` | Parsed book from **`@usfm-tools/parser`** (same shape as children of a `DocumentNode` after **`parse`**) |
+| `chapterNumbers` | `string[]` | Chapter labels exactly as on `\\c` markers, in source order |
 | `onChapterSelect` | `(detail: { chapterNumber: string }) => void` | Optional; fired when the user activates a chapter button |
 | `className` | `string` | CSS class on the root wrapper |
 
-The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml`, **`RenderPreviewOptions`**, `ViewModels`, `PublicationViewModel`, **`buildUsfmBookPickerGroups`**, **`listChapterNumbersFromBook`**, **`listChapterMarkersInBook`**, **`chapterNumberAtOrBeforeSourceOffset`**, **`UsfmBookPickerCanonGroup`**, **`UsfmBookPickerFileInput`**, **`UsfmBookPickerBook`**, **`UsfmBookPickerGroups`**, and the type **`ChapterMarkerInBook`**, so you can use the model without a second import path.
+The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml`, **`RenderPreviewOptions`**, `ViewModels`, `PublicationViewModel`, **`buildUsfmBookPickerGroups`**, **`buildUsfmFilePickerGroups`**, **`listChapterNumbersFromBook`**, **`listChapterMarkersInBook`**, **`listChapterMarkersInUsfm`**, **`bookIdMarkerOffsetInUsfm`**, **`chapterNumberAtOrBeforeSourceOffset`**, picker types, and **`ChapterMarkerInBook`**, so you can use the model without a second import path.
 
 ### UsfmEditor props
 
 | Prop | Type | Description |
 |------|------|-------------|
 | `value` | `string` | USFM content to display |
-| `onChange` | `(value: string) => void` | Called when content changes |
+| `onChange` | `(value: string) => void` | Called when content changes (debounced when `onChangeDebounceMs` > 0) |
+| `onChangeDebounceMs` | `number` | Delay lifting the full document string to React (default `0`; **`UsfmPane`** uses `500`) |
+| `onDirty` | `() => void` | First edit while the parent still considers the tab clean |
+| `onDocumentChange` | `() => void` | Every edit, before any `onChange` debounce |
+| `diagnostics` | `Diagnostic[]` | Parse diagnostics from shell unified validation (drives lint squiggles) |
+| `onSave` | `() => void` | Ctrl+S / Cmd+S (flushes pending `onChange` first) |
 | `className` | `string` | CSS class for the container (use for height) |
 | `onViewportAnchorChange` | `(sourceOffset: number) => void` | Optional; debounced (~120ms) after scroll or selection moves the viewport — document offset near the top edge |
 
 **Find / replace:** **Ctrl+F** opens find-only; **Ctrl+H** opens find with the replace row. The left **chevron** expands or collapses replace. Inline toggles: **Match Case** (Aa), **Match Whole Word** (ab), **Use Regular Expression** (.\*). **Replace** updates the current match and moves to the next; **Replace All** replaces every match. **F3** / **Ctrl+G** find next; **Shift+F3** / **Shift+Ctrl+G** find previous; **Escape** closes the panel. All controls have tooltips.
 
-**Imperative handle** (`ref` on **`UsfmEditor`**): **`scrollSourceOffsetIntoView`**, **`getTopVisibleSourceOffset`**, **`openFind()`**, **`openFindReplace()`** — same behavior as the keyboard shortcuts.
+**Imperative handle** (`ref` on **`UsfmEditor`**): **`scrollSourceOffsetIntoView`**, **`getTopVisibleSourceOffset`**, **`getDocument`**, **`flushChange`**, **`selectSourceRange`**, **`lineColumnToOffset`**, **`openFind()`**, **`openFindReplace()`**.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│  UsfmEditor / UsfmPreview / UsfmBookPicker / ChapterPicker / UsfmPane / UsfmWorkspace (React) │
-│  ┌───────────────────────────────────────────┐  │
-│  │  CodeMirror 6 (editor only)               │  │
-│  └───────────────────────────────────────────┘  │
-└───────────────┬─────────────────┬───────────────┘
-                │                 │
-                │                 │ renderPreviewHtml
-                │                 ▼
-                │         ┌───────────────────────┐
-                │         │  @usfm-tools/model    │
-                │         │  view models + HTML   │
-                │         └───────────────────────┘
-                │ async messages
-┌───────────────▼─────────────────────────────────┐
-│  USFM Language Service (editor diagnostics)     │
-│  Uses: @usfm-tools/parser                         │
-└───────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  UsfmShell / UsfmWorkspace / UsfmPane / UsfmEditor (React)   │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │  CodeMirror 6 — live document, viewport highlight,     │  │
+│  │  lint squiggles from shell-provided diagnostics        │  │
+│  └────────────────────────────────────────────────────────┘  │
+└───────────────┬──────────────────────────────┬───────────────┘
+                │                              │
+                │ renderPreviewHtml            │ validate / classify / complete
+                ▼                              ▼
+        ┌───────────────────┐        ┌─────────────────────────┐
+        │  @usfm-tools/model │        │  USFM Language Service │
+        │  view models + HTML│        │  (@usfm-tools/parser)    │
+        └───────────────────┘        └─────────────────────────┘
 ```
+
+**Validation** is owned by **`UsfmShell`**: one debounced `validate` request reads the focused editor’s live buffer and pushes diagnostics to both the errors panel and **`UsfmEditor`** (via CodeMirror **`setDiagnostics`**). **Syntax highlighting** classifies only the visible viewport (plus a few lines of margin) inside the editor.
 
 ### Language Service Protocol
 
@@ -357,14 +393,16 @@ The language service uses a simple request/response protocol inspired by LSP:
 { type: "validate", id, content }
 { type: "complete", id, content, position: { line, column } }
 { type: "classify", id, content }
+{ type: "classifyRange", id, content, from, to }
 
 // Response types
 { type: "validate", id, diagnostics: [...] }
 { type: "complete", id, items: [...] }
 { type: "classify", id, tokens: [...] }
+{ type: "classifyRange", id, tokens: [...] }
 ```
 
-The service is currently synchronous (runs in the main thread via `createLanguageClient()`). The message-based design allows a future upgrade to Web Worker transport for large documents without changing the protocol.
+The service runs synchronously on the main thread via **`createLanguageClient()`**. The message-based design allows a future upgrade to Web Worker transport or incremental document sync without changing call sites.
 
 ### Token Types
 
@@ -379,11 +417,11 @@ The service is currently synchronous (runs in the main thread via `createLanguag
 
 ## Design Considerations
 
-**Full-book editing:** **`UsfmPane`** targets entire files (multiple **`\\c`** markers). For very large books, callers may still prefer virtualization or worker-backed language features; the editor itself remains a single CodeMirror document. The language service protocol could later send diffs instead of full text on each keystroke.
+**Full-book editing:** **`UsfmPane`** targets entire files (multiple **`\\c`** markers). The live document stays in CodeMirror; React workspace state, preview HTML, chapter-marker scans, scroll sync, and validation are debounced so large books (for example Psalms) stay responsive with the preview pane open. Further gains are possible with Web Workers, chapter-scoped preview HTML, or incremental document sync to the language service.
 
 **Lightweight:** No VS Code / Monaco fork. CodeMirror 6 provides the editing primitives; the USFM-specific intelligence lives in our language service.
 
-**Self-contained pane state:** cross-cutting state that nothing else in the shell reads (for example **settings**) lives in a **host-backed context store** the pane reads and writes directly (**`SettingsProvider`** + **`useSettings()`**), rather than bubbling change events up through **`UsfmWorkspace`** to **`UsfmShell`**. The shell only wires the provider to the host; it does not own or mediate the state. Reserve the shell-owned, fully-controlled pattern (state + callbacks threaded through the workspace) for data genuinely shared across the shell — open tabs, focus, and diagnostics.
+**Self-contained pane state:** cross-cutting state that nothing else in the shell reads (for example **settings**) lives in a **host-backed context store** the pane reads and writes directly (**`SettingsProvider`** + **`useSettings()`**), rather than bubbling change events up through **`UsfmWorkspace`** to **`UsfmShell`**. The shell only wires the provider to the host; it does not own or mediate the state. Reserve the shell-owned, fully-controlled pattern (state + callbacks threaded through the workspace) for data genuinely shared across the shell — open tabs, focus, dirty flags, and diagnostics.
 
 ## Development
 
@@ -417,82 +455,50 @@ Component stories (`*.stories.tsx`) use Ladle’s CSF-compatible format (`@ladle
 packages/usfm-controls/
 ├── src/
 │   ├── fixtures/
-│   │   └── sample-bsb-genesis-usfm.ts  # Long sample USFM for Ladle stories (not part of the published entry)
-│   ├── index.ts                     # Public API exports
-│   ├── styles.css                   # Tailwind + theme tokens + preview reading styles
-│   ├── theme-tokens.ts              # Shared CSS-variable-driven control styles
+│   │   └── sample-bsb-genesis-usfm.ts
+│   ├── index.ts
+│   ├── styles.css
+│   ├── theme-tokens.ts
 │   ├── components/
 │   │   ├── usfm-editor/
-│   │   │   ├── UsfmEditor.tsx       # React component
-│   │   │   ├── UsfmEditor.stories.tsx
+│   │   │   ├── UsfmEditor.tsx
 │   │   │   ├── codemirror-usfm.ts   # CM6 extensions (highlight, lint, autocomplete)
-│   │   │   ├── usfm-search-panel.ts # Find/replace panel (@codemirror/search)
-│   │   │   ├── search-mode-icons.ts # Icons for search mode toggles
-│   │   │   └── index.ts
+│   │   │   └── usfm-search-panel.ts
 │   │   ├── usfm-preview/
-│   │   │   ├── UsfmPreview.tsx      # Publication-style HTML preview
-│   │   │   ├── UsfmPreview.stories.tsx
-│   │   │   └── index.ts
 │   │   ├── usfm-book-picker/
-│   │   │   ├── UsfmBookPicker.tsx   # OT / NT / other book grid + list
-│   │   │   ├── UsfmBookPicker.stories.tsx
-│   │   │   └── index.ts
+│   │   ├── usfm-file-picker/
 │   │   ├── usfm-pane/
-│   │   │   ├── UsfmPane.tsx       # Full-book edit + preview + toolbar (inline or portaled)
-│   │   │   └── UsfmPane.stories.tsx
 │   │   ├── usfm-workspace/
-│   │   │   ├── UsfmWorkspace.tsx    # Tab-group grid workspace (up to 2×2)
+│   │   │   ├── UsfmWorkspace.tsx
+│   │   │   └── workspace-model.ts
 │   │   ├── tab-group-layout-selector/
-│   │   │   ├── TabGroupLayoutSelector.tsx
-│   │   │   ├── workspace-model.ts # Controlled props + immutable state helpers
-│   │   │   ├── UsfmWorkspace.stories.tsx
-│   │   │   └── index.ts
 │   │   ├── usfm-shell/
-│   │   │   ├── UsfmShell.tsx        # Application shell: sidebar + workspace + bottom bar
-│   │   │   ├── UsfmShell.stories.tsx
-│   │   │   ├── host.ts              # UsfmShellHost interface (file source adapter)
-│   │   │   ├── fixture-host.ts      # In-memory host for Ladle stories + tests
-│   │   │   ├── file-browser.tsx     # Sidebar file list tab
-│   │   │   ├── search.tsx           # Sidebar folder-wide search tab
-│   │   │   ├── errors-panel.tsx     # Bottom-bar errors tab
-│   │   │   ├── shell-icons.tsx      # Doc / search / bug / collapse icons
-│   │   │   ├── line-offsets.ts      # line/column ↔ source offset helpers
-│   │   │   └── index.ts
+│   │   │   ├── UsfmShell.tsx
+│   │   │   ├── host.ts
+│   │   │   ├── file-catalog.ts
+│   │   │   ├── file-browser.tsx
+│   │   │   ├── errors-panel.tsx
+│   │   │   └── search.tsx
 │   │   ├── settings-pane/
-│   │   │   ├── SettingsPane.tsx      # Settings UI (theme); reads/writes via useSettings()
-│   │   │   ├── SettingsPane.stories.tsx
-│   │   │   ├── settings-context.tsx  # SettingsProvider + useSettings (host-backed store)
-│   │   │   ├── settings-model.ts     # ApplicationSettings, UiTheme, SettingsHost, defaults
-│   │   │   ├── theme-scope.tsx       # ThemeScope + useResolvedTheme (applies light/dark)
-│   │   │   ├── theme-utils.ts        # resolveUiTheme, getSystemTheme
-│   │   │   └── index.ts
 │   │   └── chapter-picker/
-│   │       ├── ChapterPicker.tsx    # Wrapping row of equal-width chapter buttons
-│   │       ├── ChapterPicker.stories.tsx
-│   │       └── index.ts
 │   └── language-service/
-│       ├── index.ts                 # Service exports
-│       ├── protocol.ts              # Message types
-│       ├── service.ts               # Service + async client factory
-│       ├── diagnostics.ts           # Error detection via parser
-│       ├── completions.ts           # Marker completions
-│       └── classifier.ts            # Token classification
+│       ├── protocol.ts
+│       ├── service.ts
+│       ├── diagnostics.ts
+│       ├── completions.ts
+│       └── classifier.ts
 ├── tests/
+│   ├── dom-setup.ts
+│   ├── testing-react.ts
 │   ├── language-service.test.ts
-│   ├── usfm-preview.test.tsx
-│   ├── usfm-book-picker.test.tsx
-│   ├── usfm-pane.test.tsx
+│   ├── unified-validation.test.ts
+│   ├── usfm-editor-debounce.test.tsx
 │   ├── usfm-editor-search.test.tsx
+│   ├── usfm-preview.test.tsx
+│   ├── usfm-pane.test.tsx
 │   ├── usfm-workspace.test.tsx
 │   ├── usfm-shell.test.tsx
-│   ├── theme-utils.test.ts
-│   ├── theme-scope.test.tsx
-│   ├── chapter-offset-helpers.test.ts
-│   └── chapter-picker.test.tsx
-├── tests/
-│   ├── dom-setup.ts                 # happy-dom registration for Deno tests
-│   ├── testing-react.ts             # Testing Library re-export (after DOM setup)
-│   └── deno-test-setup.ts           # per-file RTL cleanup hooks
+│   └── …
 └── deno.json
 ```
 
