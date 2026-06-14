@@ -24,12 +24,28 @@ import type {
 
 const TAB_DRAG_MIME = "application/vnd.usfmtools.workspace-tab+json";
 
+/** Live payload for the tab drag in progress (dataTransfer is unreliable during dragover). */
+const activeTabDragRef: { current: { tabId: string; fromGroupId: string } | null } = { current: null };
+
 /** Minimum share of width for adjacent tab groups while dragging a column split. */
 const MIN_COL_FRAC = 0.12;
 /** Minimum share of height for adjacent rows while dragging a row split. */
 const MIN_ROW_FRAC = 0.12;
 
+function startTabDrag(e: DragEvent, payload: { tabId: string; fromGroupId: string }) {
+  activeTabDragRef.current = payload;
+  e.dataTransfer.setData(TAB_DRAG_MIME, JSON.stringify(payload));
+  e.dataTransfer.setData("text/plain", payload.tabId);
+  e.dataTransfer.effectAllowed = "move";
+}
+
+function endTabDrag() {
+  activeTabDragRef.current = null;
+}
+
 function parseTabDrag(dt: DataTransfer): { tabId: string; fromGroupId: string } | null {
+  const active = activeTabDragRef.current;
+  if (active) return active;
   const raw = dt.getData(TAB_DRAG_MIME);
   if (!raw) return null;
   try {
@@ -44,6 +60,7 @@ function parseTabDrag(dt: DataTransfer): { tabId: string; fromGroupId: string } 
 }
 
 function isTabDragTransfer(dt: DataTransfer): boolean {
+  if (activeTabDragRef.current) return true;
   if (parseTabDrag(dt)) return true;
   for (let i = 0; i < dt.types.length; i++) {
     if (dt.types[i] === TAB_DRAG_MIME) return true;
@@ -195,8 +212,11 @@ function TabStrip({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const onDragStartTab = (e: DragEvent, tabId: string) => {
-    e.dataTransfer.setData(TAB_DRAG_MIME, JSON.stringify({ tabId, fromGroupId: groupId }));
-    e.dataTransfer.effectAllowed = "move";
+    startTabDrag(e, { tabId, fromGroupId: groupId });
+  };
+
+  const onDragEndTab = () => {
+    endTabDrag();
   };
 
   const onDragOverStrip = (e: DragEvent) => {
@@ -227,6 +247,7 @@ function TabStrip({
     } else {
       onDropTabFromOtherGroup(payload.tabId, payload.fromGroupId, insertAt);
     }
+    endTabDrag();
   };
 
   return (
@@ -260,6 +281,7 @@ function TabStrip({
                 type="button"
                 draggable
                 onDragStart={(ev) => onDragStartTab(ev, tid)}
+                onDragEnd={onDragEndTab}
                 className={`min-w-0 flex-1 truncate px-1 py-1.5 text-left ${tab.dirty ? "italic" : ""}`}
                 onClick={() => onActivate(tid)}
                 aria-selected={active}
@@ -330,7 +352,9 @@ function EmptySlotDropTarget({ groupId, onDropTab }: EmptySlotDropTargetProps) {
         setHover(false);
         if (!p || p.fromGroupId === groupId) return;
         e.preventDefault();
+        e.stopPropagation();
         onDropTab(p.tabId, p.fromGroupId);
+        endTabDrag();
       }}
       data-testid={`workspace-empty-slot-${groupId}`}
       aria-label="Empty tab group — drop a tab here"

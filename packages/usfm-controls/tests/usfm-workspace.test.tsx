@@ -21,6 +21,60 @@ import {
 } from "../src/components/usfm-workspace/workspace-model.js";
 import { UsfmWorkspace } from "../src/components/usfm-workspace/UsfmWorkspace.js";
 
+function makeDataTransfer() {
+  const store: Record<string, string> = {};
+  const dt = {
+    effectAllowed: "none" as string,
+    dropEffect: "none" as string,
+    setData(type: string, value: string) {
+      store[type] = value;
+    },
+    getData(type: string) {
+      return store[type] ?? "";
+    },
+  };
+  Object.defineProperty(dt, "types", {
+    get() {
+      return Object.keys(store);
+    },
+    enumerable: true,
+  });
+  return dt;
+}
+
+function TwoSlotHarness({
+  initialTabs,
+}: {
+  readonly initialTabs: readonly UsfmWorkspaceInitialTab[];
+}) {
+  const [model, setModel] = useState<UsfmWorkspaceModel>(() =>
+    workspaceSetGridLayout(buildWorkspaceModelFromInitialTabs(initialTabs), 1, 2),
+  );
+
+  return (
+    <>
+      <div data-testid="slot-0-count">{model.slots[0]?.tabIds.length ?? 0}</div>
+      <div data-testid="slot-1-count">{model.slots[1]?.tabIds.length ?? 0}</div>
+      <div data-testid="empty-slot-id">{model.slots[1]?.id ?? ""}</div>
+      <UsfmWorkspace
+        gridRows={model.gridRows}
+        gridCols={model.gridCols}
+        slots={model.slots}
+        tabsById={model.tabsById}
+        onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
+        onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
+        onMarkTabDirty={(tabId) => setModel((p) => workspaceSetTabDirty(p, tabId))}
+        onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
+        onReorderTabInGroup={(groupId, tabId, toIndex) =>
+          setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
+        }
+        onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
+        onSetGridLayout={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
+      />
+    </>
+  );
+}
+
 
 function Harness({
   initialTabs,
@@ -57,6 +111,32 @@ function Harness({
 }
 
 describe("UsfmWorkspace", () => {
+  it("moves a tab into an empty slot via drag and drop", () => {
+    render(
+      <TwoSlotHarness
+        initialTabs={[
+          { id: "t-move", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A", groupIndex: 0 },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("slot-0-count").textContent).toBe("1");
+    expect(screen.getByTestId("slot-1-count").textContent).toBe("0");
+
+    const tab = screen.getByRole("tab", { name: /A\.usfm/i });
+    const emptyGroupId = screen.getByTestId("empty-slot-id").textContent!;
+    const emptySlot = screen.getByTestId(`workspace-empty-slot-${emptyGroupId}`);
+    const dataTransfer = makeDataTransfer();
+
+    fireEvent.dragStart(tab, { dataTransfer });
+    fireEvent.dragOver(emptySlot, { dataTransfer });
+    fireEvent.drop(emptySlot, { dataTransfer });
+
+    expect(screen.getByTestId("slot-0-count").textContent).toBe("0");
+    expect(screen.getByTestId("slot-1-count").textContent).toBe("1");
+    expect(screen.getByRole("tab", { name: /A\.usfm/i })).toBeTruthy();
+  });
+
   it("renders tab labels from file names", () => {
     render(
       <Harness
