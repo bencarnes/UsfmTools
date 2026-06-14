@@ -2,6 +2,8 @@
  * What a workspace tab renders. `editor` tabs hold USFM content edited in a {@link UsfmPane};
  * `settings` tabs render the {@link SettingsPane}. Defaults to `editor` when omitted.
  */
+import type { Diagnostic } from "../../language-service/protocol.js";
+
 export type UsfmWorkspaceTabKind = "editor" | "settings";
 
 export interface UsfmWorkspaceTabState {
@@ -76,6 +78,12 @@ export interface UsfmWorkspaceProps {
     readonly toGroupId: string;
     readonly insertIndex: number;
   }) => void;
+  /** Diagnostics for editor tabs (from unified shell validation). */
+  readonly getDiagnosticsForTab?: (tabId: string) => readonly Diagnostic[];
+  /** Fired when an editor tab's document changes (before workspace value sync). */
+  readonly onEditorDocumentChange?: (tabId: string) => void;
+  /** Register a reader for a tab's live editor buffer; return value unregisters. */
+  readonly onRegisterDocumentReader?: (tabId: string, reader: () => string) => () => void;
   readonly className?: string;
 }
 

@@ -71,7 +71,7 @@ type PendingClose = PendingTabClose | PendingAppClose;
 type SidebarTab = "files" | "search";
 type BottomTab = "errors";
 
-const VALIDATE_DEBOUNCE_MS = 250;
+const VALIDATE_DEBOUNCE_MS = 300;
 
 export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function UsfmShell(
   {
@@ -102,8 +102,13 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
 
   const clientRef = useRef(createLanguageClient());
   const validateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const validateGenerationRef = useRef(0);
+  const documentReadersRef = useRef(new Map<string, () => string>());
+  const diagnosticsByTabRef = useRef(new Map<string, readonly Diagnostic[]>());
+  const focusedTabIdRef = useRef<string | null>(null);
   const modelRef = useRef(model);
   modelRef.current = model;
+  focusedTabIdRef.current = focusedTabId;
 
   const [closePrompt, setClosePrompt] = useState<{
     readonly fileName: string;
@@ -258,36 +263,69 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   }, [model, focusedTabId]);
 
   const focusedTab = focusedTabId ? model.tabsById[focusedTabId] ?? null : null;
-  const focusedValue = focusedTab?.value ?? "";
   const focusedFileName = focusedTab?.fileName ?? null;
 
-  // Re-validate when the focused tab's content (or identity) changes.
-  useEffect(() => {
-    // Only editor tabs carry USFM to validate; settings (and other non-editor panes) have none.
-    if (!focusedTab || focusedTab.kind === "settings") {
-      setDiagnostics([]);
-      return;
-    }
+  const scheduleValidation = useCallback((tabId: string) => {
+    const tab = modelRef.current.tabsById[tabId];
+    if (!tab || tab.kind === "settings") return;
+
     if (validateDebounceRef.current) clearTimeout(validateDebounceRef.current);
     setValidating(true);
-    const tabId = focusedTab.id;
-    const content = focusedTab.value;
     validateDebounceRef.current = setTimeout(() => {
       validateDebounceRef.current = null;
+      const gen = ++validateGenerationRef.current;
+      const readDocument = documentReadersRef.current.get(tabId);
+      const content = readDocument?.() ?? tab.value;
       void clientRef.current.validate(content).then((diags) => {
-        // Drop late results from a stale tab.
-        if (tabId !== focusedTab.id) return;
-        setDiagnostics(diags);
+        if (gen !== validateGenerationRef.current) return;
+        diagnosticsByTabRef.current.set(tabId, diags);
+        if (focusedTabIdRef.current === tabId) {
+          setDiagnostics(diags);
+        }
         setValidating(false);
       });
     }, VALIDATE_DEBOUNCE_MS);
+  }, []);
+
+  const handleEditorDocumentChange = useCallback((tabId: string) => {
+    if (tabId === focusedTabIdRef.current) scheduleValidation(tabId);
+  }, [scheduleValidation]);
+
+  const handleRegisterDocumentReader = useCallback((tabId: string, reader: () => string) => {
+    documentReadersRef.current.set(tabId, reader);
+    if (tabId === focusedTabIdRef.current) scheduleValidation(tabId);
+    return () => documentReadersRef.current.delete(tabId);
+  }, [scheduleValidation]);
+
+  const getDiagnosticsForTab = useCallback((tabId: string): readonly Diagnostic[] => {
+    if (tabId === focusedTabId) return diagnostics;
+    return diagnosticsByTabRef.current.get(tabId) ?? [];
+  }, [focusedTabId, diagnostics]);
+
+  // Validate when the focused editor tab changes.
+  useEffect(() => {
+    if (!focusedTabId) {
+      validateGenerationRef.current++;
+      setDiagnostics([]);
+      setValidating(false);
+      return;
+    }
+    const tab = modelRef.current.tabsById[focusedTabId];
+    if (!tab || tab.kind === "settings") {
+      validateGenerationRef.current++;
+      setDiagnostics([]);
+      setValidating(false);
+      return;
+    }
+    setDiagnostics(diagnosticsByTabRef.current.get(focusedTabId) ?? []);
+    scheduleValidation(focusedTabId);
     return () => {
       if (validateDebounceRef.current) {
         clearTimeout(validateDebounceRef.current);
         validateDebounceRef.current = null;
       }
     };
-  }, [focusedTab]);
+  }, [focusedTabId, scheduleValidation]);
 
   // ---- workspace callbacks ----
 
@@ -378,10 +416,12 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   const onSelectDiagnostic = useCallback(
     (d: Diagnostic) => {
       if (!focusedTabId) return;
-      const offset = lineColumnToSourceOffset(focusedValue, d.range.start.line, d.range.start.column);
+      const readDocument = documentReadersRef.current.get(focusedTabId);
+      const content = readDocument?.() ?? modelRef.current.tabsById[focusedTabId]?.value ?? "";
+      const offset = lineColumnToSourceOffset(content, d.range.start.line, d.range.start.column);
       setModel((p) => workspaceRequestTabSelection(p, focusedTabId, offset, offset));
     },
-    [focusedTabId, focusedValue],
+    [focusedTabId],
   );
 
   const activeFileIdForBrowser =
@@ -504,6 +544,9 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             onUpdateTabValue={handleUpdateTabValue}
             onMarkTabDirty={handleMarkTabDirty}
             onSaveTab={handleSaveTab}
+            getDiagnosticsForTab={getDiagnosticsForTab}
+            onEditorDocumentChange={handleEditorDocumentChange}
+            onRegisterDocumentReader={handleRegisterDocumentReader}
             onCloseTab={handleCloseTab}
             onReorderTabInGroup={handleReorderTabInGroup}
             onMoveTabToGroup={handleMoveTabToGroup}
