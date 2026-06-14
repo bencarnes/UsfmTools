@@ -1,7 +1,7 @@
 import type { RequestMessage, ResponseMessage } from "./protocol.js";
 import { getDiagnostics } from "./diagnostics.js";
 import { getCompletions } from "./completions.js";
-import { classifyTokens } from "./classifier.js";
+import { classifyTokens, classifyTokensInRange } from "./classifier.js";
 
 /**
  * USFM Language Service — async message-based API.
@@ -44,6 +44,13 @@ export class UsfmLanguageService {
           id: message.id,
           tokens: classifyTokens(message.content),
         };
+
+      case "classifyRange":
+        return {
+          type: "classifyRange",
+          id: message.id,
+          tokens: classifyTokensInRange(message.content, message.from, message.to),
+        };
     }
   }
 }
@@ -84,6 +91,18 @@ export function createLanguageClient() {
         content,
       });
       if (response.type === "classify") return response.tokens;
+      return [];
+    },
+
+    async classifyRange(content: string, from: number, to: number) {
+      const response = service.handleMessage({
+        type: "classifyRange",
+        id: crypto.randomUUID(),
+        content,
+        from,
+        to,
+      });
+      if (response.type === "classifyRange") return response.tokens;
       return [];
     },
   };
