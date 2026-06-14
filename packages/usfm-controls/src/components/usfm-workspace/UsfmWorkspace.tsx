@@ -13,6 +13,7 @@ import {
 import { UsfmPane } from "../usfm-pane/UsfmPane.js";
 import { SettingsPane } from "../settings-pane/SettingsPane.js";
 import { TabListDropdown } from "./tab-list-dropdown.js";
+import type { Diagnostic } from "../../language-service/protocol.js";
 import type {
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceProps,
@@ -345,6 +346,9 @@ interface EditorGroupPanelProps {
   readonly onUpdateValue: (tabId: string, value: string) => void;
   readonly onMarkTabDirty?: (tabId: string) => void;
   readonly onSaveValue?: (tabId: string, value: string) => void;
+  readonly getDiagnosticsForTab?: (tabId: string) => readonly Diagnostic[];
+  readonly onEditorDocumentChange?: (tabId: string) => void;
+  readonly onRegisterDocumentReader?: (tabId: string, reader: () => string) => () => void;
   readonly onMoveTabWithinGroup: (groupId: string, tabId: string, toIndex: number) => void;
   readonly onDropTabFromOtherGroup: (
     targetGroupId: string,
@@ -362,6 +366,9 @@ function EditorGroupPanel({
   onUpdateValue,
   onMarkTabDirty,
   onSaveValue,
+  getDiagnosticsForTab,
+  onEditorDocumentChange,
+  onRegisterDocumentReader,
   onMoveTabWithinGroup,
   onDropTabFromOtherGroup,
 }: EditorGroupPanelProps) {
@@ -422,6 +429,15 @@ function EditorGroupPanel({
                   onChange={(v) => onUpdateValue(tid, v)}
                   onDirty={onMarkTabDirty ? () => onMarkTabDirty(tid) : undefined}
                   onSave={onSaveValue ? (content) => onSaveValue(tid, content) : undefined}
+                  diagnostics={getDiagnosticsForTab?.(tid)}
+                  onValidationDocumentChange={
+                    onEditorDocumentChange ? () => onEditorDocumentChange(tid) : undefined
+                  }
+                  onRegisterDocumentReader={
+                    onRegisterDocumentReader
+                      ? (reader) => onRegisterDocumentReader(tid, reader)
+                      : undefined
+                  }
                   dirty={tab.dirty}
                   toolbarMount={toolbarEl}
                   toolbarActive={active}
@@ -449,6 +465,9 @@ interface WorkspaceGridRowProps {
   readonly onUpdateTabValue: UsfmWorkspaceProps["onUpdateTabValue"];
   readonly onMarkTabDirty?: UsfmWorkspaceProps["onMarkTabDirty"];
   readonly onSaveTab?: UsfmWorkspaceProps["onSaveTab"];
+  readonly getDiagnosticsForTab?: UsfmWorkspaceProps["getDiagnosticsForTab"];
+  readonly onEditorDocumentChange?: UsfmWorkspaceProps["onEditorDocumentChange"];
+  readonly onRegisterDocumentReader?: UsfmWorkspaceProps["onRegisterDocumentReader"];
   readonly onReorderTabInGroup: UsfmWorkspaceProps["onReorderTabInGroup"];
   readonly onDropTabFromOtherGroup: (
     targetGroupId: string,
@@ -470,6 +489,9 @@ function WorkspaceGridRow({
   onUpdateTabValue,
   onMarkTabDirty,
   onSaveTab,
+  getDiagnosticsForTab,
+  onEditorDocumentChange,
+  onRegisterDocumentReader,
   onReorderTabInGroup,
   onDropTabFromOtherGroup,
 }: WorkspaceGridRowProps) {
@@ -517,6 +539,9 @@ function WorkspaceGridRow({
               onUpdateValue={onUpdateTabValue}
               onMarkTabDirty={onMarkTabDirty}
               onSaveValue={onSaveTab}
+              getDiagnosticsForTab={getDiagnosticsForTab}
+              onEditorDocumentChange={onEditorDocumentChange}
+              onRegisterDocumentReader={onRegisterDocumentReader}
               onMoveTabWithinGroup={onReorderTabInGroup}
               onDropTabFromOtherGroup={onDropTabFromOtherGroup}
             />
@@ -536,6 +561,9 @@ export function UsfmWorkspace({
   onUpdateTabValue,
   onMarkTabDirty,
   onSaveTab,
+  getDiagnosticsForTab,
+  onEditorDocumentChange,
+  onRegisterDocumentReader,
   onCloseTab,
   onReorderTabInGroup,
   onMoveTabToGroup,
@@ -620,6 +648,9 @@ export function UsfmWorkspace({
                 onUpdateTabValue={onUpdateTabValue}
                 onMarkTabDirty={onMarkTabDirty}
                 onSaveTab={onSaveTab}
+                getDiagnosticsForTab={getDiagnosticsForTab}
+                onEditorDocumentChange={onEditorDocumentChange}
+                onRegisterDocumentReader={onRegisterDocumentReader}
                 onReorderTabInGroup={onReorderTabInGroup}
                 onDropTabFromOtherGroup={onDropTabFromOtherGroup}
               />

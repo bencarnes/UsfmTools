@@ -14,6 +14,7 @@ import {
   listChapterMarkersInUsfm,
   type ChapterMarkerInBook,
 } from "@usfm-tools/model";
+import type { Diagnostic } from "../../language-service/protocol.js";
 import type { ChapterPickerSelectDetail } from "../chapter-picker/ChapterPicker.js";
 import { ChapterNavigator } from "./chapter-navigator.js";
 import { UsfmEditor, type UsfmEditorHandle } from "../usfm-editor/UsfmEditor.js";
@@ -60,6 +61,12 @@ export interface UsfmPaneProps {
   readonly onSave?: (value: string) => void;
   /** When true, the tab has unsaved edits and the save control is enabled. */
   readonly dirty?: boolean;
+  /** Parse diagnostics for this tab (from unified shell validation). */
+  readonly diagnostics?: readonly Diagnostic[];
+  /** Fired on every editor document edit to schedule shell validation. */
+  readonly onValidationDocumentChange?: () => void;
+  /** Register a reader for the live editor buffer with the shell. */
+  readonly onRegisterDocumentReader?: (readDocument: () => string) => void | (() => void);
   /**
    * When set together with `toolbarActive`, chapter navigation, scroll sync, and view mode render
    * into this host element (for example the strip to the right of editor tabs).
@@ -112,6 +119,9 @@ export function UsfmPane({
   onDirty,
   onSave,
   dirty = false,
+  diagnostics,
+  onValidationDocumentChange,
+  onRegisterDocumentReader,
   toolbarMount,
   toolbarActive = true,
   defaultViewMode = "split",
@@ -127,6 +137,8 @@ export function UsfmPane({
   const [scrollSyncEnabled, setScrollSyncEnabled] = useState(defaultScrollSyncEnabled);
 
   const editorRef = useRef<UsfmEditorHandle>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const splitHostRef = useRef<HTMLDivElement>(null);
   const syncLockRef = useRef(false);
@@ -214,6 +226,20 @@ export function UsfmPane({
       syncPreviewToEditorOffset(offset);
     }, SCROLL_SYNC_TYPING_IDLE_MS);
   }, [viewMode, scrollSyncEnabled, syncPreviewToEditorOffset]);
+
+  const notifyDocumentChange = useCallback(() => {
+    scheduleIdleScrollSync();
+    onValidationDocumentChange?.();
+  }, [scheduleIdleScrollSync, onValidationDocumentChange]);
+
+  const registerDocumentReader = useCallback(() => {
+    return editorRef.current?.getDocument() ?? valueRef.current;
+  }, []);
+
+  useEffect(() => {
+    if (!onRegisterDocumentReader) return;
+    return onRegisterDocumentReader(registerDocumentReader) ?? undefined;
+  }, [onRegisterDocumentReader, registerDocumentReader]);
 
   const handleDirty = useCallback(() => {
     if (!dirty) onDirty?.();
@@ -466,7 +492,8 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
             onChange={onChange}
             onChangeDebounceMs={EDITOR_VALUE_SYNC_DEBOUNCE_MS}
             onDirty={handleDirty}
-            onDocumentChange={scheduleIdleScrollSync}
+            onDocumentChange={notifyDocumentChange}
+            diagnostics={diagnostics}
             onSave={handleSave}
             onViewportAnchorChange={onEditorViewportAnchor}
             className="flex-1 min-h-0 h-full border-0 rounded-none"
@@ -492,7 +519,8 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 onChange={onChange}
                 onChangeDebounceMs={EDITOR_VALUE_SYNC_DEBOUNCE_MS}
                 onDirty={handleDirty}
-                onDocumentChange={scheduleIdleScrollSync}
+                onDocumentChange={notifyDocumentChange}
+                diagnostics={diagnostics}
                 onSave={handleSave}
                 onViewportAnchorChange={onEditorViewportAnchor}
                 className="flex-1 min-h-0 h-full border-0 rounded-none"

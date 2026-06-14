@@ -7,7 +7,9 @@ import {
   type EditorView,
   type ViewUpdate,
 } from "@codemirror/view";
-import { linter, type Diagnostic as CmDiagnostic } from "@codemirror/lint";
+import { linter } from "@codemirror/lint";
+import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
+import type { Diagnostic as LanguageDiagnostic } from "../../language-service/protocol.js";
 import {
   autocompletion,
   type CompletionContext,
@@ -208,22 +210,25 @@ export const usfmHighlighter = ViewPlugin.fromClass(
   { decorations: (v) => v.decorations },
 );
 
-// --- Linter (diagnostics / red squiggles) ---
-export const usfmLinter = linter(async (view) => {
-  const content = view.state.doc.toString();
-  const diagnostics = await client.validate(content);
-
-  return diagnostics.map((d): CmDiagnostic => {
-    const from = posToOffset(view.state.doc, d.range.start);
-    const to = posToOffset(view.state.doc, d.range.end);
+// --- Linter (diagnostics supplied by the shell via setDiagnostics) ---
+export function languageDiagnosticsToCm(
+  doc: { length: number; line: (n: number) => { from: number } },
+  diagnostics: readonly LanguageDiagnostic[],
+): CmDiagnostic[] {
+  return diagnostics.map((d) => {
+    const from = posToOffset(doc, d.range.start);
+    const to = posToOffset(doc, d.range.end);
     return {
       from: Math.max(0, from),
-      to: Math.min(view.state.doc.length, to),
+      to: Math.min(doc.length, to),
       severity: "error",
       message: d.message,
     };
   });
-}, { delay: 300 });
+}
+
+/** Enables lint UI; diagnostics are pushed with {@link setDiagnostics} from UsfmEditor. */
+export const usfmLintExtension = linter(null);
 
 // --- Autocomplete ---
 async function usfmCompletionSource(

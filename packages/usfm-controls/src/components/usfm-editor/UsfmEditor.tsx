@@ -8,7 +8,14 @@ import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { EditorState, EditorSelection, Prec } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
-import { usfmHighlighter, usfmLinter, usfmAutocomplete } from "./codemirror-usfm.js";
+import { setDiagnostics } from "@codemirror/lint";
+import type { Diagnostic as LanguageDiagnostic } from "../../language-service/protocol.js";
+import {
+  languageDiagnosticsToCm,
+  usfmHighlighter,
+  usfmLintExtension,
+  usfmAutocomplete,
+} from "./codemirror-usfm.js";
 import {
   usfmSearchExtensions,
   openFindPanel,
@@ -46,6 +53,13 @@ export interface UsfmEditorProps {
   onDirty?: () => void;
   /** Fired on every document edit (before any `onChange` debounce). */
   onDocumentChange?: () => void;
+  /** Parse diagnostics for the current tab (owned by the shell; drives lint squiggles). */
+  diagnostics?: readonly LanguageDiagnostic[];
+  /**
+   * Registers a reader for the live document buffer. Called on mount/update;
+   * return value unregisters on cleanup.
+   */
+  onRegisterDocumentReader?: (readDocument: () => string) => void | (() => void);
   /** When set, Ctrl+S / Cmd+S triggers this callback instead of the browser save dialog. */
   onSave?: () => void;
   className?: string;
@@ -63,6 +77,8 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     onChangeDebounceMs = 0,
     onDirty,
     onDocumentChange,
+    diagnostics = [],
+    onRegisterDocumentReader,
     onSave,
     onViewportAnchorChange,
     className,
@@ -225,7 +241,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
           ]),
         ),
         usfmHighlighter,
-        usfmLinter,
+        usfmLintExtension,
         usfmAutocomplete,
         usfmSearchExtensions,
         updateListener,
@@ -297,6 +313,17 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   useEffect(() => {
     dirtyReportedRef.current = false;
   }, [value]);
+
+  useEffect(() => {
+    if (!onRegisterDocumentReader) return;
+    return onRegisterDocumentReader(readDocument) ?? undefined;
+  }, [onRegisterDocumentReader]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch(setDiagnostics(view.state, languageDiagnosticsToCm(view.state.doc, diagnostics)));
+  }, [diagnostics]);
 
   // Update content when value prop changes externally
   useEffect(() => {
