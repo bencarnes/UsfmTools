@@ -23,8 +23,8 @@ flowchart TB
 | Name | Role |
 |--------|------|
 | **usfm-parser** | Parses USFM source into structured data; exports TypeScript from `src/`. |
-| **usfm-model** | View models (for example `ViewModels.Publication` / `PublicationViewModel`), publication-style HTML rendering via **`renderPreviewHtml`**, standard USFM **book identifier** metadata and **`buildUsfmBookPickerGroups`**, **`listChapterNumbersFromBook`**, plus re-exports of **`parse`**. |
-| **usfm-controls** | React controls: **`UsfmEditor`** (CodeMirror, with find/replace via **Ctrl+F** / **Ctrl+H**), **`UsfmPreview`**, **`UsfmBookPicker`**, **`ChapterPicker`**, and the async USFM language service. Depends on the parser and model. |
+| **usfm-model** | View models (for example `ViewModels.Publication` / `PublicationViewModel`), publication-style HTML rendering via **`renderPreviewHtml`**, standard USFM **book identifier** metadata, **`buildUsfmBookPickerGroups`** / **`buildUsfmFilePickerGroups`**, chapter indexing (**`listChapterMarkersInBook`**, lightweight **`listChapterMarkersInUsfm`**), plus re-exports of **`parse`**. |
+| **usfm-controls** | React controls: **`UsfmEditor`**, **`UsfmPreview`**, **`UsfmPane`**, **`UsfmWorkspace`**, **`UsfmShell`**, pickers, and the USFM language service. Depends on the parser and model. |
 | **usfm-parser-integration-tests** | Longer-running checks against the parser; tests only (no separate check task). |
 
 The **`Plan/`** directory holds Obsidian-style planning notes and is not part of the build.
