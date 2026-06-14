@@ -53,9 +53,11 @@ export enum TokenType {
 export type RequestMessage =
   | { type: "validate"; id: string; content: string }
   | { type: "complete"; id: string; content: string; position: Position }
-  | { type: "classify"; id: string; content: string };
+  | { type: "classify"; id: string; content: string }
+  | { type: "classifyRange"; id: string; content: string; from: number; to: number };
 
 export type ResponseMessage =
   | { type: "validate"; id: string; diagnostics: Diagnostic[] }
   | { type: "complete"; id: string; items: CompletionItem[] }
-  | { type: "classify"; id: string; tokens: TokenClassification[] };
+  | { type: "classify"; id: string; tokens: TokenClassification[] }
+  | { type: "classifyRange"; id: string; tokens: TokenClassification[] };

@@ -136,6 +136,62 @@ describe("UsfmLanguageService", () => {
       }
     });
   });
+
+  describe("classifyRange", () => {
+    const content = "\\id GEN\n\\c 1\n\\p\n\\v 1 First\n\\v 2 Second\n\\c 2\n\\p\n\\v 1 Third";
+
+    it("should classify tokens in a slice with correct line offsets", () => {
+      const from = content.indexOf("\\v 2");
+      const to = content.indexOf("\\c 2");
+      const response = service.handleMessage({
+        type: "classifyRange",
+        id: "10",
+        content,
+        from,
+        to,
+      });
+      if (response.type === "classifyRange") {
+        const verseNums = response.tokens.filter((t) => t.type === TokenType.VerseNumber);
+        expect(verseNums).toHaveLength(1);
+        expect(verseNums[0].range.start.line).toBe(4);
+      }
+    });
+
+    it("should match full classify for the same span", () => {
+      const from = content.indexOf("\\c 2");
+      const to = content.length;
+      const rangeResponse = service.handleMessage({
+        type: "classifyRange",
+        id: "11",
+        content,
+        from,
+        to,
+      });
+      const fullResponse = service.handleMessage({
+        type: "classify",
+        id: "12",
+        content: content.slice(from, to),
+      });
+      if (rangeResponse.type === "classifyRange" && fullResponse.type === "classify") {
+        const lineOffset = 5; // line index of "\\c 2"
+        expect(rangeResponse.tokens).toEqual(
+          fullResponse.tokens.map((t) => ({
+            type: t.type,
+            range: {
+              start: {
+                line: t.range.start.line + lineOffset,
+                column: t.range.start.column,
+              },
+              end: {
+                line: t.range.end.line + lineOffset,
+                column: t.range.end.column,
+              },
+            },
+          })),
+        );
+      }
+    });
+  });
 });
 
 describe("createLanguageClient", () => {
@@ -150,5 +206,8 @@ describe("createLanguageClient", () => {
 
     const tokens = await client.classify("\\v 1 Text");
     expect(tokens.length).toBeGreaterThan(0);
+
+    const rangeTokens = await client.classifyRange("\\id GEN\n\\c 1\n\\v 1 Text", 0, 20);
+    expect(rangeTokens.some((t) => t.type === TokenType.Marker)).toBe(true);
   });
 });

@@ -7,7 +7,6 @@ import {
   type EditorView,
   type ViewUpdate,
 } from "@codemirror/view";
-import { RangeSetBuilder } from "@codemirror/state";
 import { linter, type Diagnostic as CmDiagnostic } from "@codemirror/lint";
 import {
   autocompletion,
@@ -90,51 +89,120 @@ function posToOffset(doc: { line: (n: number) => { from: number } }, pos: { line
   return lineInfo.from + pos.column;
 }
 
-// --- Highlight plugin ---
+const HIGHLIGHT_MARGIN_LINES = 5;
+const HIGHLIGHT_DEBOUNCE_MS = 100;
+
+function viewportCharRange(view: EditorView): { from: number; to: number } {
+  const doc = view.state.doc;
+  const { from, to } = view.viewport;
+  const fromLine = doc.lineAt(from);
+  const toLine = doc.lineAt(to);
+  const startLine = Math.max(1, fromLine.number - HIGHLIGHT_MARGIN_LINES);
+  const endLine = Math.min(doc.lines, toLine.number + HIGHLIGHT_MARGIN_LINES);
+  return {
+    from: doc.line(startLine).from,
+    to: doc.line(endLine).to,
+  };
+}
+
+function decorationsForTokens(
+  doc: EditorView["state"]["doc"],
+  tokens: TokenClassification[],
+): Array<{ from: number; to: number; value: Decoration }> {
+  const sorted = [...tokens].sort((a: TokenClassification, b: TokenClassification) => {
+    const aOff = posToOffset(doc, a.range.start);
+    const bOff = posToOffset(doc, b.range.start);
+    return aOff - bOff;
+  });
+
+  const ranges: Array<{ from: number; to: number; value: Decoration }> = [];
+  for (const token of sorted) {
+    const deco = decoForTokenType(token.type);
+    if (!deco) continue;
+    try {
+      const from = posToOffset(doc, token.range.start);
+      const to = posToOffset(doc, token.range.end);
+      if (from < to && to <= doc.length) {
+        ranges.push({ from, to, value: deco });
+      }
+    } catch {
+      // Skip tokens with invalid positions
+    }
+  }
+  return ranges;
+}
+
+// --- Highlight plugin (viewport-scoped, incremental decorations) ---
 export const usfmHighlighter = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+    view: EditorView;
     pending: ReturnType<typeof setTimeout> | null = null;
+    generation = 0;
 
     constructor(view: EditorView) {
+      this.view = view;
       this.decorations = Decoration.none;
-      this.computeDecorations(view);
+      this.scheduleRefresh();
     }
 
     update(update: ViewUpdate) {
+      this.view = update.view;
+
       if (update.docChanged) {
-        if (this.pending) clearTimeout(this.pending);
-        this.pending = setTimeout(() => this.computeDecorations(update.view), 100);
+        const viewport = viewportCharRange(this.view);
+        let replacedMost = false;
+        let overlapsViewport = false;
+
+        update.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
+          const changeSize = Math.max(toA - fromA, toB - fromB);
+          if (changeSize > this.view.state.doc.length * 0.4) {
+            replacedMost = true;
+          }
+          if (fromB < viewport.to && toB > viewport.from) {
+            overlapsViewport = true;
+          }
+        });
+
+        if (replacedMost) {
+          this.decorations = Decoration.none;
+          overlapsViewport = true;
+        } else {
+          this.decorations = this.decorations.map(update.changes);
+        }
+
+        if (overlapsViewport) this.scheduleRefresh();
+      } else if (update.viewportChanged) {
+        this.scheduleRefresh();
       }
     }
 
-    async computeDecorations(view: EditorView) {
+    destroy() {
+      if (this.pending) clearTimeout(this.pending);
+    }
+
+    scheduleRefresh() {
+      if (this.pending) clearTimeout(this.pending);
+      this.pending = setTimeout(() => {
+        this.pending = null;
+        void this.refreshViewport();
+      }, HIGHLIGHT_DEBOUNCE_MS);
+    }
+
+    async refreshViewport() {
+      const gen = ++this.generation;
+      const view = this.view;
+      const { from, to } = viewportCharRange(view);
       const content = view.state.doc.toString();
-      const tokens = await client.classify(content);
-      const builder = new RangeSetBuilder<Decoration>();
+      const tokens = await client.classifyRange(content, from, to);
+      if (gen !== this.generation || !view.dom.isConnected) return;
 
-      const sorted = tokens.sort((a: TokenClassification, b: TokenClassification) => {
-        const aOff = posToOffset(view.state.doc, a.range.start);
-        const bOff = posToOffset(view.state.doc, b.range.start);
-        return aOff - bOff;
+      const ranges = decorationsForTokens(view.state.doc, tokens);
+      this.decorations = this.decorations.update({
+        filter: (f, t) => t <= from || f >= to,
+        add: ranges,
       });
-
-      for (const token of sorted) {
-        const deco = decoForTokenType(token.type);
-        if (!deco) continue;
-        try {
-          const from = posToOffset(view.state.doc, token.range.start);
-          const to = posToOffset(view.state.doc, token.range.end);
-          if (from < to && to <= view.state.doc.length) {
-            builder.add(from, to, deco);
-          }
-        } catch {
-          // Skip tokens with invalid positions
-        }
-      }
-
-      this.decorations = builder.finish();
-      view.dispatch({ effects: [] }); // Trigger re-render
+      view.dispatch();
     }
   },
   { decorations: (v) => v.decorations },
