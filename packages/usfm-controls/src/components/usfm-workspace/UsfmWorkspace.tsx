@@ -2,6 +2,8 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -66,6 +68,90 @@ function isTabDragTransfer(dt: DataTransfer): boolean {
     if (dt.types[i] === TAB_DRAG_MIME) return true;
   }
   return false;
+}
+
+interface GroupMounts {
+  toolbar: HTMLDivElement | null;
+  content: HTMLDivElement | null;
+}
+
+interface TabPlacement {
+  readonly groupId: string;
+  readonly active: boolean;
+}
+
+function buildTabPlacements(slots: readonly UsfmWorkspaceEditorGroupState[]): Map<string, TabPlacement> {
+  const map = new Map<string, TabPlacement>();
+  for (const slot of slots) {
+    for (const tabId of slot.tabIds) {
+      map.set(tabId, { groupId: slot.id, active: slot.activeTabId === tabId });
+    }
+  }
+  return map;
+}
+
+function useGroupContentRects(
+  layoutRef: RefObject<HTMLDivElement | null>,
+  groupIds: readonly string[],
+  groupMountsRef: RefObject<Map<string, GroupMounts>>,
+  mountGeneration: number,
+): ReadonlyMap<string, DOMRect> {
+  const [rects, setRects] = useState<ReadonlyMap<string, DOMRect>>(() => new Map());
+
+  useLayoutEffect(() => {
+    const layout = layoutRef.current;
+    if (!layout) return;
+
+    let frame = 0;
+
+    const measure = () => {
+      const layoutBox = layout.getBoundingClientRect();
+      const next = new Map<string, DOMRect>();
+      for (const groupId of groupIds) {
+        const content = groupMountsRef.current?.get(groupId)?.content;
+        if (!content) continue;
+        const box = content.getBoundingClientRect();
+        next.set(
+          groupId,
+          new DOMRect(box.left - layoutBox.left, box.top - layoutBox.top, box.width, box.height),
+        );
+      }
+      setRects((prev) => {
+        if (prev.size !== next.size) return next;
+        for (const [groupId, rect] of next) {
+          const old = prev.get(groupId);
+          if (
+            !old ||
+            old.top !== rect.top ||
+            old.left !== rect.left ||
+            old.width !== rect.width ||
+            old.height !== rect.height
+          ) {
+            return next;
+          }
+        }
+        return prev;
+      });
+    };
+
+    const scheduleMeasure = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
+    };
+
+    measure();
+    const observer = new ResizeObserver(scheduleMeasure);
+    observer.observe(layout);
+    return () => {
+      observer.disconnect();
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [layoutRef, groupIds, groupMountsRef, mountGeneration]);
+
+  return rects;
 }
 
 interface ColumnResizableGapProps {
@@ -369,12 +455,6 @@ interface EditorGroupPanelProps {
   readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
   readonly onActivateTab: (groupId: string, tabId: string) => void;
   readonly onCloseTab: (groupId: string, tabId: string) => void;
-  readonly onUpdateValue: (tabId: string, value: string) => void;
-  readonly onMarkTabDirty?: (tabId: string) => void;
-  readonly onSaveValue?: (tabId: string, value: string) => void;
-  readonly getDiagnosticsForTab?: (tabId: string) => readonly Diagnostic[];
-  readonly onEditorDocumentChange?: (tabId: string) => void;
-  readonly onRegisterDocumentReader?: (tabId: string, reader: () => string) => () => void;
   readonly onMoveTabWithinGroup: (groupId: string, tabId: string, toIndex: number) => void;
   readonly onDropTabFromOtherGroup: (
     targetGroupId: string,
@@ -386,6 +466,7 @@ interface EditorGroupPanelProps {
   readonly gridCols: WorkspaceGridDimension;
   readonly onSetGridLayout?: (rows: WorkspaceGridDimension, cols: WorkspaceGridDimension) => void;
   readonly showLayoutSelector: boolean;
+  readonly registerGroupMount: (groupId: string, kind: keyof GroupMounts, el: HTMLDivElement | null) => void;
 }
 
 function EditorGroupPanel({
@@ -393,103 +474,146 @@ function EditorGroupPanel({
   tabsById,
   onActivateTab,
   onCloseTab,
-  onUpdateValue,
-  onMarkTabDirty,
-  onSaveValue,
-  getDiagnosticsForTab,
-  onEditorDocumentChange,
-  onRegisterDocumentReader,
   onMoveTabWithinGroup,
   onDropTabFromOtherGroup,
   gridRows,
   gridCols,
   onSetGridLayout,
   showLayoutSelector,
+  registerGroupMount,
 }: EditorGroupPanelProps) {
-  const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
   const isEmpty = group.tabIds.length === 0;
 
-  if (isEmpty) {
-    return (
-      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900">
-        <EmptySlotDropTarget
-          groupId={group.id}
-          onDropTab={(tabId, fromGroupId) => onDropTabFromOtherGroup(group.id, tabId, fromGroupId, 0)}
-        />
-      </div>
-    );
-  }
+  const setToolbarMount = useCallback(
+    (el: HTMLDivElement | null) => registerGroupMount(group.id, "toolbar", el),
+    [group.id, registerGroupMount],
+  );
+  const setContentMount = useCallback(
+    (el: HTMLDivElement | null) => registerGroupMount(group.id, "content", el),
+    [group.id, registerGroupMount],
+  );
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900">
-      <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch overflow-visible border-b border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800">
-        <TabStrip
-          groupId={group.id}
-          tabIds={group.tabIds}
-          activeTabId={group.activeTabId}
-          tabsById={tabsById}
-          onActivate={(tabId) => onActivateTab(group.id, tabId)}
-          onClose={(tabId) => onCloseTab(group.id, tabId)}
-          onMoveTabInGroup={(tabId, toIndex) => onMoveTabWithinGroup(group.id, tabId, toIndex)}
-          onDropTabFromOtherGroup={(tabId, fromGroupId, insertIndex) =>
-            onDropTabFromOtherGroup(group.id, tabId, fromGroupId, insertIndex)
-          }
-        />
-        <div className="flex shrink-0 items-center gap-1 border-l border-gray-200 bg-gray-50 px-1.5 dark:border-gray-700 dark:bg-gray-800">
-          {showLayoutSelector && onSetGridLayout ? (
-            <TabGroupLayoutSelector
-              gridRows={gridRows}
-              gridCols={gridCols}
-              onChange={onSetGridLayout}
-            />
-          ) : null}
-          <div ref={setToolbarEl} className="flex min-w-0 flex-1 items-center justify-end gap-1" />
+      {isEmpty ? null : (
+        <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch overflow-visible border-b border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800">
+          <TabStrip
+            groupId={group.id}
+            tabIds={group.tabIds}
+            activeTabId={group.activeTabId}
+            tabsById={tabsById}
+            onActivate={(tabId) => onActivateTab(group.id, tabId)}
+            onClose={(tabId) => onCloseTab(group.id, tabId)}
+            onMoveTabInGroup={(tabId, toIndex) => onMoveTabWithinGroup(group.id, tabId, toIndex)}
+            onDropTabFromOtherGroup={(tabId, fromGroupId, insertIndex) =>
+              onDropTabFromOtherGroup(group.id, tabId, fromGroupId, insertIndex)
+            }
+          />
+          <div className="flex shrink-0 items-center gap-1 border-l border-gray-200 bg-gray-50 px-1.5 dark:border-gray-700 dark:bg-gray-800">
+            {showLayoutSelector && onSetGridLayout ? (
+              <TabGroupLayoutSelector
+                gridRows={gridRows}
+                gridCols={gridCols}
+                onChange={onSetGridLayout}
+              />
+            ) : null}
+            <div ref={setToolbarMount} className="flex min-w-0 flex-1 items-center justify-end gap-1" />
+          </div>
         </div>
-      </div>
-      <div className="relative z-0 grid min-h-0 flex-1 grid-cols-1 grid-rows-1 overflow-hidden">
-        {group.tabIds.map((tid) => {
-          const tab = tabsById[tid];
-          if (!tab) return null;
-          const active = tid === group.activeTabId;
-          return (
-            <div
-              key={tid}
-              className={
-                active
-                  ? "col-start-1 row-start-1 z-10 flex min-h-0 min-w-0 flex-col"
-                  : "col-start-1 row-start-1 z-0 flex min-h-0 min-w-0 flex-col invisible pointer-events-none"
-              }
-              aria-hidden={!active}
-            >
-              {tab.kind === "settings" ? (
-                <SettingsPane className="min-h-0 flex-1" />
-              ) : (
-                <UsfmPane
-                  value={tab.value}
-                  onChange={(v) => onUpdateValue(tid, v)}
-                  onDirty={onMarkTabDirty ? () => onMarkTabDirty(tid) : undefined}
-                  onSave={onSaveValue ? (content) => onSaveValue(tid, content) : undefined}
-                  diagnostics={getDiagnosticsForTab?.(tid)}
-                  onValidationDocumentChange={
-                    onEditorDocumentChange ? () => onEditorDocumentChange(tid) : undefined
-                  }
-                  onRegisterDocumentReader={
-                    onRegisterDocumentReader
-                      ? (reader) => onRegisterDocumentReader(tid, reader)
-                      : undefined
-                  }
-                  dirty={tab.dirty}
-                  toolbarMount={toolbarEl}
-                  toolbarActive={active}
-                  selectionRequest={tab.selectionRequest}
-                  className="min-h-0 flex-1 rounded-none border-0"
-                />
-              )}
-            </div>
-          );
-        })}
+      )}
+      <div ref={setContentMount} className="relative z-0 min-h-0 flex-1 overflow-hidden">
+        {isEmpty ? (
+          <EmptySlotDropTarget
+            groupId={group.id}
+            onDropTab={(tabId, fromGroupId) => onDropTabFromOtherGroup(group.id, tabId, fromGroupId, 0)}
+          />
+        ) : null}
       </div>
     </div>
+  );
+}
+
+interface WorkspaceTabPaneLayerProps {
+  readonly visibleSlots: readonly UsfmWorkspaceEditorGroupState[];
+  readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
+  readonly contentRects: ReadonlyMap<string, DOMRect>;
+  readonly groupMountsRef: RefObject<Map<string, GroupMounts>>;
+  readonly onUpdateValue: (tabId: string, value: string) => void;
+  readonly onMarkTabDirty?: (tabId: string) => void;
+  readonly onSaveValue?: (tabId: string, value: string) => void;
+  readonly getDiagnosticsForTab?: (tabId: string) => readonly Diagnostic[];
+  readonly onEditorDocumentChange?: (tabId: string) => void;
+  readonly onRegisterDocumentReader?: (tabId: string, reader: () => string) => () => void;
+}
+
+function WorkspaceTabPaneLayer({
+  visibleSlots,
+  tabsById,
+  contentRects,
+  groupMountsRef,
+  onUpdateValue,
+  onMarkTabDirty,
+  onSaveValue,
+  getDiagnosticsForTab,
+  onEditorDocumentChange,
+  onRegisterDocumentReader,
+}: WorkspaceTabPaneLayerProps) {
+  const placements = useMemo(() => buildTabPlacements(visibleSlots), [visibleSlots]);
+
+  return (
+  <>
+    {[...placements.keys()].map((tabId) => {
+      const tab = tabsById[tabId];
+      const placement = placements.get(tabId);
+      if (!tab || !placement) return null;
+      const rect = contentRects.get(placement.groupId);
+      if (!rect) return null;
+      const toolbarMount = groupMountsRef.current?.get(placement.groupId)?.toolbar ?? null;
+
+      return (
+        <div
+          key={tabId}
+          className={`absolute flex min-h-0 min-w-0 flex-col overflow-hidden ${
+            placement.active
+              ? "z-10 pointer-events-auto"
+              : "z-0 pointer-events-none invisible"
+          }`}
+          style={{
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+          }}
+          aria-hidden={!placement.active}
+        >
+          {tab.kind === "settings" ? (
+            <SettingsPane className="min-h-0 flex-1" />
+          ) : (
+            <UsfmPane
+              value={tab.value}
+              onChange={(v) => onUpdateValue(tabId, v)}
+              onDirty={onMarkTabDirty ? () => onMarkTabDirty(tabId) : undefined}
+              onSave={onSaveValue ? (content) => onSaveValue(tabId, content) : undefined}
+              diagnostics={getDiagnosticsForTab?.(tabId)}
+              onValidationDocumentChange={
+                onEditorDocumentChange ? () => onEditorDocumentChange(tabId) : undefined
+              }
+              onRegisterDocumentReader={
+                onRegisterDocumentReader
+                  ? (reader) => onRegisterDocumentReader(tabId, reader)
+                  : undefined
+              }
+              dirty={tab.dirty}
+              toolbarMount={toolbarMount}
+              toolbarActive={placement.active}
+              selectionRequest={tab.selectionRequest}
+              className="min-h-0 flex-1 rounded-none border-0"
+            />
+          )}
+        </div>
+      );
+    })}
+  </>
   );
 }
 
@@ -503,12 +627,6 @@ interface WorkspaceGridRowProps {
   readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
   readonly onActivateTab: UsfmWorkspaceProps["onActivateTab"];
   readonly onCloseTab: UsfmWorkspaceProps["onCloseTab"];
-  readonly onUpdateTabValue: UsfmWorkspaceProps["onUpdateTabValue"];
-  readonly onMarkTabDirty?: UsfmWorkspaceProps["onMarkTabDirty"];
-  readonly onSaveTab?: UsfmWorkspaceProps["onSaveTab"];
-  readonly getDiagnosticsForTab?: UsfmWorkspaceProps["getDiagnosticsForTab"];
-  readonly onEditorDocumentChange?: UsfmWorkspaceProps["onEditorDocumentChange"];
-  readonly onRegisterDocumentReader?: UsfmWorkspaceProps["onRegisterDocumentReader"];
   readonly onReorderTabInGroup: UsfmWorkspaceProps["onReorderTabInGroup"];
   readonly onDropTabFromOtherGroup: (
     targetGroupId: string,
@@ -518,6 +636,7 @@ interface WorkspaceGridRowProps {
   ) => void;
   readonly onSetGridLayout?: UsfmWorkspaceProps["onSetGridLayout"];
   readonly layoutSelectorGroupId: string | null;
+  readonly registerGroupMount: (groupId: string, kind: keyof GroupMounts, el: HTMLDivElement | null) => void;
 }
 
 function WorkspaceGridRow({
@@ -530,16 +649,11 @@ function WorkspaceGridRow({
   tabsById,
   onActivateTab,
   onCloseTab,
-  onUpdateTabValue,
-  onMarkTabDirty,
-  onSaveTab,
-  getDiagnosticsForTab,
-  onEditorDocumentChange,
-  onRegisterDocumentReader,
   onReorderTabInGroup,
   onDropTabFromOtherGroup,
   onSetGridLayout,
   layoutSelectorGroupId,
+  registerGroupMount,
 }: WorkspaceGridRowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -582,18 +696,13 @@ function WorkspaceGridRow({
               tabsById={tabsById}
               onActivateTab={onActivateTab}
               onCloseTab={onCloseTab}
-              onUpdateValue={onUpdateTabValue}
-              onMarkTabDirty={onMarkTabDirty}
-              onSaveValue={onSaveTab}
-              getDiagnosticsForTab={getDiagnosticsForTab}
-              onEditorDocumentChange={onEditorDocumentChange}
-              onRegisterDocumentReader={onRegisterDocumentReader}
               onMoveTabWithinGroup={onReorderTabInGroup}
               onDropTabFromOtherGroup={onDropTabFromOtherGroup}
               gridRows={gridRows}
               gridCols={gridCols}
               onSetGridLayout={onSetGridLayout}
               showLayoutSelector={group.id === layoutSelectorGroupId}
+              registerGroupMount={registerGroupMount}
             />
           </div>
         </Fragment>
@@ -621,10 +730,25 @@ export function UsfmWorkspace({
   className,
 }: UsfmWorkspaceProps) {
   const layoutRef = useRef<HTMLDivElement>(null);
+  const groupMountsRef = useRef(new Map<string, GroupMounts>());
+  const [mountGeneration, setMountGeneration] = useState(0);
   const visibleSlots = slots.slice(0, gridRows * gridCols);
+  const visibleGroupIds = useMemo(() => visibleSlots.map((slot) => slot.id), [visibleSlots]);
   const layoutSelectorGroupId = onSetGridLayout
     ? (visibleSlots.find((slot) => slot.tabIds.length > 0)?.id ?? null)
     : null;
+
+  const registerGroupMount = useCallback(
+    (groupId: string, kind: keyof GroupMounts, el: HTMLDivElement | null) => {
+      const cur = groupMountsRef.current.get(groupId) ?? { toolbar: null, content: null };
+      if (cur[kind] === el) return;
+      groupMountsRef.current.set(groupId, { ...cur, [kind]: el });
+      setMountGeneration((g) => g + 1);
+    },
+    [],
+  );
+
+  const contentRects = useGroupContentRects(layoutRef, visibleGroupIds, groupMountsRef, mountGeneration);
 
   const [rowFractions, setRowFractions] = useState<number[]>(() =>
     gridRows > 0 ? Array.from({ length: gridRows }, () => 1 / gridRows) : [1],
@@ -665,7 +789,7 @@ export function UsfmWorkspace({
   return (
     <div
       ref={layoutRef}
-      className={`flex min-h-[320px] min-w-0 flex-1 flex-col bg-gray-200 dark:bg-gray-950 ${className ?? ""}`}
+      className={`relative flex min-h-[320px] min-w-0 flex-1 flex-col bg-gray-200 dark:bg-gray-950 ${className ?? ""}`}
       data-testid="usfm-workspace"
     >
       {Array.from({ length: gridRows }, (_, rowIndex) => {
@@ -700,21 +824,30 @@ export function UsfmWorkspace({
                 tabsById={tabsById}
                 onActivateTab={onActivateTab}
                 onCloseTab={onCloseTab}
-                onUpdateTabValue={onUpdateTabValue}
-                onMarkTabDirty={onMarkTabDirty}
-                onSaveTab={onSaveTab}
-                getDiagnosticsForTab={getDiagnosticsForTab}
-                onEditorDocumentChange={onEditorDocumentChange}
-                onRegisterDocumentReader={onRegisterDocumentReader}
                 onReorderTabInGroup={onReorderTabInGroup}
                 onDropTabFromOtherGroup={onDropTabFromOtherGroup}
                 onSetGridLayout={onSetGridLayout}
                 layoutSelectorGroupId={layoutSelectorGroupId}
+                registerGroupMount={registerGroupMount}
               />
             </div>
           </Fragment>
         );
       })}
+      <div className="pointer-events-none absolute inset-0 z-[5]">
+        <WorkspaceTabPaneLayer
+          visibleSlots={visibleSlots}
+          tabsById={tabsById}
+          contentRects={contentRects}
+          groupMountsRef={groupMountsRef}
+          onUpdateValue={onUpdateTabValue}
+          onMarkTabDirty={onMarkTabDirty}
+          onSaveValue={onSaveTab}
+          getDiagnosticsForTab={getDiagnosticsForTab}
+          onEditorDocumentChange={onEditorDocumentChange}
+          onRegisterDocumentReader={onRegisterDocumentReader}
+        />
+      </div>
     </div>
   );
 }
