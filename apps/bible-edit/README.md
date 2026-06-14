@@ -25,6 +25,12 @@ apps/bible-edit/
   frontend/                # React + Vite UI (UsfmShell)
 ```
 
+## Drag-and-drop in the webview
+
+Tab dragging in `UsfmShell` is implemented with **pointer events**, not the HTML5 DnD (Drag and Drop) API. On Linux, Wails renders in WebKitGTK, whose HTML5 DnD drop-target events (`dragenter`/`dragover`/`drop`) are unreliable: a drag visibly starts but no target ever accepts it, so the cursor stays "not allowed". The same code works in WebView2 (Windows) and WKWebView (macOS) but fails on Linux.
+
+No Wails/Go option fixes this — `options.App.DragAndDrop{ EnableFileDrop }` only governs dropping OS files into the window, not dragging DOM elements between each other. Prefer pointer events (the approach the split resizers and tab dragging already use) for any future drag features.
+
 ## Prerequisites
 
 - Go 1.22+

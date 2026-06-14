@@ -22,6 +22,19 @@ import {
 import { UsfmWorkspace } from "../src/components/usfm-workspace/UsfmWorkspace.js";
 
 
+/**
+ * jsdom has no layout engine, so `document.elementFromPoint` always returns null. Tab dragging
+ * resolves its drop target through that API, so stub it to report a chosen element. Returns a
+ * restore function.
+ */
+function stubElementFromPoint(el: Element): () => void {
+  const original = document.elementFromPoint;
+  document.elementFromPoint = () => el;
+  return () => {
+    document.elementFromPoint = original;
+  };
+}
+
 function Harness({
   initialTabs,
   writeLog,
@@ -51,6 +64,7 @@ function Harness({
         setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
       }
       onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
+      onChangeGridLayout={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
     />
   );
 }
@@ -222,5 +236,58 @@ describe("UsfmWorkspace", () => {
     expect(shrunk.slots[0]!.tabIds).toContain("t1");
     expect(shrunk.slots[0]!.tabIds).toContain("t2");
     expect(Object.keys(shrunk.tabsById).sort()).toEqual(["t1", "t2"]);
+  });
+
+  it("drops a tab from another group into an empty tab group", () => {
+    render(
+      <Harness
+        initialTabs={[
+          { id: "t-gen", fileName: "GEN.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 Hi.", groupIndex: 0 },
+          { id: "t-exo", fileName: "EXO.usfm", value: "\\id EXO\n\\c 1\n\\p\n\\v 1 Hi.", groupIndex: 0 },
+        ]}
+      />,
+    );
+
+    // Split into a 1×2 grid; both tabs stay in slot 0, leaving slot 1 empty.
+    fireEvent.click(screen.getByRole("button", { name: /tab group layout 1×1/i }));
+    fireEvent.click(screen.getByRole("option", { name: /1×2 layout/i }));
+    expect(screen.getByLabelText(/empty tab group/i)).toBeTruthy();
+
+    // Pointer-drag GEN out of the populated group and drop it onto the empty slot. jsdom has no
+    // layout, so stub elementFromPoint to report the empty slot under the pointer.
+    const emptyTarget = screen.getByLabelText(/empty tab group/i);
+    const restore = stubElementFromPoint(emptyTarget);
+    try {
+      const genTab = screen.getByRole("tab", { name: /GEN\.usfm/i });
+      fireEvent.pointerDown(genTab, { button: 0, clientX: 0, clientY: 0 });
+      fireEvent.pointerMove(genTab, { clientX: 200, clientY: 40 }); // past the drag threshold
+      fireEvent.pointerUp(genTab, { clientX: 200, clientY: 40 });
+    } finally {
+      restore();
+    }
+
+    // Each slot now holds exactly one tab, so no empty drop target remains.
+    expect(screen.queryByLabelText(/empty tab group/i)).toBeNull();
+    expect(screen.getByRole("tab", { name: /GEN\.usfm/i })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /EXO\.usfm/i })).toBeTruthy();
+  });
+
+  it("changes the grid layout from the tab group toolbar selector", () => {
+    render(
+      <Harness
+        initialTabs={[{ id: "t-layout", fileName: "GEN.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 Hi." }]}
+      />,
+    );
+
+    // Single group, single tab → exactly one layout selector in the toolbar.
+    const trigger = screen.getByRole("button", { name: /tab group layout 1×1/i });
+    fireEvent.click(trigger);
+
+    // Pick the 2×2 corner cell to split into a four-group grid.
+    fireEvent.click(screen.getByRole("option", { name: /2×2 layout/i }));
+
+    // The grid now exposes a selector per non-empty group; the existing tab stays put.
+    expect(screen.getByRole("tab", { name: /GEN\.usfm/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /tab group layout 2×2/i })).toBeTruthy();
   });
 });

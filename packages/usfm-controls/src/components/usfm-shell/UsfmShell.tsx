@@ -11,12 +11,14 @@ import {
   workspaceReorderTabInGroup,
   workspaceOpenSettingsTab,
   workspaceRequestTabSelection,
+  workspaceSetGridLayout,
   SETTINGS_TAB_ID,
   workspaceSetTabValue,
   workspaceSetTabDirty,
   workspaceMarkTabSaved,
   workspaceListDirtyEditorTabs,
   type UsfmWorkspaceModel,
+  type WorkspaceGridDimension,
 } from "../usfm-workspace/workspace-model.js";
 import { UnsavedChangesDialog } from "./unsaved-changes-dialog.js";
 import { SettingsProvider } from "../settings-pane/settings-context.js";
@@ -350,6 +352,12 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
     [],
   );
 
+  const handleChangeGridLayout = useCallback(
+    (rows: WorkspaceGridDimension, cols: WorkspaceGridDimension) =>
+      setModel((p) => workspaceSetGridLayout(p, rows, cols)),
+    [],
+  );
+
   const handleOpenSettings = useCallback(() => {
     setModel((p) => workspaceOpenSettingsTab(p));
     setFocusedTabId(SETTINGS_TAB_ID);
@@ -550,6 +558,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             onCloseTab={handleCloseTab}
             onReorderTabInGroup={handleReorderTabInGroup}
             onMoveTabToGroup={handleMoveTabToGroup}
+            onChangeGridLayout={handleChangeGridLayout}
             className="min-h-0 flex-1"
           />
         </main>
