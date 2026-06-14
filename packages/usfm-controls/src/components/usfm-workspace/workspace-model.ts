@@ -78,6 +78,8 @@ export interface UsfmWorkspaceProps {
     readonly toGroupId: string;
     readonly insertIndex: number;
   }) => void;
+  /** Change the tab-group grid layout (max 2×2). When omitted, the layout selector is hidden. */
+  readonly onChangeGridLayout?: (rows: WorkspaceGridDimension, cols: WorkspaceGridDimension) => void;
   /** Diagnostics for editor tabs (from unified shell validation). */
   readonly getDiagnosticsForTab?: (tabId: string) => readonly Diagnostic[];
   /** Fired when an editor tab's document changes (before workspace value sync). */

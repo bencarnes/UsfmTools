@@ -1,52 +1,95 @@
 import {
+  createContext,
   Fragment,
   useCallback,
+  useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
-  type DragEvent,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type RefObject,
   type SetStateAction,
 } from "react";
 import { UsfmPane } from "../usfm-pane/UsfmPane.js";
 import { SettingsPane } from "../settings-pane/SettingsPane.js";
+import { TabGroupLayoutSelector } from "../tab-group-layout-selector/TabGroupLayoutSelector.js";
 import { TabListDropdown } from "./tab-list-dropdown.js";
 import type { Diagnostic } from "../../language-service/protocol.js";
 import type {
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceProps,
   UsfmWorkspaceTabState,
+  WorkspaceGridDimension,
 } from "./workspace-model.js";
-
-const TAB_DRAG_MIME = "application/vnd.usfmtools.workspace-tab+json";
 
 /** Minimum share of width for adjacent tab groups while dragging a column split. */
 const MIN_COL_FRAC = 0.12;
 /** Minimum share of height for adjacent rows while dragging a row split. */
 const MIN_ROW_FRAC = 0.12;
 
-function parseTabDrag(dt: DataTransfer): { tabId: string; fromGroupId: string } | null {
-  const raw = dt.getData(TAB_DRAG_MIME);
-  if (!raw) return null;
-  try {
-    const v = JSON.parse(raw) as { tabId?: string; fromGroupId?: string };
-    if (typeof v.tabId === "string" && typeof v.fromGroupId === "string") {
-      return { tabId: v.tabId, fromGroupId: v.fromGroupId };
-    }
-    return null;
-  } catch {
-    return null;
-  }
+/** Pixels the pointer must travel before a tab press is treated as a drag rather than a click. */
+const TAB_DRAG_THRESHOLD_PX = 5;
+
+/**
+ * Tab dragging is implemented with pointer events instead of the HTML5 Drag-and-Drop API.
+ * The HTML5 API's drop-target events (`dragenter`/`dragover`/`drop`) are unreliable in some
+ * webviews — notably WebKitGTK, which backs Wails on Linux — where a drag visibly starts but no
+ * target ever accepts it (the cursor stays "not allowed"). Pointer events behave consistently
+ * across WebView2, WKWebView, and WebKitGTK, the same way the split resizers already work.
+ */
+interface ActiveTabDrag {
+  readonly tabId: string;
+  readonly fromGroupId: string;
+  readonly fileName: string;
+  /** Group currently under the pointer, or null when the pointer is outside any drop zone. */
+  readonly overGroupId: string | null;
 }
 
-function isTabDragTransfer(dt: DataTransfer): boolean {
-  if (parseTabDrag(dt)) return true;
-  for (let i = 0; i < dt.types.length; i++) {
-    if (dt.types[i] === TAB_DRAG_MIME) return true;
+interface TabDragContextValue {
+  /** The in-progress drag once it passes the movement threshold, otherwise null. */
+  readonly active: ActiveTabDrag | null;
+  /** Begin tracking a potential drag from a tab press. */
+  readonly beginDrag: (
+    e: ReactPointerEvent,
+    detail: { readonly tabId: string; readonly fromGroupId: string; readonly fileName: string },
+  ) => void;
+  /** Returns (and clears) whether the last pointer interaction ended a drag, to suppress the click. */
+  readonly consumeDragEnd: () => boolean;
+}
+
+const TabDragContext = createContext<TabDragContextValue | null>(null);
+
+interface TabDropTarget {
+  readonly groupId: string;
+  readonly insertIndex: number;
+}
+
+/** Insertion index for `clientX` within a tab strip element (VS Code-style midpoint behavior). */
+function insertIndexInStrip(stripEl: Element, clientX: number): number {
+  const buttons = [...stripEl.querySelectorAll<HTMLElement>("[data-workspace-tab-id]")];
+  for (let i = 0; i < buttons.length; i++) {
+    const r = buttons[i]!.getBoundingClientRect();
+    if (clientX < r.left + r.width / 2) return i;
   }
-  return false;
+  return buttons.length;
+}
+
+/** Resolve the drop target (group + insertion index) under a screen point, if any. */
+function dropTargetAtPoint(clientX: number, clientY: number): TabDropTarget | null {
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el) return null;
+  const empty = el.closest<HTMLElement>("[data-workspace-empty-slot]");
+  if (empty?.dataset.workspaceEmptySlot) {
+    return { groupId: empty.dataset.workspaceEmptySlot, insertIndex: 0 };
+  }
+  const strip = el.closest<HTMLElement>("[data-workspace-strip]");
+  if (strip?.dataset.workspaceStrip) {
+    return { groupId: strip.dataset.workspaceStrip, insertIndex: insertIndexInStrip(strip, clientX) };
+  }
+  return null;
 }
 
 interface ColumnResizableGapProps {
@@ -176,8 +219,6 @@ interface TabStripProps {
   readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
   readonly onActivate: (tabId: string) => void;
   readonly onClose: (tabId: string) => void;
-  readonly onMoveTabInGroup: (tabId: string, toIndex: number) => void;
-  readonly onDropTabFromOtherGroup: (tabId: string, fromGroupId: string, insertIndex: number) => void;
 }
 
 function TabStrip({
@@ -187,53 +228,17 @@ function TabStrip({
   tabsById,
   onActivate,
   onClose,
-  onMoveTabInGroup,
-  onDropTabFromOtherGroup,
 }: TabStripProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const onDragStartTab = (e: DragEvent, tabId: string) => {
-    e.dataTransfer.setData(TAB_DRAG_MIME, JSON.stringify({ tabId, fromGroupId: groupId }));
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const onDragOverStrip = (e: DragEvent) => {
-    if (!isTabDragTransfer(e.dataTransfer)) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
-
-  const dropIndexFromPoint = (clientX: number): number => {
-    const root = scrollRef.current;
-    if (!root) return tabIds.length;
-    const buttons = [...root.querySelectorAll<HTMLElement>("[data-workspace-tab-id]")];
-    for (let i = 0; i < buttons.length; i++) {
-      const r = buttons[i]!.getBoundingClientRect();
-      const mid = r.left + r.width / 2;
-      if (clientX < mid) return i;
-    }
-    return tabIds.length;
-  };
-
-  const onDropStrip = (e: DragEvent) => {
-    const payload = parseTabDrag(e.dataTransfer);
-    if (!payload) return;
-    e.preventDefault();
-    const insertAt = dropIndexFromPoint(e.clientX);
-    if (payload.fromGroupId === groupId) {
-      onMoveTabInGroup(payload.tabId, insertAt);
-    } else {
-      onDropTabFromOtherGroup(payload.tabId, payload.fromGroupId, insertAt);
-    }
-  };
+  const drag = useContext(TabDragContext);
+  const isDropTarget = drag?.active != null && drag.active.overGroupId === groupId;
 
   return (
     <div className="flex min-w-0 flex-1 items-stretch">
       <div
-        ref={scrollRef}
-        className="flex min-w-0 flex-1 flex-nowrap gap-0.5 overflow-x-auto overflow-y-hidden"
-        onDragOver={onDragOverStrip}
-        onDrop={onDropStrip}
+        className={`flex min-w-0 flex-1 flex-nowrap gap-0.5 overflow-x-auto overflow-y-hidden ${
+          isDropTarget ? "bg-blue-50/70 dark:bg-blue-950/40" : ""
+        }`}
+        data-workspace-strip={groupId}
       >
         {tabIds.map((tid) => {
           const tab = tabsById[tid];
@@ -248,18 +253,17 @@ function TabStrip({
                   : "border-transparent bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
               }`}
               data-workspace-tab-id={tid}
-              onDragOver={(e) => {
-                if (!isTabDragTransfer(e.dataTransfer)) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-              }}
             >
               <button
                 type="button"
-                draggable
-                onDragStart={(ev) => onDragStartTab(ev, tid)}
-                className={`min-w-0 flex-1 truncate px-1 py-1.5 text-left ${tab.dirty ? "italic" : ""}`}
-                onClick={() => onActivate(tid)}
+                onPointerDown={(ev) =>
+                  drag?.beginDrag(ev, { tabId: tid, fromGroupId: groupId, fileName: tab.fileName })
+                }
+                className={`min-w-0 flex-1 cursor-grab truncate px-1 py-1.5 text-left ${tab.dirty ? "italic" : ""}`}
+                onClick={() => {
+                  if (drag?.consumeDragEnd()) return;
+                  onActivate(tid);
+                }}
                 aria-selected={active}
                 role="tab"
                 title={tab.dirty ? `${tab.fileName} (unsaved)` : tab.fileName}
@@ -300,11 +304,11 @@ function TabStrip({
 
 interface EmptySlotDropTargetProps {
   readonly groupId: string;
-  readonly onDropTab: (tabId: string, fromGroupId: string) => void;
 }
 
-function EmptySlotDropTarget({ groupId, onDropTab }: EmptySlotDropTargetProps) {
-  const [hover, setHover] = useState(false);
+function EmptySlotDropTarget({ groupId }: EmptySlotDropTargetProps) {
+  const drag = useContext(TabDragContext);
+  const hover = drag?.active != null && drag.active.overGroupId === groupId;
 
   return (
     <div
@@ -313,23 +317,7 @@ function EmptySlotDropTarget({ groupId, onDropTab }: EmptySlotDropTargetProps) {
           ? "border-blue-400 bg-blue-50/60 text-blue-800 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-200"
           : "border-gray-300 bg-gray-50/80 text-gray-500 dark:border-gray-600 dark:bg-gray-800/80 dark:text-gray-400"
       }`}
-      onDragEnter={(e) => {
-        if (isTabDragTransfer(e.dataTransfer)) setHover(true);
-      }}
-      onDragLeave={() => setHover(false)}
-      onDragOver={(e) => {
-        if (!isTabDragTransfer(e.dataTransfer)) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        setHover(true);
-      }}
-      onDrop={(e) => {
-        const p = parseTabDrag(e.dataTransfer);
-        setHover(false);
-        if (!p || p.fromGroupId === groupId) return;
-        e.preventDefault();
-        onDropTab(p.tabId, p.fromGroupId);
-      }}
+      data-workspace-empty-slot={groupId}
       data-testid={`workspace-empty-slot-${groupId}`}
       aria-label="Empty tab group — drop a tab here"
     >
@@ -349,13 +337,9 @@ interface EditorGroupPanelProps {
   readonly getDiagnosticsForTab?: (tabId: string) => readonly Diagnostic[];
   readonly onEditorDocumentChange?: (tabId: string) => void;
   readonly onRegisterDocumentReader?: (tabId: string, reader: () => string) => () => void;
-  readonly onMoveTabWithinGroup: (groupId: string, tabId: string, toIndex: number) => void;
-  readonly onDropTabFromOtherGroup: (
-    targetGroupId: string,
-    tabId: string,
-    fromGroupId: string,
-    insertIndex: number,
-  ) => void;
+  readonly gridRows: WorkspaceGridDimension;
+  readonly gridCols: WorkspaceGridDimension;
+  readonly onChangeGridLayout?: (rows: WorkspaceGridDimension, cols: WorkspaceGridDimension) => void;
 }
 
 function EditorGroupPanel({
@@ -369,8 +353,9 @@ function EditorGroupPanel({
   getDiagnosticsForTab,
   onEditorDocumentChange,
   onRegisterDocumentReader,
-  onMoveTabWithinGroup,
-  onDropTabFromOtherGroup,
+  gridRows,
+  gridCols,
+  onChangeGridLayout,
 }: EditorGroupPanelProps) {
   const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
   const isEmpty = group.tabIds.length === 0;
@@ -378,10 +363,7 @@ function EditorGroupPanel({
   if (isEmpty) {
     return (
       <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900">
-        <EmptySlotDropTarget
-          groupId={group.id}
-          onDropTab={(tabId, fromGroupId) => onDropTabFromOtherGroup(group.id, tabId, fromGroupId, 0)}
-        />
+        <EmptySlotDropTarget groupId={group.id} />
       </div>
     );
   }
@@ -396,15 +378,16 @@ function EditorGroupPanel({
           tabsById={tabsById}
           onActivate={(tabId) => onActivateTab(group.id, tabId)}
           onClose={(tabId) => onCloseTab(group.id, tabId)}
-          onMoveTabInGroup={(tabId, toIndex) => onMoveTabWithinGroup(group.id, tabId, toIndex)}
-          onDropTabFromOtherGroup={(tabId, fromGroupId, insertIndex) =>
-            onDropTabFromOtherGroup(group.id, tabId, fromGroupId, insertIndex)
-          }
         />
         <div
           ref={setToolbarEl}
           className="flex shrink-0 items-center justify-end gap-1 border-l border-gray-200 bg-gray-50 px-1.5 dark:border-gray-700 dark:bg-gray-800"
         />
+        {onChangeGridLayout ? (
+          <div className="flex shrink-0 items-center border-l border-gray-200 bg-gray-50 px-1.5 dark:border-gray-700 dark:bg-gray-800">
+            <TabGroupLayoutSelector gridRows={gridRows} gridCols={gridCols} onChange={onChangeGridLayout} />
+          </div>
+        ) : null}
       </div>
       <div className="relative z-0 grid min-h-0 flex-1 grid-cols-1 grid-rows-1 overflow-hidden">
         {group.tabIds.map((tid) => {
@@ -455,7 +438,8 @@ function EditorGroupPanel({
 
 interface WorkspaceGridRowProps {
   readonly rowIndex: number;
-  readonly gridCols: number;
+  readonly gridRows: WorkspaceGridDimension;
+  readonly gridCols: WorkspaceGridDimension;
   readonly rowSlots: readonly UsfmWorkspaceEditorGroupState[];
   readonly columnFractions: readonly number[];
   readonly setColumnFractions: Dispatch<SetStateAction<number[][]>>;
@@ -468,17 +452,12 @@ interface WorkspaceGridRowProps {
   readonly getDiagnosticsForTab?: UsfmWorkspaceProps["getDiagnosticsForTab"];
   readonly onEditorDocumentChange?: UsfmWorkspaceProps["onEditorDocumentChange"];
   readonly onRegisterDocumentReader?: UsfmWorkspaceProps["onRegisterDocumentReader"];
-  readonly onReorderTabInGroup: UsfmWorkspaceProps["onReorderTabInGroup"];
-  readonly onDropTabFromOtherGroup: (
-    targetGroupId: string,
-    tabId: string,
-    fromGroupId: string,
-    insertIndex: number,
-  ) => void;
+  readonly onChangeGridLayout?: UsfmWorkspaceProps["onChangeGridLayout"];
 }
 
 function WorkspaceGridRow({
   rowIndex,
+  gridRows,
   gridCols,
   rowSlots,
   columnFractions,
@@ -492,8 +471,7 @@ function WorkspaceGridRow({
   getDiagnosticsForTab,
   onEditorDocumentChange,
   onRegisterDocumentReader,
-  onReorderTabInGroup,
-  onDropTabFromOtherGroup,
+  onChangeGridLayout,
 }: WorkspaceGridRowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -542,8 +520,9 @@ function WorkspaceGridRow({
               getDiagnosticsForTab={getDiagnosticsForTab}
               onEditorDocumentChange={onEditorDocumentChange}
               onRegisterDocumentReader={onRegisterDocumentReader}
-              onMoveTabWithinGroup={onReorderTabInGroup}
-              onDropTabFromOtherGroup={onDropTabFromOtherGroup}
+              gridRows={gridRows}
+              gridCols={gridCols}
+              onChangeGridLayout={onChangeGridLayout}
             />
           </div>
         </Fragment>
@@ -567,6 +546,7 @@ export function UsfmWorkspace({
   onCloseTab,
   onReorderTabInGroup,
   onMoveTabToGroup,
+  onChangeGridLayout,
   className,
 }: UsfmWorkspaceProps) {
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -600,20 +580,121 @@ export function UsfmWorkspace({
     );
   }, [gridRows, gridCols]);
 
-  const onDropTabFromOtherGroup = useCallback(
-    (targetGroupId: string, tabId: string, fromGroupId: string, insertIndex: number) => {
-      if (fromGroupId === targetGroupId) return;
-      onMoveTabToGroup({ tabId, fromGroupId, toGroupId: targetGroupId, insertIndex });
+  // ---- pointer-based tab drag controller (see ActiveTabDrag above for why not HTML5 DnD) ----
+  const [activeDrag, setActiveDrag] = useState<ActiveTabDrag | null>(null);
+  const dragRef = useRef<
+    | {
+        tabId: string;
+        fromGroupId: string;
+        fileName: string;
+        startX: number;
+        startY: number;
+        started: boolean;
+        overGroupId: string | null;
+      }
+    | null
+  >(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
+  const justDraggedRef = useRef(false);
+
+  const performDrop = useCallback(
+    (tabId: string, fromGroupId: string, clientX: number, clientY: number) => {
+      const target = dropTargetAtPoint(clientX, clientY);
+      if (!target) return;
+      if (target.groupId === fromGroupId) {
+        onReorderTabInGroup(fromGroupId, tabId, target.insertIndex);
+      } else {
+        onMoveTabToGroup({ tabId, fromGroupId, toGroupId: target.groupId, insertIndex: target.insertIndex });
+      }
     },
-    [onMoveTabToGroup],
+    [onReorderTabInGroup, onMoveTabToGroup],
+  );
+
+  const beginDrag = useCallback<TabDragContextValue["beginDrag"]>(
+    (e, detail) => {
+      if (e.button !== 0) return;
+      justDraggedRef.current = false;
+      dragRef.current = { ...detail, startX: e.clientX, startY: e.clientY, started: false, overGroupId: null };
+
+      const onMove = (ev: PointerEvent) => {
+        const d = dragRef.current;
+        if (!d) return;
+        if (!d.started) {
+          if (Math.hypot(ev.clientX - d.startX, ev.clientY - d.startY) < TAB_DRAG_THRESHOLD_PX) return;
+          d.started = true;
+          const g = ghostRef.current;
+          if (g) {
+            g.textContent = d.fileName;
+            g.classList.remove("hidden");
+          }
+          document.body.style.cursor = "grabbing";
+          document.body.style.userSelect = "none";
+          setActiveDrag({ tabId: d.tabId, fromGroupId: d.fromGroupId, fileName: d.fileName, overGroupId: null });
+        }
+        const g = ghostRef.current;
+        if (g) g.style.transform = `translate(${ev.clientX + 12}px, ${ev.clientY + 12}px)`;
+        const overGroupId = dropTargetAtPoint(ev.clientX, ev.clientY)?.groupId ?? null;
+        if (overGroupId !== d.overGroupId) {
+          d.overGroupId = overGroupId;
+          setActiveDrag((prev) => (prev ? { ...prev, overGroupId } : prev));
+        }
+      };
+
+      const cleanup = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", cleanup);
+        ghostRef.current?.classList.add("hidden");
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        dragRef.current = null;
+        setActiveDrag(null);
+      };
+
+      const onUp = (ev: PointerEvent) => {
+        const d = dragRef.current;
+        const started = d?.started ?? false;
+        const tabId = d?.tabId;
+        const fromGroupId = d?.fromGroupId;
+        cleanup();
+        if (started && tabId && fromGroupId) {
+          justDraggedRef.current = true;
+          performDrop(tabId, fromGroupId, ev.clientX, ev.clientY);
+        }
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", cleanup);
+    },
+    [performDrop],
+  );
+
+  const dragContextValue = useMemo<TabDragContextValue>(
+    () => ({
+      active: activeDrag,
+      beginDrag,
+      consumeDragEnd: () => {
+        const v = justDraggedRef.current;
+        justDraggedRef.current = false;
+        return v;
+      },
+    }),
+    [activeDrag, beginDrag],
   );
 
   return (
+    <TabDragContext.Provider value={dragContextValue}>
     <div
       ref={layoutRef}
       className={`flex min-h-[320px] min-w-0 flex-1 flex-col bg-gray-200 dark:bg-gray-950 ${className ?? ""}`}
       data-testid="usfm-workspace"
     >
+      <div
+        ref={ghostRef}
+        className="pointer-events-none fixed left-0 top-0 z-50 hidden max-w-[11rem] truncate rounded border border-gray-400 bg-white px-2 py-1 text-sm shadow-lg dark:border-gray-500 dark:bg-gray-800 dark:text-gray-100"
+        aria-hidden
+      />
       {Array.from({ length: gridRows }, (_, rowIndex) => {
         const rowSlots = visibleSlots.slice(rowIndex * gridCols, rowIndex * gridCols + gridCols);
         const colFracs = colFractions[rowIndex] ?? Array.from({ length: gridCols }, () => 1 / gridCols);
@@ -638,6 +719,7 @@ export function UsfmWorkspace({
             >
               <WorkspaceGridRow
                 rowIndex={rowIndex}
+                gridRows={gridRows}
                 gridCols={gridCols}
                 rowSlots={rowSlots}
                 columnFractions={colFracs}
@@ -651,13 +733,13 @@ export function UsfmWorkspace({
                 getDiagnosticsForTab={getDiagnosticsForTab}
                 onEditorDocumentChange={onEditorDocumentChange}
                 onRegisterDocumentReader={onRegisterDocumentReader}
-                onReorderTabInGroup={onReorderTabInGroup}
-                onDropTabFromOtherGroup={onDropTabFromOtherGroup}
+                onChangeGridLayout={onChangeGridLayout}
               />
             </div>
           </Fragment>
         );
       })}
     </div>
+    </TabDragContext.Provider>
   );
 }
