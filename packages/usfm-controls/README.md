@@ -125,15 +125,14 @@ function App() {
 
 ### UsfmWorkspace
 
-**`UsfmWorkspace`** is a **fully controlled** tabbed document layout (**TDI**) on a **tab-group grid** (up to **2×2**, default **1×1**). You pass **`gridRows`**, **`gridCols`**, **`slots`** (row-major groups; empty slots have **`tabIds: []`**), **`tabsById`**, and callbacks. The UI shows **`UsfmPane`** per tab, filenames on tabs, chapter / sync / view controls **to the right of the tab strip**, a scrollable tab strip, a chevron **tab-list** dropdown (tooltip: Select tab) immediately after the tabs, close (**×** vs **circle** when **`dirty`**), **drag-and-drop** to reorder tabs or move them between groups (including **empty** slots). Closing the last tab in a group leaves an **empty slot** (no placeholder document is created).
+**`UsfmWorkspace`** is a **fully controlled** tabbed document layout (**TDI**) on a **tab-group grid** (up to **2×2**, default **1×1**). You pass **`gridRows`**, **`gridCols`**, **`slots`** (row-major groups; empty slots have **`tabIds: []`**), **`tabsById`**, and callbacks. The UI shows **`UsfmPane`** per tab, filenames on tabs, chapter / sync / view controls **to the right of the tab strip**, a **`TabGroupLayoutSelector`** in the first non-empty group's toolbar (when **`onSetGridLayout`** is set), a scrollable tab strip, a chevron **tab-list** dropdown (tooltip: Select tab) immediately after the tabs, close (**×** vs **circle** when **`dirty`**), **drag-and-drop** to reorder tabs or move them between groups (including **empty** slots). Closing the last tab in a group leaves an **empty slot** (no placeholder document is created).
 
-Resize the grid with **`TabGroupLayoutSelector`** (outside the workspace) and **`workspaceSetGridLayout`**: expanding adds empty slots; shrinking moves tabs from removed slots into the remaining groups without creating or destroying tabs. **Draggable splitter bars** between adjacent tab groups (horizontal) and rows (vertical) adjust relative size within the workspace panel.
+Pass **`onSetGridLayout`** to wire the built-in layout selector; it calls your handler with the new **`gridRows`** / **`gridCols`**. Use **`workspaceSetGridLayout`** on your model: expanding adds empty slots; shrinking moves tabs from removed slots into the remaining groups without creating or destroying tabs. **Draggable splitter bars** between adjacent tab groups (horizontal) and rows (vertical) adjust relative size within the workspace panel.
 
 ```tsx
 import { useState } from "react";
 import {
   UsfmWorkspace,
-  TabGroupLayoutSelector,
   buildWorkspaceModelFromInitialTabs,
   workspaceActivateTab,
   workspaceAppendTab,
@@ -152,12 +151,7 @@ function App() {
   );
 
   return (
-    <div className="flex h-[720px] flex-col gap-2">
-      <TabGroupLayoutSelector
-        gridRows={model.gridRows}
-        gridCols={model.gridCols}
-        onChange={(rows, cols) => setModel((m) => workspaceSetGridLayout(m, rows, cols))}
-      />
+    <div className="flex h-[720px] flex-col">
       <UsfmWorkspace
         gridRows={model.gridRows}
         gridCols={model.gridCols}
@@ -174,6 +168,7 @@ function App() {
           setModel((m) => workspaceReorderTabInGroup(m, groupId, tabId, toIndex))
         }
         onMoveTabToGroup={(d) => setModel((m) => workspaceMoveTabToGroup(m, d))}
+        onSetGridLayout={(rows, cols) => setModel((m) => workspaceSetGridLayout(m, rows, cols))}
         className="min-h-0 flex-1"
       />
     </div>
@@ -193,6 +188,7 @@ function App() {
 | `onCloseTab` | `(groupId, tabId) => void` | User closed a tab |
 | `onReorderTabInGroup` | `(groupId, tabId, toIndex) => void` | Reorder within the same strip |
 | `onMoveTabToGroup` | `(detail) => void` | Move tab to another slot (**`toGroupId`**, **`insertIndex`**, **`fromGroupId`**) |
+| `onSetGridLayout` | `(rows, cols) => void` | Optional; shows **`TabGroupLayoutSelector`** in the first non-empty group's toolbar |
 | `className` | `string` | Optional root wrapper class |
 
 ### UsfmShell
@@ -298,7 +294,7 @@ When integrating into an app that already owns global dark mode, either nest **`
 
 ### TabGroupLayoutSelector
 
-Dropdown with a **2×2 grid** trigger icon. The menu shows four squares; clicking cell **(row, col)** sets **`gridRows = row + 1`** and **`gridCols = col + 1`** (e.g. bottom-right → 2×2). Wire **`onChange`** to **`workspaceSetGridLayout`** on your workspace model.
+Dropdown with a **2×2 grid** trigger icon. The menu shows four squares; clicking cell **(row, col)** sets **`gridRows = row + 1`** and **`gridCols = col + 1`** (e.g. bottom-right → 2×2). **`UsfmWorkspace`** embeds this control in the tab group toolbar when **`onSetGridLayout`** is set; you can also render it standalone and wire **`onChange`** to **`workspaceSetGridLayout`** on your workspace model.
 
 | Prop | Type | Description |
 |------|------|-------------|

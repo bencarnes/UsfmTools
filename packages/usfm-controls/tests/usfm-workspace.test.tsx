@@ -51,6 +51,7 @@ function Harness({
         setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
       }
       onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
+      onSetGridLayout={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
     />
   );
 }
@@ -202,6 +203,17 @@ describe("UsfmWorkspace", () => {
     expect(m1.slots[0]!.tabIds).toEqual([]);
     expect(m1.slots[0]!.activeTabId).toBeNull();
     expect(Object.keys(m1.tabsById)).toHaveLength(0);
+  });
+
+  it("shows the tab group layout selector in the toolbar when onSetGridLayout is provided", () => {
+    render(
+      <Harness
+        initialTabs={[
+          { id: "t1", fileName: "GEN.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 Hi." },
+        ]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: /tab group layout 1×1/i })).toBeTruthy();
   });
 
   it("workspaceSetGridLayout expands with empty slots and shrinks by moving tabs", () => {

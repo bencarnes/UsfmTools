@@ -12,12 +12,14 @@ import {
 } from "react";
 import { UsfmPane } from "../usfm-pane/UsfmPane.js";
 import { SettingsPane } from "../settings-pane/SettingsPane.js";
+import { TabGroupLayoutSelector } from "../tab-group-layout-selector/TabGroupLayoutSelector.js";
 import { TabListDropdown } from "./tab-list-dropdown.js";
 import type { Diagnostic } from "../../language-service/protocol.js";
 import type {
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceProps,
   UsfmWorkspaceTabState,
+  WorkspaceGridDimension,
 } from "./workspace-model.js";
 
 const TAB_DRAG_MIME = "application/vnd.usfmtools.workspace-tab+json";
@@ -356,6 +358,10 @@ interface EditorGroupPanelProps {
     fromGroupId: string,
     insertIndex: number,
   ) => void;
+  readonly gridRows: WorkspaceGridDimension;
+  readonly gridCols: WorkspaceGridDimension;
+  readonly onSetGridLayout?: (rows: WorkspaceGridDimension, cols: WorkspaceGridDimension) => void;
+  readonly showLayoutSelector: boolean;
 }
 
 function EditorGroupPanel({
@@ -371,6 +377,10 @@ function EditorGroupPanel({
   onRegisterDocumentReader,
   onMoveTabWithinGroup,
   onDropTabFromOtherGroup,
+  gridRows,
+  gridCols,
+  onSetGridLayout,
+  showLayoutSelector,
 }: EditorGroupPanelProps) {
   const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
   const isEmpty = group.tabIds.length === 0;
@@ -401,10 +411,16 @@ function EditorGroupPanel({
             onDropTabFromOtherGroup(group.id, tabId, fromGroupId, insertIndex)
           }
         />
-        <div
-          ref={setToolbarEl}
-          className="flex shrink-0 items-center justify-end gap-1 border-l border-gray-200 bg-gray-50 px-1.5 dark:border-gray-700 dark:bg-gray-800"
-        />
+        <div className="flex shrink-0 items-center gap-1 border-l border-gray-200 bg-gray-50 px-1.5 dark:border-gray-700 dark:bg-gray-800">
+          {showLayoutSelector && onSetGridLayout ? (
+            <TabGroupLayoutSelector
+              gridRows={gridRows}
+              gridCols={gridCols}
+              onChange={onSetGridLayout}
+            />
+          ) : null}
+          <div ref={setToolbarEl} className="flex min-w-0 flex-1 items-center justify-end gap-1" />
+        </div>
       </div>
       <div className="relative z-0 grid min-h-0 flex-1 grid-cols-1 grid-rows-1 overflow-hidden">
         {group.tabIds.map((tid) => {
@@ -455,7 +471,8 @@ function EditorGroupPanel({
 
 interface WorkspaceGridRowProps {
   readonly rowIndex: number;
-  readonly gridCols: number;
+  readonly gridRows: WorkspaceGridDimension;
+  readonly gridCols: WorkspaceGridDimension;
   readonly rowSlots: readonly UsfmWorkspaceEditorGroupState[];
   readonly columnFractions: readonly number[];
   readonly setColumnFractions: Dispatch<SetStateAction<number[][]>>;
@@ -475,10 +492,13 @@ interface WorkspaceGridRowProps {
     fromGroupId: string,
     insertIndex: number,
   ) => void;
+  readonly onSetGridLayout?: UsfmWorkspaceProps["onSetGridLayout"];
+  readonly layoutSelectorGroupId: string | null;
 }
 
 function WorkspaceGridRow({
   rowIndex,
+  gridRows,
   gridCols,
   rowSlots,
   columnFractions,
@@ -494,6 +514,8 @@ function WorkspaceGridRow({
   onRegisterDocumentReader,
   onReorderTabInGroup,
   onDropTabFromOtherGroup,
+  onSetGridLayout,
+  layoutSelectorGroupId,
 }: WorkspaceGridRowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -544,6 +566,10 @@ function WorkspaceGridRow({
               onRegisterDocumentReader={onRegisterDocumentReader}
               onMoveTabWithinGroup={onReorderTabInGroup}
               onDropTabFromOtherGroup={onDropTabFromOtherGroup}
+              gridRows={gridRows}
+              gridCols={gridCols}
+              onSetGridLayout={onSetGridLayout}
+              showLayoutSelector={group.id === layoutSelectorGroupId}
             />
           </div>
         </Fragment>
@@ -567,10 +593,14 @@ export function UsfmWorkspace({
   onCloseTab,
   onReorderTabInGroup,
   onMoveTabToGroup,
+  onSetGridLayout,
   className,
 }: UsfmWorkspaceProps) {
   const layoutRef = useRef<HTMLDivElement>(null);
   const visibleSlots = slots.slice(0, gridRows * gridCols);
+  const layoutSelectorGroupId = onSetGridLayout
+    ? (visibleSlots.find((slot) => slot.tabIds.length > 0)?.id ?? null)
+    : null;
 
   const [rowFractions, setRowFractions] = useState<number[]>(() =>
     gridRows > 0 ? Array.from({ length: gridRows }, () => 1 / gridRows) : [1],
@@ -638,6 +668,7 @@ export function UsfmWorkspace({
             >
               <WorkspaceGridRow
                 rowIndex={rowIndex}
+                gridRows={gridRows}
                 gridCols={gridCols}
                 rowSlots={rowSlots}
                 columnFractions={colFracs}
@@ -653,6 +684,8 @@ export function UsfmWorkspace({
                 onRegisterDocumentReader={onRegisterDocumentReader}
                 onReorderTabInGroup={onReorderTabInGroup}
                 onDropTabFromOtherGroup={onDropTabFromOtherGroup}
+                onSetGridLayout={onSetGridLayout}
+                layoutSelectorGroupId={layoutSelectorGroupId}
               />
             </div>
           </Fragment>

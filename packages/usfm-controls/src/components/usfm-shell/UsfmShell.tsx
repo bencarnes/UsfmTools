@@ -16,6 +16,7 @@ import {
   workspaceSetTabDirty,
   workspaceMarkTabSaved,
   workspaceListDirtyEditorTabs,
+  workspaceSetGridLayout,
   type UsfmWorkspaceModel,
 } from "../usfm-workspace/workspace-model.js";
 import { UnsavedChangesDialog } from "./unsaved-changes-dialog.js";
@@ -350,6 +351,11 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
     [],
   );
 
+  const handleSetGridLayout = useCallback(
+    (rows: 1 | 2, cols: 1 | 2) => setModel((p) => workspaceSetGridLayout(p, rows, cols)),
+    [],
+  );
+
   const handleOpenSettings = useCallback(() => {
     setModel((p) => workspaceOpenSettingsTab(p));
     setFocusedTabId(SETTINGS_TAB_ID);
@@ -550,6 +556,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             onCloseTab={handleCloseTab}
             onReorderTabInGroup={handleReorderTabInGroup}
             onMoveTabToGroup={handleMoveTabToGroup}
+            onSetGridLayout={handleSetGridLayout}
             className="min-h-0 flex-1"
           />
         </main>

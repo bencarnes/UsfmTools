@@ -1,7 +1,6 @@
 import type { Story, StoryDefault } from "@ladle/react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { SAMPLE_BSB_GENESIS_USFM, SAMPLE_EXO_SNIPPET_USFM } from "../../fixtures/sample-bsb-genesis-usfm.js";
-import { TabGroupLayoutSelector } from "../tab-group-layout-selector/TabGroupLayoutSelector.js";
 import {
   buildWorkspaceModelFromInitialTabs,
   newWorkspaceId,
@@ -25,17 +24,6 @@ export default {
   title: "Controls/UsfmWorkspace",
 } satisfies StoryDefault;
 
-function StoryChrome({ toolbar, workspace }: { readonly toolbar: ReactNode; readonly workspace: ReactNode }) {
-  return (
-    <div className="box-border flex w-full flex-col gap-2" style={{ maxWidth: STORY_WORKSPACE_MAX_WIDTH }}>
-      {toolbar}
-      <div className="w-full overflow-hidden rounded border border-gray-300" style={{ height: STORY_WORKSPACE_HEIGHT }}>
-        {workspace}
-      </div>
-    </div>
-  );
-}
-
 function WorkspaceFromModel({
   model,
   setModel,
@@ -44,39 +32,34 @@ function WorkspaceFromModel({
   readonly setModel: (fn: (p: UsfmWorkspaceModel) => UsfmWorkspaceModel) => void;
 }) {
   return (
-    <UsfmWorkspace
-      gridRows={model.gridRows}
-      gridCols={model.gridCols}
-      slots={model.slots}
-      tabsById={model.tabsById}
-      className="h-full min-h-0"
-      onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
-      onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
-      onMarkTabDirty={(tabId) => setModel((p) => workspaceSetTabDirty(p, tabId))}
-      onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
-      onReorderTabInGroup={(groupId, tabId, toIndex) =>
-        setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
-      }
-      onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
-    />
+    <div
+      className="box-border w-full overflow-hidden rounded border border-gray-300"
+      style={{ maxWidth: STORY_WORKSPACE_MAX_WIDTH, height: STORY_WORKSPACE_HEIGHT }}
+    >
+      <UsfmWorkspace
+        gridRows={model.gridRows}
+        gridCols={model.gridCols}
+        slots={model.slots}
+        tabsById={model.tabsById}
+        className="h-full min-h-0"
+        onActivateTab={(groupId, tabId) => setModel((p) => workspaceActivateTab(p, groupId, tabId))}
+        onUpdateTabValue={(tabId, value) => setModel((p) => workspaceSetTabValue(p, tabId, value))}
+        onMarkTabDirty={(tabId) => setModel((p) => workspaceSetTabDirty(p, tabId))}
+        onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
+        onReorderTabInGroup={(groupId, tabId, toIndex) =>
+          setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
+        }
+        onMoveTabToGroup={(d) => setModel((p) => workspaceMoveTabToGroup(p, d))}
+        onSetGridLayout={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
+      />
+    </div>
   );
 }
 
 function ControlledWorkspace({ initialTabs }: { readonly initialTabs: readonly UsfmWorkspaceInitialTab[] }) {
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs(initialTabs));
 
-  return (
-    <StoryChrome
-      toolbar={
-        <TabGroupLayoutSelector
-          gridRows={model.gridRows}
-          gridCols={model.gridCols}
-          onChange={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
-        />
-      }
-      workspace={<WorkspaceFromModel model={model} setModel={setModel} />}
-    />
-  );
+  return <WorkspaceFromModel model={model} setModel={setModel} />;
 }
 
 export const SingleGroupTwoTabs: Story = () => (
@@ -120,24 +103,15 @@ export const OpenFileDemo: Story = () => {
   };
 
   return (
-    <StoryChrome
-      toolbar={
-        <div className="flex items-center gap-2">
-          <TabGroupLayoutSelector
-            gridRows={model.gridRows}
-            gridCols={model.gridCols}
-            onChange={(rows, cols) => setModel((p) => workspaceSetGridLayout(p, rows, cols))}
-          />
-          <button
-            type="button"
-            className="rounded border border-gray-400 bg-white px-3 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
-            onClick={openLeviticus}
-          >
-            Open LEV.usfm (append tab)
-          </button>
-        </div>
-      }
-      workspace={<WorkspaceFromModel model={model} setModel={setModel} />}
-    />
+    <div className="box-border flex w-full flex-col gap-2" style={{ maxWidth: STORY_WORKSPACE_MAX_WIDTH }}>
+      <button
+        type="button"
+        className="self-start rounded border border-gray-400 bg-white px-3 py-1 text-sm hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700"
+        onClick={openLeviticus}
+      >
+        Open LEV.usfm (append tab)
+      </button>
+      <WorkspaceFromModel model={model} setModel={setModel} />
+    </div>
   );
 };

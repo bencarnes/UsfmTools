@@ -84,6 +84,8 @@ export interface UsfmWorkspaceProps {
   readonly onEditorDocumentChange?: (tabId: string) => void;
   /** Register a reader for a tab's live editor buffer; return value unregisters. */
   readonly onRegisterDocumentReader?: (tabId: string, reader: () => string) => () => void;
+  /** When set, a {@link TabGroupLayoutSelector} renders in the first non-empty tab group's toolbar. */
+  readonly onSetGridLayout?: (rows: WorkspaceGridDimension, cols: WorkspaceGridDimension) => void;
   readonly className?: string;
 }
 
