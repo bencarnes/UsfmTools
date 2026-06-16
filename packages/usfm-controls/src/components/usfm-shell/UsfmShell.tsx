@@ -163,7 +163,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
       if (!tab || tab.kind === "settings") return;
       const body = valueOverride ?? tab.value;
       if (host.writeFile) {
-        await host.writeFile(tabId, body);
+        await host.writeFile(tab.fileId, body);
       }
       setModel((p) => workspaceMarkTabSaved(workspaceSetTabValue(p, tabId, body), tabId));
     },
@@ -203,7 +203,11 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   );
 
   const confirmExit = useCallback(async (): Promise<boolean> => {
-    let remaining = workspaceListDirtyEditorTabs(modelRef.current).map((tab) => tab.id);
+    // The same file can be open as several tabs that share one dirty buffer; prompt once per file.
+    const seenFiles = new Set<string>();
+    let remaining = workspaceListDirtyEditorTabs(modelRef.current)
+      .filter((tab) => (seenFiles.has(tab.fileId) ? false : (seenFiles.add(tab.fileId), true)))
+      .map((tab) => tab.id);
     while (remaining.length > 0) {
       const tabId = remaining[0]!;
       const tab = modelRef.current.tabsById[tabId];
@@ -398,32 +402,9 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
         readonly targetGroupId?: string;
       },
     ) => {
-      const existingTabId = entry.id;
+      const fileId = entry.id;
 
-      // If a tab with the file id already exists, focus it.
-      let groupHoldingTab: string | null = null;
-      for (const slot of model.slots) {
-        if (slot.tabIds.includes(existingTabId)) {
-          groupHoldingTab = slot.id;
-          break;
-        }
-      }
-      if (groupHoldingTab) {
-        setModel((p) => {
-          let next = workspaceActivateTab(p, groupHoldingTab!, existingTabId);
-          if (opts?.selection) {
-            next = workspaceRequestTabSelection(next, existingTabId, opts.selection.from, opts.selection.to);
-          }
-          return next;
-        });
-        setActiveGroupId(groupHoldingTab);
-        return;
-      }
-
-      const usfm = await host.readFile(entry.id);
-      if (usfm == null) return;
-      // Prefer an explicit drop target; otherwise open into the active tab group, falling back to
-      // the first slot when neither is valid.
+      // Resolve the destination group: an explicit drop target, else the active group, else slot 0.
       const requestedGroupId =
         opts?.targetGroupId && model.slots.some((s) => s.id === opts.targetGroupId)
           ? opts.targetGroupId
@@ -434,19 +415,60 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
         model.slots[0]?.id;
       if (!targetGroupId) return;
 
+      // A file may appear at most once per group. If the destination already shows it, just focus
+      // that tab (opening into a different group, however, deliberately creates a second tab so the
+      // same file can be viewed in multiple groups).
+      const targetSlot = model.slots.find((s) => s.id === targetGroupId);
+      const existingInTarget =
+        targetSlot?.tabIds.find((tid) => model.tabsById[tid]?.fileId === fileId) ?? null;
+      if (existingInTarget) {
+        setModel((p) => {
+          let next = workspaceActivateTab(p, targetGroupId, existingInTarget);
+          if (opts?.selection) {
+            next = workspaceRequestTabSelection(next, existingInTarget, opts.selection.from, opts.selection.to);
+          }
+          return next;
+        });
+        setActiveGroupId(targetGroupId);
+        return;
+      }
+
+      // If the file is already open in another group, reuse its live buffer (content + dirty state)
+      // so both tabs edit the same document; otherwise load the persisted body from the host.
+      const openElsewhere =
+        Object.values(model.tabsById).find((t) => t.kind !== "settings" && t.fileId === fileId) ?? null;
+      let value: string;
+      let savedValue: string;
+      let dirty: boolean;
+      if (openElsewhere) {
+        value = openElsewhere.value;
+        savedValue = openElsewhere.savedValue;
+        dirty = openElsewhere.dirty;
+      } else {
+        const usfm = await host.readFile(entry.id);
+        if (usfm == null) return;
+        value = usfm;
+        savedValue = usfm;
+        dirty = false;
+      }
+
       setModel((p) => {
         let next = workspaceAppendTab(p, {
           groupId: targetGroupId,
-          tab: { id: existingTabId, fileName: entry.name, value: usfm },
+          tab: { fileId, fileName: entry.name, value, savedValue, dirty },
         });
         if (opts?.selection) {
-          next = workspaceRequestTabSelection(next, existingTabId, opts.selection.from, opts.selection.to);
+          // The freshly appended tab is the target group's active tab.
+          const newTabId = next.slots.find((s) => s.id === targetGroupId)?.activeTabId;
+          if (newTabId) {
+            next = workspaceRequestTabSelection(next, newTabId, opts.selection.from, opts.selection.to);
+          }
         }
         return next;
       });
       setActiveGroupId(targetGroupId);
     },
-    [host, model.slots, activeGroupId],
+    [host, model.slots, model.tabsById, activeGroupId],
   );
 
   // ---- drag a file from the sidebar into a tab group ----
@@ -545,7 +567,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   );
 
   const activeFileIdForBrowser =
-    activeTab && fileEntries.some((f) => f.id === activeTab.id) ? activeTab.id : null;
+    activeTab && fileEntries.some((f) => f.id === activeTab.fileId) ? activeTab.fileId : null;
 
   const sidebarTabs = useMemo<readonly { id: SidebarTab; label: string; Icon: (p: { label?: string }) => ReactElement }[]>(
     () => [
