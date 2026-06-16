@@ -1,3 +1,4 @@
+import type { PointerEvent as ReactPointerEvent } from "react";
 import type { UsfmFilePickerGroups } from "@usfm-tools/model";
 import { UsfmFilePicker } from "../usfm-file-picker/index.js";
 import { FolderSelector } from "./folder-selector.js";
@@ -8,6 +9,10 @@ export interface FileBrowserProps {
   readonly catalog: UsfmFilePickerGroups;
   readonly activeFileId: string | null;
   readonly onOpenFile: (entry: UsfmShellFileEntry) => void;
+  /** Begin dragging a file row toward a workspace tab group. */
+  readonly onFileDragStart: (e: ReactPointerEvent, entry: UsfmShellFileEntry) => void;
+  /** Swallow the click that ends a drag so it does not also open the file in place. */
+  readonly consumeFileDragEnd: () => boolean;
   readonly loading: boolean;
   readonly folderLabel: string;
   readonly folderPath: string;
@@ -21,6 +26,8 @@ export function FileBrowser({
   catalog,
   activeFileId,
   onOpenFile,
+  onFileDragStart,
+  consumeFileDragEnd,
   loading,
   folderLabel,
   folderPath,
@@ -43,6 +50,11 @@ export function FileBrowser({
               const entry = fileEntries.find((f) => f.id === fileId);
               if (entry) onOpenFile(entry);
             }}
+            onFileDragStart={(e, { fileId }) => {
+              const entry = fileEntries.find((f) => f.id === fileId);
+              if (entry) onFileDragStart(e, entry);
+            }}
+            consumeFileDragEnd={consumeFileDragEnd}
             fileTestIdPrefix="usfm-shell-file"
           />
         )}

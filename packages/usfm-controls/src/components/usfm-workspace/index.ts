@@ -28,3 +28,5 @@ export {
   workspaceListDirtyEditorTabs,
   SETTINGS_TAB_ID,
 } from "./workspace-model.js";
+export { dropTargetAtPoint } from "./drop-target.js";
+export type { TabDropTarget } from "./drop-target.js";

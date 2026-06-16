@@ -12,6 +12,19 @@ import type { ApplicationSettings } from "../src/components/settings-pane/settin
 import { lineColumnToSourceOffset, sourceOffsetToLineColumn } from "../src/components/usfm-shell/line-offsets.js";
 
 
+/**
+ * jsdom has no layout engine, so `document.elementFromPoint` always returns null. The file
+ * drag-drop gesture resolves its target group through that API, so stub it to report a chosen
+ * element. Returns a restore function.
+ */
+function stubElementFromPoint(el: Element): () => void {
+  const original = document.elementFromPoint;
+  document.elementFromPoint = () => el;
+  return () => {
+    document.elementFromPoint = original;
+  };
+}
+
 function makeHost(
   files: readonly { id: string; name: string; usfm: string }[],
   settingsStore?: { value: ApplicationSettings | null },
@@ -232,6 +245,40 @@ describe("UsfmShell", () => {
     const badPane = document.querySelectorAll(".cm-content")[0]!;
     fireEvent.pointerDown(badPane, { button: 0 });
     await screen.findByTestId("usfm-shell-errors-count", undefined, { timeout: 2500 });
+  });
+
+  it("opens a file dragged from the sidebar into a tab group", async () => {
+    const host = makeHost([
+      { id: "f://a", name: "A.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n\\v 1 hi" },
+      { id: "f://b", name: "B.usfm", usfm: "\\id EXO\n\\c 1\n\\p\n\\v 1 hi" },
+    ]);
+    render(<UsfmShell host={host} />);
+    await waitFor(() => screen.getByTestId("usfm-shell-file-A.usfm"));
+
+    // Open A so the group has a tab (which surfaces the layout selector), then split into 1×2 so
+    // slot 1 is empty.
+    fireEvent.click(screen.getByTestId("usfm-shell-file-A.usfm"));
+    await waitFor(() => screen.getByRole("tab", { name: /A\.usfm/i }));
+    fireEvent.click(screen.getByRole("button", { name: /tab group layout 1×1/i }));
+    fireEvent.click(screen.getByRole("option", { name: /1×2 layout/i }));
+    const emptySlot = await screen.findByLabelText(/empty tab group/i);
+
+    // Pointer-drag B out of the sidebar and drop it onto the empty slot. jsdom has no layout, so
+    // stub elementFromPoint to report the empty slot under the pointer.
+    const restore = stubElementFromPoint(emptySlot);
+    try {
+      const row = screen.getByTestId("usfm-shell-file-B.usfm");
+      fireEvent.pointerDown(row, { button: 0, clientX: 0, clientY: 0 });
+      fireEvent.pointerMove(row, { clientX: 200, clientY: 40 }); // past the drag threshold
+      fireEvent.pointerUp(row, { clientX: 200, clientY: 40 });
+    } finally {
+      restore();
+    }
+
+    // B opened into the previously empty slot, so no empty drop target remains.
+    await waitFor(() => screen.getByRole("tab", { name: /B\.usfm/i }));
+    expect(screen.queryByLabelText(/empty tab group/i)).toBeNull();
+    expect(screen.getByRole("tab", { name: /A\.usfm/i })).toBeTruthy();
   });
 
   it("toggles the bottom bar between expanded and collapsed", () => {

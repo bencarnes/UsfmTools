@@ -1,4 +1,4 @@
-import React, { useMemo, type CSSProperties } from "react";
+import React, { useMemo, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { themedControlButton, themedControlDivider } from "../../theme-tokens.js";
 import {
   buildUsfmFilePickerGroups,
@@ -25,6 +25,16 @@ export interface UsfmFilePickerProps {
   readonly activeFileId?: string | null;
   /** Fired when the user activates a file (click or keyboard on the button). */
   readonly onFileSelect?: (detail: UsfmFilePickerSelectDetail) => void;
+  /**
+   * Begin a pointer-based drag of a file row (for example to drop it into a workspace tab group).
+   * Fired on `pointerdown`; the consumer decides when the movement passes a drag threshold.
+   */
+  readonly onFileDragStart?: (e: ReactPointerEvent, detail: UsfmFilePickerSelectDetail) => void;
+  /**
+   * Returns true when the click that follows a drag should be swallowed (so a drag does not also
+   * open the file in place). Mirrors the workspace tab-drag click suppression.
+   */
+  readonly consumeFileDragEnd?: () => boolean;
   /**
    * Optional prefix for `data-testid` on each file button (`${prefix}-${name}`).
    * Omit to skip test ids.
@@ -70,11 +80,15 @@ function VerticalFileList({
   files,
   activeFileId,
   onFileSelect,
+  onFileDragStart,
+  consumeFileDragEnd,
   fileTestIdPrefix,
 }: {
   readonly files: readonly UsfmFilePickerFile[];
   readonly activeFileId?: string | null;
   readonly onFileSelect?: (detail: UsfmFilePickerSelectDetail) => void;
+  readonly onFileDragStart?: (e: ReactPointerEvent, detail: UsfmFilePickerSelectDetail) => void;
+  readonly consumeFileDragEnd?: () => boolean;
   readonly fileTestIdPrefix?: string;
 }) {
   return (
@@ -105,7 +119,15 @@ function VerticalFileList({
               data-testid={
                 fileTestIdPrefix ? `${fileTestIdPrefix}-${file.displayLabel}` : undefined
               }
-              onClick={() => onFileSelect?.({ fileId: file.fileId, code: file.code })}
+              onPointerDown={
+                onFileDragStart
+                  ? (e) => onFileDragStart(e, { fileId: file.fileId, code: file.code })
+                  : undefined
+              }
+              onClick={() => {
+                if (consumeFileDragEnd?.()) return;
+                onFileSelect?.({ fileId: file.fileId, code: file.code });
+              }}
             >
               {file.displayLabel}
             </button>
@@ -129,6 +151,8 @@ export function UsfmFilePicker({
   groups,
   activeFileId,
   onFileSelect,
+  onFileDragStart,
+  consumeFileDragEnd,
   fileTestIdPrefix,
   className,
 }: UsfmFilePickerProps): React.JSX.Element {
@@ -152,6 +176,8 @@ export function UsfmFilePicker({
           files={resolvedGroups.oldTestament}
           activeFileId={activeFileId}
           onFileSelect={onFileSelect}
+          onFileDragStart={onFileDragStart}
+          consumeFileDragEnd={consumeFileDragEnd}
           fileTestIdPrefix={fileTestIdPrefix}
         />
       ) : null}

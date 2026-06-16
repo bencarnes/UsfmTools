@@ -1,7 +1,18 @@
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef, type ReactElement } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  forwardRef,
+  type PointerEvent as ReactPointerEvent,
+  type ReactElement,
+} from "react";
 import { createLanguageClient } from "../../language-service/service.js";
 import type { Diagnostic } from "../../language-service/protocol.js";
 import { UsfmWorkspace } from "../usfm-workspace/UsfmWorkspace.js";
+import { dropTargetAtPoint } from "../usfm-workspace/drop-target.js";
 import {
   buildWorkspaceModelFromInitialTabs,
   workspaceActivateTab,
@@ -74,6 +85,9 @@ type SidebarTab = "files" | "search";
 type BottomTab = "errors";
 
 const VALIDATE_DEBOUNCE_MS = 300;
+
+/** Pixels the pointer must travel before a file-row press is treated as a drag rather than a click. */
+const FILE_DRAG_THRESHOLD_PX = 5;
 
 export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function UsfmShell(
   {
@@ -376,7 +390,14 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   // ---- file open / focus ----
 
   const openFile = useCallback(
-    async (entry: UsfmShellFileEntry, opts?: { readonly selection?: { from: number; to: number } }) => {
+    async (
+      entry: UsfmShellFileEntry,
+      opts?: {
+        readonly selection?: { from: number; to: number };
+        /** Open into this specific tab group (e.g. a drag-drop target) instead of the active group. */
+        readonly targetGroupId?: string;
+      },
+    ) => {
       const existingTabId = entry.id;
 
       // If a tab with the file id already exists, focus it.
@@ -401,8 +422,14 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
 
       const usfm = await host.readFile(entry.id);
       if (usfm == null) return;
-      // Open into the active tab group; fall back to the first slot when it is no longer valid.
+      // Prefer an explicit drop target; otherwise open into the active tab group, falling back to
+      // the first slot when neither is valid.
+      const requestedGroupId =
+        opts?.targetGroupId && model.slots.some((s) => s.id === opts.targetGroupId)
+          ? opts.targetGroupId
+          : null;
       const targetGroupId =
+        requestedGroupId ??
         (activeGroupId && model.slots.some((s) => s.id === activeGroupId) ? activeGroupId : null) ??
         model.slots[0]?.id;
       if (!targetGroupId) return;
@@ -421,6 +448,78 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
     },
     [host, model.slots, activeGroupId],
   );
+
+  // ---- drag a file from the sidebar into a tab group ----
+  // Pointer-based to match the workspace's tab drag (see UsfmWorkspace for why not HTML5 DnD). The
+  // workspace exposes its groups as DOM drop targets; we hit-test them with dropTargetAtPoint and
+  // open the file into the group under the pointer on release.
+  const fileDragRef = useRef<
+    { entry: UsfmShellFileEntry; startX: number; startY: number; started: boolean } | null
+  >(null);
+  const fileGhostRef = useRef<HTMLDivElement>(null);
+  const justDraggedFileRef = useRef(false);
+  const [fileDropTargetGroupId, setFileDropTargetGroupId] = useState<string | null>(null);
+
+  const beginFileDrag = useCallback(
+    (e: ReactPointerEvent, entry: UsfmShellFileEntry) => {
+      if (e.button !== 0) return;
+      justDraggedFileRef.current = false;
+      fileDragRef.current = { entry, startX: e.clientX, startY: e.clientY, started: false };
+
+      const onMove = (ev: PointerEvent) => {
+        const d = fileDragRef.current;
+        if (!d) return;
+        if (!d.started) {
+          if (Math.hypot(ev.clientX - d.startX, ev.clientY - d.startY) < FILE_DRAG_THRESHOLD_PX) return;
+          d.started = true;
+          const g = fileGhostRef.current;
+          if (g) {
+            g.textContent = d.entry.name;
+            g.classList.remove("hidden");
+          }
+          document.body.style.cursor = "grabbing";
+          document.body.style.userSelect = "none";
+        }
+        const g = fileGhostRef.current;
+        if (g) g.style.transform = `translate(${ev.clientX + 12}px, ${ev.clientY + 12}px)`;
+        setFileDropTargetGroupId(dropTargetAtPoint(ev.clientX, ev.clientY)?.groupId ?? null);
+      };
+
+      const cleanup = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", cleanup);
+        fileGhostRef.current?.classList.add("hidden");
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        fileDragRef.current = null;
+        setFileDropTargetGroupId(null);
+      };
+
+      const onUp = (ev: PointerEvent) => {
+        const d = fileDragRef.current;
+        const started = d?.started ?? false;
+        const draggedEntry = d?.entry;
+        cleanup();
+        if (started && draggedEntry) {
+          justDraggedFileRef.current = true;
+          const target = dropTargetAtPoint(ev.clientX, ev.clientY);
+          if (target) void openFile(draggedEntry, { targetGroupId: target.groupId });
+        }
+      };
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", cleanup);
+    },
+    [openFile],
+  );
+
+  const consumeFileDragEnd = useCallback(() => {
+    const v = justDraggedFileRef.current;
+    justDraggedFileRef.current = false;
+    return v;
+  }, []);
 
   // ---- search ----
 
@@ -467,6 +566,12 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
         data-testid="usfm-shell"
         className={`flex h-full min-h-0 min-w-0 flex-row bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 ${className ?? ""}`}
       >
+      {/* Floating label that follows the pointer while dragging a file from the sidebar. */}
+      <div
+        ref={fileGhostRef}
+        className="pointer-events-none fixed left-0 top-0 z-50 hidden max-w-[11rem] truncate rounded border border-gray-400 bg-white px-2 py-1 text-sm shadow-lg dark:border-gray-500 dark:bg-gray-800 dark:text-gray-100"
+        aria-hidden
+      />
       {/* Left sidebar — vertical tab rail + (when expanded) tab panel, spanning full height */}
       <aside
         className="flex min-h-0 shrink-0 flex-row border-r border-gray-300 bg-gray-100 dark:border-gray-600 dark:bg-gray-800"
@@ -534,6 +639,8 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
                 catalog={fileCatalog}
                 activeFileId={activeFileIdForBrowser}
                 onOpenFile={(entry) => void openFile(entry)}
+                onFileDragStart={beginFileDrag}
+                consumeFileDragEnd={consumeFileDragEnd}
                 loading={filesLoading}
                 folderLabel={folderLabel}
                 folderPath={folderPath}
@@ -573,6 +680,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             onReorderTabInGroup={handleReorderTabInGroup}
             onMoveTabToGroup={handleMoveTabToGroup}
             onChangeGridLayout={handleChangeGridLayout}
+            externalDropTargetGroupId={fileDropTargetGroupId}
             className="min-h-0 flex-1"
           />
         </main>
