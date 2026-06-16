@@ -92,6 +92,12 @@ export interface UsfmWorkspaceProps {
   readonly onEditorDocumentChange?: (tabId: string) => void;
   /** Register a reader for a tab's live editor buffer; return value unregisters. */
   readonly onRegisterDocumentReader?: (tabId: string, reader: () => string) => () => void;
+  /**
+   * Group id currently under an external drag (e.g. a file dragged from the shell sidebar), or null.
+   * The workspace highlights this group's tab strip / empty slot to mirror in-workspace tab drags;
+   * the external gesture itself is owned by the parent.
+   */
+  readonly externalDropTargetGroupId?: string | null;
   readonly className?: string;
 }
 

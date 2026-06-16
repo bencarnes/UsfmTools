@@ -17,6 +17,7 @@ import { UsfmPane } from "../usfm-pane/UsfmPane.js";
 import { SettingsPane } from "../settings-pane/SettingsPane.js";
 import { TabGroupLayoutSelector } from "../tab-group-layout-selector/TabGroupLayoutSelector.js";
 import { TabListDropdown } from "./tab-list-dropdown.js";
+import { dropTargetAtPoint } from "./drop-target.js";
 import type { Diagnostic } from "../../language-service/protocol.js";
 import type {
   UsfmWorkspaceEditorGroupState,
@@ -61,36 +62,6 @@ interface TabDragContextValue {
 }
 
 const TabDragContext = createContext<TabDragContextValue | null>(null);
-
-interface TabDropTarget {
-  readonly groupId: string;
-  readonly insertIndex: number;
-}
-
-/** Insertion index for `clientX` within a tab strip element (VS Code-style midpoint behavior). */
-function insertIndexInStrip(stripEl: Element, clientX: number): number {
-  const buttons = [...stripEl.querySelectorAll<HTMLElement>("[data-workspace-tab-id]")];
-  for (let i = 0; i < buttons.length; i++) {
-    const r = buttons[i]!.getBoundingClientRect();
-    if (clientX < r.left + r.width / 2) return i;
-  }
-  return buttons.length;
-}
-
-/** Resolve the drop target (group + insertion index) under a screen point, if any. */
-function dropTargetAtPoint(clientX: number, clientY: number): TabDropTarget | null {
-  const el = document.elementFromPoint(clientX, clientY);
-  if (!el) return null;
-  const empty = el.closest<HTMLElement>("[data-workspace-empty-slot]");
-  if (empty?.dataset.workspaceEmptySlot) {
-    return { groupId: empty.dataset.workspaceEmptySlot, insertIndex: 0 };
-  }
-  const strip = el.closest<HTMLElement>("[data-workspace-strip]");
-  if (strip?.dataset.workspaceStrip) {
-    return { groupId: strip.dataset.workspaceStrip, insertIndex: insertIndexInStrip(strip, clientX) };
-  }
-  return null;
-}
 
 interface ColumnResizableGapProps {
   readonly boundaryIndex: number;
@@ -562,6 +533,7 @@ export function UsfmWorkspace({
   onReorderTabInGroup,
   onMoveTabToGroup,
   onChangeGridLayout,
+  externalDropTargetGroupId,
   className,
 }: UsfmWorkspaceProps) {
   const layoutRef = useRef<HTMLDivElement>(null);
@@ -685,9 +657,20 @@ export function UsfmWorkspace({
     [performDrop],
   );
 
+  // A file being dragged from the shell sidebar isn't tracked by this component's tab-drag
+  // controller, but the hovered group should still light up. Synthesize a drag-active value from
+  // the externally supplied group id so {@link TabStrip} / {@link EmptySlotDropTarget} highlight it.
+  const externalDrag = useMemo<ActiveTabDrag | null>(
+    () =>
+      externalDropTargetGroupId != null
+        ? { tabId: "", fromGroupId: "", fileName: "", overGroupId: externalDropTargetGroupId }
+        : null,
+    [externalDropTargetGroupId],
+  );
+
   const dragContextValue = useMemo<TabDragContextValue>(
     () => ({
-      active: activeDrag,
+      active: activeDrag ?? externalDrag,
       beginDrag,
       consumeDragEnd: () => {
         const v = justDraggedRef.current;
@@ -695,7 +678,7 @@ export function UsfmWorkspace({
         return v;
       },
     }),
-    [activeDrag, beginDrag],
+    [activeDrag, externalDrag, beginDrag],
   );
 
   return (
