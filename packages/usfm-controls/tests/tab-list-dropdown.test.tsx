@@ -15,8 +15,8 @@ describe("TabListDropdown", () => {
         tabIds={["a", "b"]}
         activeTabId="a"
         tabsById={{
-          a: { id: "a", fileName: "A.usfm", value: "", savedValue: "", dirty: false },
-          b: { id: "b", fileName: "B.usfm", value: "", savedValue: "", dirty: false },
+          a: { id: "a", fileId: "a", fileName: "A.usfm", value: "", savedValue: "", dirty: false },
+          b: { id: "b", fileId: "b", fileName: "B.usfm", value: "", savedValue: "", dirty: false },
         }}
         onActivate={() => {}}
       />,
@@ -33,8 +33,8 @@ describe("TabListDropdown", () => {
         tabIds={["a", "b"]}
         activeTabId="a"
         tabsById={{
-          a: { id: "a", fileName: "A.usfm", value: "", savedValue: "", dirty: false },
-          b: { id: "b", fileName: "B.usfm", value: "", savedValue: "", dirty: false },
+          a: { id: "a", fileId: "a", fileName: "A.usfm", value: "", savedValue: "", dirty: false },
+          b: { id: "b", fileId: "b", fileName: "B.usfm", value: "", savedValue: "", dirty: false },
         }}
         onActivate={onActivate}
       />,

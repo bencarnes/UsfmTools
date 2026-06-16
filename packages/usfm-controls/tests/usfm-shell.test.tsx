@@ -163,6 +163,30 @@ describe("UsfmShell", () => {
     expect(tabs.length).toBe(1);
   });
 
+  it("opens the same file in a second tab group while keeping one copy per group", async () => {
+    const host = makeHost([
+      { id: "f://a", name: "A.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n\\v 1 hi" },
+    ]);
+    render(<UsfmShell host={host} />);
+    await waitFor(() => screen.getByTestId("usfm-shell-file-A.usfm"));
+
+    // Open A in the only group, then split into 1×2 so slot 1 is empty.
+    fireEvent.click(screen.getByTestId("usfm-shell-file-A.usfm"));
+    await waitFor(() => screen.getByRole("tab", { name: /A\.usfm/i }));
+    fireEvent.click(screen.getByRole("button", { name: /tab group layout 1×1/i }));
+    fireEvent.click(screen.getByRole("option", { name: /1×2 layout/i }));
+    const emptySlot = await screen.findByLabelText(/empty tab group/i);
+
+    // Activate the empty group and open A again — it opens a second tab there (one per group).
+    fireEvent.pointerDown(emptySlot, { button: 0 });
+    fireEvent.click(screen.getByTestId("usfm-shell-file-A.usfm"));
+    await waitFor(() => expect(screen.getAllByRole("tab", { name: /A\.usfm/i }).length).toBe(2));
+
+    // Clicking A again while the second group is active focuses the existing copy — no third tab.
+    fireEvent.click(screen.getByTestId("usfm-shell-file-A.usfm"));
+    expect(screen.getAllByRole("tab", { name: /A\.usfm/i }).length).toBe(2);
+  });
+
   it("toggles the sidebar between expanded and collapsed", async () => {
     const host = makeHost([
       { id: "f://a", name: "A.usfm", usfm: "\\id GEN" },

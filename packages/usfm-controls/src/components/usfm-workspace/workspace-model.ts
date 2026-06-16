@@ -8,6 +8,13 @@ export type UsfmWorkspaceTabKind = "editor" | "settings";
 
 export interface UsfmWorkspaceTabState {
   readonly id: string;
+  /**
+   * Identifies the underlying document/buffer. The same file may be open as several tabs (one per
+   * tab group); those tabs share a `fileId` and stay in sync via {@link workspaceSetTabValue} &
+   * friends, which fan edits out to every tab with the same `fileId`. Tab `id` stays unique per
+   * instance. For non-file tabs (e.g. settings) `fileId` equals the tab `id`.
+   */
+  readonly fileId: string;
   readonly fileName: string;
   readonly value: string;
   /** Pane kind for this tab. Omitted (or `editor`) renders a USFM editor pane. */
@@ -44,6 +51,8 @@ export type WorkspaceGridDimension = 1 | 2;
 
 export interface UsfmWorkspaceInitialTab {
   readonly id?: string;
+  /** Underlying document id; defaults to the tab `id`. Reuse across tabs to open one file twice. */
+  readonly fileId?: string;
   readonly fileName: string;
   readonly value: string;
   /** Last saved body; defaults to `value`. */
@@ -160,6 +169,21 @@ function removeTabFromGroup(tabIds: readonly string[], tabId: string): string[] 
   return tabIds.filter((t) => t !== tabId);
 }
 
+/** Ids of every tab backed by the same document (one per group it is open in). */
+function fileSiblingIds(tabsById: Record<string, UsfmWorkspaceTabState>, fileId: string): string[] {
+  return Object.keys(tabsById).filter((id) => tabsById[id]?.fileId === fileId);
+}
+
+/** A tab in this slot showing `fileId` (other than `excludeTabId`), or undefined. */
+function findTabInSlotByFile(
+  slot: UsfmWorkspaceEditorGroupState,
+  fileId: string,
+  tabsById: Record<string, UsfmWorkspaceTabState>,
+  excludeTabId?: string,
+): string | undefined {
+  return slot.tabIds.find((tid) => tid !== excludeTabId && tabsById[tid]?.fileId === fileId);
+}
+
 function insertTabAt(tabIds: readonly string[], tabId: string, index: number): string[] {
   const filtered = tabIds.filter((t) => t !== tabId);
   const i = Math.max(0, Math.min(index, filtered.length));
@@ -187,10 +211,11 @@ export function buildWorkspaceModelFromInitialTabs(
 
   for (const t of initialTabs) {
     const id = t.id ?? newWorkspaceId("tab");
+    const fileId = t.fileId ?? id;
     const gi = t.groupIndex ?? 0;
     const savedValue = t.savedValue ?? t.value;
     const dirty = t.dirty ?? t.value !== savedValue;
-    tabsById[id] = { id, fileName: t.fileName, value: t.value, savedValue, dirty };
+    tabsById[id] = { id, fileId, fileName: t.fileName, value: t.value, savedValue, dirty };
     if (!groupBuckets.has(gi)) groupBuckets.set(gi, []);
     groupBuckets.get(gi)!.push(id);
   }
@@ -251,16 +276,23 @@ export function workspaceSetGridLayout(
   }
 
   for (const tabId of orphaned) {
-    let target = 0;
-    for (let j = 1; j < nextSlots.length; j++) {
-      if (nextSlots[j]!.tabIds.length < nextSlots[target]!.tabIds.length) target = j;
+    const fileId = model.tabsById[tabId]?.fileId;
+    // Merging groups can collide two instances of the same file into one group. Place the orphan in
+    // the least-filled slot that does not already show its file; if every slot already shows it,
+    // drop the duplicate tab (the file stays open in the surviving group).
+    let target = -1;
+    for (let j = 0; j < nextSlots.length; j++) {
+      const slot = nextSlots[j]!;
+      if (fileId != null && slot.tabIds.some((tid) => model.tabsById[tid]?.fileId === fileId)) continue;
+      if (target < 0 || slot.tabIds.length < nextSlots[target]!.tabIds.length) target = j;
     }
+    if (target < 0) continue;
     const slot = nextSlots[target]!;
-    const nextIds = [...slot.tabIds, tabId];
-    nextSlots[target] = { ...slot, tabIds: nextIds, activeTabId: slot.activeTabId ?? tabId };
+    nextSlots[target] = { ...slot, tabIds: [...slot.tabIds, tabId], activeTabId: slot.activeTabId ?? tabId };
   }
 
-  return asModel(newRows, newCols, nextSlots, { ...model.tabsById });
+  const tabsById = pruneTabs(nextSlots, { ...model.tabsById });
+  return asModel(newRows, newCols, nextSlots, tabsById);
 }
 
 export function workspaceActivateTab(model: UsfmWorkspaceModel, groupId: string, tabId: string): UsfmWorkspaceModel {
@@ -271,38 +303,44 @@ export function workspaceActivateTab(model: UsfmWorkspaceModel, groupId: string,
 export function workspaceSetTabValue(model: UsfmWorkspaceModel, tabId: string, value: string): UsfmWorkspaceModel {
   const cur = model.tabsById[tabId];
   if (!cur || cur.value === value) return model;
-  const dirty = cur.kind === "settings" ? false : value !== cur.savedValue;
-  return asModel(
-    model.gridRows,
-    model.gridCols,
-    model.slots.map(cloneGroup),
-    { ...model.tabsById, [tabId]: { ...cur, value, dirty } },
-  );
+  if (cur.kind === "settings") {
+    return asModel(model.gridRows, model.gridCols, model.slots.map(cloneGroup), {
+      ...model.tabsById,
+      [tabId]: { ...cur, value, dirty: false },
+    });
+  }
+  // The same file may be open in multiple groups; apply the edit (and resulting dirty state) to
+  // every tab sharing this document so they behave as one in-memory buffer.
+  const dirty = value !== cur.savedValue;
+  const nextTabs = { ...model.tabsById };
+  for (const id of fileSiblingIds(model.tabsById, cur.fileId)) {
+    nextTabs[id] = { ...nextTabs[id]!, value, dirty };
+  }
+  return asModel(model.gridRows, model.gridCols, model.slots.map(cloneGroup), nextTabs);
 }
 
-/** Mark an editor tab dirty without lifting the latest document text into React state. */
+/** Mark an editor tab (and every tab sharing its document) dirty without lifting the latest text. */
 export function workspaceSetTabDirty(model: UsfmWorkspaceModel, tabId: string): UsfmWorkspaceModel {
   const cur = model.tabsById[tabId];
   if (!cur || cur.kind === "settings" || cur.dirty) return model;
-  return asModel(
-    model.gridRows,
-    model.gridCols,
-    model.slots.map(cloneGroup),
-    { ...model.tabsById, [tabId]: { ...cur, dirty: true } },
-  );
+  const nextTabs = { ...model.tabsById };
+  for (const id of fileSiblingIds(model.tabsById, cur.fileId)) {
+    nextTabs[id] = { ...nextTabs[id]!, dirty: true };
+  }
+  return asModel(model.gridRows, model.gridCols, model.slots.map(cloneGroup), nextTabs);
 }
 
-/** Mark a tab's current `value` as saved (clears `dirty`). */
+/** Mark a tab's current `value` as saved (clears `dirty`) for every tab sharing its document. */
 export function workspaceMarkTabSaved(model: UsfmWorkspaceModel, tabId: string): UsfmWorkspaceModel {
   const cur = model.tabsById[tabId];
   if (!cur || cur.kind === "settings") return model;
   if (!cur.dirty && cur.savedValue === cur.value) return model;
-  return asModel(
-    model.gridRows,
-    model.gridCols,
-    model.slots.map(cloneGroup),
-    { ...model.tabsById, [tabId]: { ...cur, savedValue: cur.value, dirty: false } },
-  );
+  const nextTabs = { ...model.tabsById };
+  for (const id of fileSiblingIds(model.tabsById, cur.fileId)) {
+    const t = nextTabs[id]!;
+    nextTabs[id] = { ...t, savedValue: t.value, dirty: false };
+  }
+  return asModel(model.gridRows, model.gridCols, model.slots.map(cloneGroup), nextTabs);
 }
 
 /** Editor tabs with unsaved changes (excludes the settings tab). */
@@ -350,15 +388,21 @@ export function workspaceMoveTabToGroup(
 
   const fromG = model.slots[fromI]!;
   const toG = model.slots[toI]!;
+  const fileId = model.tabsById[tabId]?.fileId;
   const fromNextIds = removeTabFromGroup(fromG.tabIds, tabId);
   let fromActive = fromG.activeTabId;
   if (fromActive === tabId) fromActive = fromNextIds[0] ?? null;
 
-  const toNextIds = insertTabAt(toG.tabIds, tabId, insertIndex);
+  // The destination already shows this file: keeping both would put the same file twice in one
+  // group. Drop the dragged tab and focus the existing instance instead.
+  const dupInTarget = fileId != null ? findTabInSlotByFile(toG, fileId, model.tabsById, tabId) : undefined;
 
   const slots = model.slots.map((s) => {
     if (s.id === fromGroupId) return { ...cloneGroup(s), tabIds: fromNextIds, activeTabId: fromActive };
-    if (s.id === toGroupId) return { ...cloneGroup(s), tabIds: toNextIds, activeTabId: tabId };
+    if (s.id === toGroupId) {
+      if (dupInTarget) return { ...cloneGroup(s), activeTabId: dupInTarget };
+      return { ...cloneGroup(s), tabIds: insertTabAt(s.tabIds, tabId, insertIndex), activeTabId: tabId };
+    }
     return cloneGroup(s);
   });
 
@@ -402,6 +446,8 @@ export function workspaceAppendTab(
     readonly groupId: string;
     readonly tab: {
       readonly id?: string;
+      /** Underlying document id; defaults to the tab `id`. */
+      readonly fileId?: string;
       readonly fileName: string;
       readonly value: string;
       readonly dirty?: boolean;
@@ -412,21 +458,31 @@ export function workspaceAppendTab(
   },
 ): UsfmWorkspaceModel {
   const id = options.tab.id ?? newWorkspaceId("tab");
+  const fileId = options.tab.fileId ?? id;
   const kind = options.tab.kind ?? "editor";
+  const activate = options.activate !== false;
+  const si = findSlotIndex(model.slots, options.groupId);
+  if (si < 0) return model;
+
+  // A file may appear at most once per group: if this group already shows the document, focus that
+  // tab instead of opening a duplicate.
+  const existing = findTabInSlotByFile(model.slots[si]!, fileId, model.tabsById);
+  if (existing) {
+    return activate ? workspaceActivateTab(model, options.groupId, existing) : model;
+  }
+
   const savedValue = options.tab.savedValue ?? options.tab.value;
   const dirty =
     kind === "settings" ? false : (options.tab.dirty ?? options.tab.value !== savedValue);
   const tab: UsfmWorkspaceTabState = {
     id,
+    fileId,
     fileName: options.tab.fileName,
     value: options.tab.value,
     kind,
     savedValue,
     dirty,
   };
-  const activate = options.activate !== false;
-  const si = findSlotIndex(model.slots, options.groupId);
-  if (si < 0) return model;
 
   const slots = model.slots.map((s, i) => {
     if (i !== si) return cloneGroup(s);

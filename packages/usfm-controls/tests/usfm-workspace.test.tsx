@@ -272,6 +272,70 @@ describe("UsfmWorkspace", () => {
     expect(screen.getByRole("tab", { name: /EXO\.usfm/i })).toBeTruthy();
   });
 
+  it("keeps same-file tabs in different groups in sync for value, dirty, and saved state", () => {
+    // One file (fileId "doc") open as two tabs, one per group.
+    const m0 = buildWorkspaceModelFromInitialTabs([
+      { id: "g0", fileId: "doc", fileName: "GEN.usfm", value: "\\id GEN v1", groupIndex: 0 },
+      { id: "g1", fileId: "doc", fileName: "GEN.usfm", value: "\\id GEN v1", groupIndex: 1 },
+    ]);
+
+    // Editing one tab updates both tabs' value and marks both dirty.
+    const edited = workspaceSetTabValue(m0, "g0", "\\id GEN v2");
+    expect(edited.tabsById["g0"]?.value).toBe("\\id GEN v2");
+    expect(edited.tabsById["g1"]?.value).toBe("\\id GEN v2");
+    expect(edited.tabsById["g0"]?.dirty).toBe(true);
+    expect(edited.tabsById["g1"]?.dirty).toBe(true);
+
+    // Saving one tab clears dirty and advances savedValue on both.
+    const saved = workspaceMarkTabSaved(edited, "g1");
+    expect(saved.tabsById["g0"]?.dirty).toBe(false);
+    expect(saved.tabsById["g1"]?.dirty).toBe(false);
+    expect(saved.tabsById["g0"]?.savedValue).toBe("\\id GEN v2");
+    expect(saved.tabsById["g1"]?.savedValue).toBe("\\id GEN v2");
+  });
+
+  it("workspaceAppendTab refuses a second copy of a file in the same group", () => {
+    const m0 = buildWorkspaceModelFromInitialTabs([
+      { id: "g0", fileId: "doc", fileName: "GEN.usfm", value: "\\id GEN" },
+    ]);
+    const gid = m0.slots[0]!.id;
+    const m1 = workspaceAppendTab(m0, {
+      groupId: gid,
+      tab: { fileId: "doc", fileName: "GEN.usfm", value: "\\id GEN" },
+    });
+    // No new tab was created; the existing one is focused instead.
+    expect(m1.slots[0]!.tabIds).toEqual(["g0"]);
+    expect(m1.slots[0]!.activeTabId).toBe("g0");
+  });
+
+  it("workspaceMoveTabToGroup closes the dragged duplicate when the target already shows the file", () => {
+    const m0 = buildWorkspaceModelFromInitialTabs([
+      { id: "g0", fileId: "doc", fileName: "GEN.usfm", value: "\\id GEN", groupIndex: 0 },
+      { id: "g1", fileId: "doc", fileName: "GEN.usfm", value: "\\id GEN", groupIndex: 1 },
+    ]);
+    const from = m0.slots[1]!.id;
+    const to = m0.slots[0]!.id;
+    const moved = workspaceMoveTabToGroup(m0, { tabId: "g1", fromGroupId: from, toGroupId: to, insertIndex: 1 });
+    // The dragged tab is dropped; the destination still shows the file exactly once and focuses it.
+    expect(moved.slots[0]!.tabIds).toEqual(["g0"]);
+    expect(moved.slots[0]!.activeTabId).toBe("g0");
+    expect(moved.slots[1]!.tabIds).toEqual([]);
+    expect(moved.tabsById["g1"]).toBeUndefined();
+  });
+
+  it("workspaceSetGridLayout closes duplicate file tabs when groups merge", () => {
+    const m0 = buildWorkspaceModelFromInitialTabs([
+      { id: "g0", fileId: "doc", fileName: "GEN.usfm", value: "\\id GEN", groupIndex: 0 },
+      { id: "g1", fileId: "doc", fileName: "GEN.usfm", value: "\\id GEN", groupIndex: 1 },
+    ]);
+    // Collapse the 1×2 grid back to a single group: the two copies of the file would land together.
+    const merged = workspaceSetGridLayout(m0, 1, 1);
+    expect(merged.slots).toHaveLength(1);
+    const remaining = merged.slots[0]!.tabIds.filter((id) => merged.tabsById[id]?.fileId === "doc");
+    expect(remaining).toHaveLength(1);
+    expect(Object.keys(merged.tabsById)).toHaveLength(1);
+  });
+
   it("changes the grid layout from the tab group toolbar selector", () => {
     render(
       <Harness
