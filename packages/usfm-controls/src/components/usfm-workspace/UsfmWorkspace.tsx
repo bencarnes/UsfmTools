@@ -330,6 +330,7 @@ interface EditorGroupPanelProps {
   readonly group: UsfmWorkspaceEditorGroupState;
   readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
   readonly onActivateTab: (groupId: string, tabId: string) => void;
+  readonly onActivateGroup?: (groupId: string) => void;
   readonly onCloseTab: (groupId: string, tabId: string) => void;
   readonly onUpdateValue: (tabId: string, value: string) => void;
   readonly onMarkTabDirty?: (tabId: string) => void;
@@ -346,6 +347,7 @@ function EditorGroupPanel({
   group,
   tabsById,
   onActivateTab,
+  onActivateGroup,
   onCloseTab,
   onUpdateValue,
   onMarkTabDirty,
@@ -360,16 +362,25 @@ function EditorGroupPanel({
   const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
   const isEmpty = group.tabIds.length === 0;
 
+  // Pressing anywhere inside a group (tab strip, pane body, toolbar) makes it the active tab page.
+  const handleActivateGroup = onActivateGroup ? () => onActivateGroup(group.id) : undefined;
+
   if (isEmpty) {
     return (
-      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900">
+      <div
+        className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900"
+        onPointerDown={handleActivateGroup}
+      >
         <EmptySlotDropTarget groupId={group.id} />
       </div>
     );
   }
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900">
+    <div
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900"
+      onPointerDown={handleActivateGroup}
+    >
       <div className="relative z-20 flex min-h-[2.25rem] shrink-0 items-stretch overflow-visible border-b border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-800">
         <TabStrip
           groupId={group.id}
@@ -445,6 +456,7 @@ interface WorkspaceGridRowProps {
   readonly setColumnFractions: Dispatch<SetStateAction<number[][]>>;
   readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
   readonly onActivateTab: UsfmWorkspaceProps["onActivateTab"];
+  readonly onActivateGroup?: UsfmWorkspaceProps["onActivateGroup"];
   readonly onCloseTab: UsfmWorkspaceProps["onCloseTab"];
   readonly onUpdateTabValue: UsfmWorkspaceProps["onUpdateTabValue"];
   readonly onMarkTabDirty?: UsfmWorkspaceProps["onMarkTabDirty"];
@@ -464,6 +476,7 @@ function WorkspaceGridRow({
   setColumnFractions,
   tabsById,
   onActivateTab,
+  onActivateGroup,
   onCloseTab,
   onUpdateTabValue,
   onMarkTabDirty,
@@ -513,6 +526,7 @@ function WorkspaceGridRow({
               group={group}
               tabsById={tabsById}
               onActivateTab={onActivateTab}
+              onActivateGroup={onActivateGroup}
               onCloseTab={onCloseTab}
               onUpdateValue={onUpdateTabValue}
               onMarkTabDirty={onMarkTabDirty}
@@ -537,6 +551,7 @@ export function UsfmWorkspace({
   slots,
   tabsById,
   onActivateTab,
+  onActivateGroup,
   onUpdateTabValue,
   onMarkTabDirty,
   onSaveTab,
@@ -726,6 +741,7 @@ export function UsfmWorkspace({
                 setColumnFractions={setColFractions}
                 tabsById={tabsById}
                 onActivateTab={onActivateTab}
+                onActivateGroup={onActivateGroup}
                 onCloseTab={onCloseTab}
                 onUpdateTabValue={onUpdateTabValue}
                 onMarkTabDirty={onMarkTabDirty}
