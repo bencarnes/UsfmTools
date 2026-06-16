@@ -201,6 +201,39 @@ describe("UsfmShell", () => {
     expect(Number(count.textContent)).toBeGreaterThan(0);
   });
 
+  it("opens files into the active tab group and follows it in the errors panel", async () => {
+    const host = makeHost([
+      // \xyz is an unknown marker, so Bad.usfm produces a diagnostic; Good.usfm is clean.
+      { id: "f://bad", name: "Bad.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n\\v 1 ok\n\\xyz unknown\n" },
+      { id: "f://good", name: "Good.usfm", usfm: "\\id EXO\n\\c 1\n\\p\n\\v 1 fine" },
+    ]);
+    render(<UsfmShell host={host} />);
+    await waitFor(() => screen.getByTestId("usfm-shell-file-Bad.usfm"));
+
+    // Open Bad in the only (active) group; its error surfaces in the errors panel.
+    fireEvent.click(screen.getByTestId("usfm-shell-file-Bad.usfm"));
+    await screen.findByTestId("usfm-shell-errors-count", undefined, { timeout: 2500 });
+
+    // Split into 1×2; Bad stays in slot 0, leaving slot 1 empty.
+    fireEvent.click(screen.getByRole("button", { name: /tab group layout 1×1/i }));
+    fireEvent.click(screen.getByRole("option", { name: /1×2 layout/i }));
+    const emptySlot = await screen.findByLabelText(/empty tab group/i);
+
+    // Pressing inside the empty group makes it active, so the next opened file lands there.
+    fireEvent.pointerDown(emptySlot, { button: 0 });
+    fireEvent.click(screen.getByTestId("usfm-shell-file-Good.usfm"));
+    await waitFor(() => screen.getByRole("tab", { name: /Good\.usfm/i }));
+    // Both groups are populated now — Bad did not move out of slot 0.
+    expect(screen.getByRole("tab", { name: /Bad\.usfm/i })).toBeTruthy();
+    // Good (clean) is the active tab page, so the errors panel clears its count.
+    await waitFor(() => expect(screen.queryByTestId("usfm-shell-errors-count")).toBeNull());
+
+    // Pressing inside Bad's pane re-activates slot 0; the errors panel follows it back.
+    const badPane = document.querySelectorAll(".cm-content")[0]!;
+    fireEvent.pointerDown(badPane, { button: 0 });
+    await screen.findByTestId("usfm-shell-errors-count", undefined, { timeout: 2500 });
+  });
+
   it("toggles the bottom bar between expanded and collapsed", () => {
     const host = makeHost([]);
     render(<UsfmShell host={host} />);

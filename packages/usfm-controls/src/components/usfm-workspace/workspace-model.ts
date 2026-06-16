@@ -67,6 +67,12 @@ export interface UsfmWorkspaceProps {
   readonly slots: readonly UsfmWorkspaceEditorGroupState[];
   readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
   readonly onActivateTab: (groupId: string, tabId: string) => void;
+  /**
+   * Fired when a tab group becomes the active tab page — either its tab header is clicked or the
+   * pointer is pressed anywhere inside the group's pane. The shell uses this to decide which group
+   * receives newly opened files and whose diagnostics the errors panel shows.
+   */
+  readonly onActivateGroup?: (groupId: string) => void;
   readonly onUpdateTabValue: (tabId: string, value: string) => void;
   readonly onMarkTabDirty?: (tabId: string) => void;
   readonly onSaveTab?: (tabId: string, value: string) => void;

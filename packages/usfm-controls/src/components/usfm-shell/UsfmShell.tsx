@@ -98,7 +98,10 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   const [bottomExpanded, setBottomExpanded] = useState(defaultBottomExpanded);
   const [bottomTab, setBottomTab] = useState<BottomTab>("errors");
 
-  const [focusedTabId, setFocusedTabId] = useState<string | null>(null);
+  // The active tab page is the active tab of the active tab group. Tracking the group (rather than a
+  // bare tab id) lets newly opened files land in the group the user last interacted with, and keeps
+  // a stable target when the active tab is closed.
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<readonly Diagnostic[]>([]);
   const [validating, setValidating] = useState(false);
 
@@ -107,10 +110,19 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   const validateGenerationRef = useRef(0);
   const documentReadersRef = useRef(new Map<string, () => string>());
   const diagnosticsByTabRef = useRef(new Map<string, readonly Diagnostic[]>());
-  const focusedTabIdRef = useRef<string | null>(null);
+  const activeTabIdRef = useRef<string | null>(null);
+  const activeGroupIdRef = useRef<string | null>(null);
   const modelRef = useRef(model);
   modelRef.current = model;
-  focusedTabIdRef.current = focusedTabId;
+  activeGroupIdRef.current = activeGroupId;
+
+  const activeGroup = activeGroupId ? model.slots.find((s) => s.id === activeGroupId) ?? null : null;
+  const activeTabId = activeGroup?.activeTabId ?? null;
+  const activeTab = activeTabId ? model.tabsById[activeTabId] ?? null : null;
+  // The errors panel only follows USFM editor tabs; the settings pane has no diagnostics.
+  const activeEditorTab = activeTab && activeTab.kind !== "settings" ? activeTab : null;
+  const activeFileName = activeEditorTab?.fileName ?? null;
+  activeTabIdRef.current = activeTabId;
 
   const [closePrompt, setClosePrompt] = useState<{
     readonly fileName: string;
@@ -146,8 +158,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
 
   const closeTabNow = useCallback((groupId: string, tabId: string) => {
     setModel((p) => workspaceCloseTab(p, groupId, tabId));
-    if (focusedTabId === tabId) setFocusedTabId(null);
-  }, [focusedTabId]);
+  }, []);
 
   const handleSaveTab = useCallback(
     (tabId: string, value: string) => {
@@ -252,20 +263,11 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
     void host.pickFolder().then(refreshFolder);
   }, [host, refreshFolder]);
 
-  // Track first active tab as the focused tab when the workspace is non-empty.
+  // Keep the active tab group pointing at a real slot; default to the first slot.
   useEffect(() => {
-    if (focusedTabId && model.tabsById[focusedTabId]) return;
-    for (const slot of model.slots) {
-      if (slot.activeTabId) {
-        setFocusedTabId(slot.activeTabId);
-        return;
-      }
-    }
-    setFocusedTabId(null);
-  }, [model, focusedTabId]);
-
-  const focusedTab = focusedTabId ? model.tabsById[focusedTabId] ?? null : null;
-  const focusedFileName = focusedTab?.fileName ?? null;
+    if (activeGroupId && model.slots.some((s) => s.id === activeGroupId)) return;
+    setActiveGroupId(model.slots[0]?.id ?? null);
+  }, [model, activeGroupId]);
 
   const scheduleValidation = useCallback((tabId: string) => {
     const tab = modelRef.current.tabsById[tabId];
@@ -282,7 +284,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
       void clientRef.current.validate(content).then((diags) => {
         if (gen !== validateGenerationRef.current) return;
         diagnosticsByTabRef.current.set(tabId, diags);
-        if (focusedTabIdRef.current === tabId) {
+        if (activeTabIdRef.current === tabId) {
           setDiagnostics(diags);
         }
         setValidating(false);
@@ -291,7 +293,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   }, []);
 
   const handleEditorDocumentChange = useCallback((tabId: string) => {
-    if (tabId === focusedTabIdRef.current) scheduleValidation(tabId);
+    if (tabId === activeTabIdRef.current) scheduleValidation(tabId);
   }, [scheduleValidation]);
 
   const handleRegisterDocumentReader = useCallback((tabId: string, reader: () => string) => {
@@ -300,40 +302,45 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   }, []);
 
   const getDiagnosticsForTab = useCallback((tabId: string): readonly Diagnostic[] => {
-    if (tabId === focusedTabId) return diagnostics;
+    if (tabId === activeTabId) return diagnostics;
     return diagnosticsByTabRef.current.get(tabId) ?? [];
-  }, [focusedTabId, diagnostics]);
+  }, [activeTabId, diagnostics]);
 
-  // Validate when the focused editor tab changes.
+  // Validate when the active editor tab changes.
   useEffect(() => {
-    if (!focusedTabId) {
+    if (!activeTabId) {
       validateGenerationRef.current++;
       setDiagnostics([]);
       setValidating(false);
       return;
     }
-    const tab = modelRef.current.tabsById[focusedTabId];
+    const tab = modelRef.current.tabsById[activeTabId];
     if (!tab || tab.kind === "settings") {
       validateGenerationRef.current++;
       setDiagnostics([]);
       setValidating(false);
       return;
     }
-    setDiagnostics(diagnosticsByTabRef.current.get(focusedTabId) ?? []);
-    scheduleValidation(focusedTabId);
+    setDiagnostics(diagnosticsByTabRef.current.get(activeTabId) ?? []);
+    scheduleValidation(activeTabId);
     return () => {
       if (validateDebounceRef.current) {
         clearTimeout(validateDebounceRef.current);
         validateDebounceRef.current = null;
       }
     };
-  }, [focusedTabId, scheduleValidation]);
+  }, [activeTabId, scheduleValidation]);
 
   // ---- workspace callbacks ----
 
   const handleActivateTab = useCallback((groupId: string, tabId: string) => {
     setModel((p) => workspaceActivateTab(p, groupId, tabId));
-    setFocusedTabId(tabId);
+    setActiveGroupId(groupId);
+  }, []);
+
+  // Pressing anywhere inside a tab group makes it the active tab page (errors panel + open target).
+  const handleActivateGroup = useCallback((groupId: string) => {
+    setActiveGroupId(groupId);
   }, []);
 
   const handleUpdateTabValue = useCallback((tabId: string, value: string) => {
@@ -359,8 +366,11 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   );
 
   const handleOpenSettings = useCallback(() => {
-    setModel((p) => workspaceOpenSettingsTab(p));
-    setFocusedTabId(SETTINGS_TAB_ID);
+    const targetGroupId = activeGroupIdRef.current ?? modelRef.current.slots[0]?.id;
+    // Settings is a singleton: if it already lives in another group, that group becomes active.
+    const existing = modelRef.current.slots.find((s) => s.tabIds.includes(SETTINGS_TAB_ID));
+    setModel((p) => workspaceOpenSettingsTab(p, { groupId: targetGroupId }));
+    setActiveGroupId(existing?.id ?? targetGroupId ?? null);
   }, []);
 
   // ---- file open / focus ----
@@ -385,13 +395,16 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
           }
           return next;
         });
-        setFocusedTabId(existingTabId);
+        setActiveGroupId(groupHoldingTab);
         return;
       }
 
       const usfm = await host.readFile(entry.id);
       if (usfm == null) return;
-      const targetGroupId = model.slots[0]?.id;
+      // Open into the active tab group; fall back to the first slot when it is no longer valid.
+      const targetGroupId =
+        (activeGroupId && model.slots.some((s) => s.id === activeGroupId) ? activeGroupId : null) ??
+        model.slots[0]?.id;
       if (!targetGroupId) return;
 
       setModel((p) => {
@@ -404,9 +417,9 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
         }
         return next;
       });
-      setFocusedTabId(existingTabId);
+      setActiveGroupId(targetGroupId);
     },
-    [host, model.slots],
+    [host, model.slots, activeGroupId],
   );
 
   // ---- search ----
@@ -423,17 +436,17 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
 
   const onSelectDiagnostic = useCallback(
     (d: Diagnostic) => {
-      if (!focusedTabId) return;
-      const readDocument = documentReadersRef.current.get(focusedTabId);
-      const content = readDocument?.() ?? modelRef.current.tabsById[focusedTabId]?.value ?? "";
+      if (!activeTabId) return;
+      const readDocument = documentReadersRef.current.get(activeTabId);
+      const content = readDocument?.() ?? modelRef.current.tabsById[activeTabId]?.value ?? "";
       const offset = lineColumnToSourceOffset(content, d.range.start.line, d.range.start.column);
-      setModel((p) => workspaceRequestTabSelection(p, focusedTabId, offset, offset));
+      setModel((p) => workspaceRequestTabSelection(p, activeTabId, offset, offset));
     },
-    [focusedTabId],
+    [activeTabId],
   );
 
   const activeFileIdForBrowser =
-    focusedTab && fileEntries.some((f) => f.id === focusedTab.id) ? focusedTab.id : null;
+    activeTab && fileEntries.some((f) => f.id === activeTab.id) ? activeTab.id : null;
 
   const sidebarTabs = useMemo<readonly { id: SidebarTab; label: string; Icon: (p: { label?: string }) => ReactElement }[]>(
     () => [
@@ -549,6 +562,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             slots={model.slots}
             tabsById={model.tabsById}
             onActivateTab={handleActivateTab}
+            onActivateGroup={handleActivateGroup}
             onUpdateTabValue={handleUpdateTabValue}
             onMarkTabDirty={handleMarkTabDirty}
             onSaveTab={handleSaveTab}
@@ -623,7 +637,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             >
               {bottomTab === "errors" ? (
                 <ErrorsPanel
-                  activeFileName={focusedFileName}
+                  activeFileName={activeFileName}
                   diagnostics={diagnostics}
                   onSelectDiagnostic={onSelectDiagnostic}
                   loading={validating && diagnostics.length === 0}
