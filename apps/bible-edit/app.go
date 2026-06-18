@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 
 	"github.com/usfm-tools/bible-edit/internal/files"
@@ -202,6 +204,33 @@ func (a *App) SaveSettings(settings session.ApplicationSettings) error {
 	copy := settings
 	a.data.Settings = &copy
 	return a.persistSession()
+}
+
+// GetSystemTheme reports the OS light/dark preference as "dark" or "light", or "" when it cannot
+// be determined. The frontend uses this on Linux because WebKitGTK does not expose the system
+// `prefers-color-scheme` to the webview; on macOS/Windows it returns "" so the webview's own
+// media query (which works there) is used instead.
+func (a *App) GetSystemTheme() string {
+	if goruntime.GOOS != "linux" {
+		return ""
+	}
+	return detectLinuxColorScheme()
+}
+
+// detectLinuxColorScheme reads the desktop color-scheme preference, falling back to GTK_THEME.
+func detectLinuxColorScheme() string {
+	if out, err := exec.Command("gsettings", "get", "org.gnome.desktop.interface", "color-scheme").Output(); err == nil {
+		switch scheme := strings.ToLower(string(out)); {
+		case strings.Contains(scheme, "dark"):
+			return "dark"
+		case strings.Contains(scheme, "light"), strings.Contains(scheme, "default"):
+			return "light"
+		}
+	}
+	if strings.Contains(strings.ToLower(os.Getenv("GTK_THEME")), "dark") {
+		return "dark"
+	}
+	return ""
 }
 
 // AllowQuitAndExit bypasses the close guard and quits the application.

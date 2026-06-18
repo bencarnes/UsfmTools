@@ -31,6 +31,12 @@ Tab dragging in `UsfmShell` is implemented with **pointer events**, not the HTML
 
 No Wails/Go option fixes this — `options.App.DragAndDrop{ EnableFileDrop }` only governs dropping OS files into the window, not dragging DOM elements between each other. Prefer pointer events (the approach the split resizers and tab dragging already use) for any future drag features.
 
+## System theme detection in the webview
+
+The `prefers-color-scheme` media query does **not** track the OS light/dark setting in the Linux WebKitGTK webview — it stays fixed regardless of the desktop theme. This works as expected in WebView2 (Windows) and WKWebView (macOS) but not on Linux.
+
+This is an accepted limitation. Working around it (e.g. querying the GTK theme through Go and pushing it to the frontend) would add cross-platform complexity that isn't worth it; users can always set the theme explicitly in settings. Don't try to make automatic system-theme following work on Linux.
+
 ## Prerequisites
 
 - Go 1.22+

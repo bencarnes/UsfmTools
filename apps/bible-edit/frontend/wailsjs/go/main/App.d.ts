@@ -7,6 +7,8 @@ export function AllowQuitAndExit():Promise<void>;
 
 export function GetHostInfo():Promise<main.HostInfo>;
 
+export function GetSystemTheme():Promise<string>;
+
 export function ListRecentFolders():Promise<Array<session.RecentFolder>>;
 
 export function ListUsfmFiles(arg1:string):Promise<Array<main.FileEntry>>;

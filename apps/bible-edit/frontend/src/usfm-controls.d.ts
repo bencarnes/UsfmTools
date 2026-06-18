@@ -39,6 +39,15 @@ declare module "@usfm-tools/controls" {
   }
 
   export const UsfmShell: ComponentType<UsfmShellProps>;
+
+  export type ResolvedTheme = "light" | "dark";
+
+  export interface SystemThemeSource {
+    get(): ResolvedTheme;
+    subscribe(listener: (theme: ResolvedTheme) => void): () => void;
+  }
+
+  export function setSystemThemeSource(source: SystemThemeSource): void;
 }
 
 declare module "@usfm-tools/controls/styles.css";
