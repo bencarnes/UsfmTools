@@ -5,8 +5,13 @@ export type { SettingsProviderProps, SettingsContextValue } from "./settings-con
 export { DEFAULT_APPLICATION_SETTINGS, UI_THEME_OPTIONS } from "./settings-model.js";
 export { ThemeScope, useResolvedTheme } from "./theme-scope.js";
 export type { ThemeScopeProps } from "./theme-scope.js";
-export { getSystemTheme, resolveUiTheme } from "./theme-utils.js";
-export type { ResolvedTheme } from "./theme-utils.js";
+export {
+  getSystemTheme,
+  resolveUiTheme,
+  setSystemThemeSource,
+  subscribeSystemTheme,
+} from "./theme-utils.js";
+export type { ResolvedTheme, SystemThemeSource } from "./theme-utils.js";
 export type {
   ApplicationSettings,
   UiTheme,

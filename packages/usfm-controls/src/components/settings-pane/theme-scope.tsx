@@ -7,7 +7,12 @@ import {
   type ReactNode,
 } from "react";
 import { DEFAULT_APPLICATION_SETTINGS, type UiTheme } from "./settings-model.js";
-import { getSystemTheme, resolveUiTheme, type ResolvedTheme } from "./theme-utils.js";
+import {
+  getSystemTheme,
+  resolveUiTheme,
+  subscribeSystemTheme,
+  type ResolvedTheme,
+} from "./theme-utils.js";
 
 const SettingsThemeContext = createContext<UiTheme>(DEFAULT_APPLICATION_SETTINGS.theme);
 
@@ -29,13 +34,8 @@ export function ThemeScope({ theme: themeProp, children, className }: ThemeScope
 
   useEffect(() => {
     if (preference !== "system") return;
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setSystemTheme(media.matches ? "dark" : "light");
-    onChange();
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
+    setSystemTheme(getSystemTheme());
+    return subscribeSystemTheme(setSystemTheme);
   }, [preference]);
 
   const resolved = useMemo(
@@ -60,13 +60,8 @@ export function useResolvedTheme(explicit?: UiTheme): ResolvedTheme {
 
   useEffect(() => {
     if (preference !== "system") return;
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setSystemTheme(media.matches ? "dark" : "light");
-    onChange();
-    media.addEventListener("change", onChange);
-    return () => media.removeEventListener("change", onChange);
+    setSystemTheme(getSystemTheme());
+    return subscribeSystemTheme(setSystemTheme);
   }, [preference]);
 
   return useMemo(() => resolveUiTheme(preference, systemTheme), [preference, systemTheme]);

@@ -47,6 +47,8 @@ export {
   useResolvedTheme,
   getSystemTheme,
   resolveUiTheme,
+  setSystemThemeSource,
+  subscribeSystemTheme,
 } from "./components/settings-pane/index.js";
 export type {
   SettingsPaneProps,
@@ -58,6 +60,7 @@ export type {
   SettingsHost,
   ThemeScopeProps,
   ResolvedTheme,
+  SystemThemeSource,
 } from "./components/settings-pane/index.js";
 export { UsfmShell, createFixtureUsfmShellHost } from "./components/usfm-shell/index.js";
 export type {

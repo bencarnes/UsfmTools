@@ -10,6 +10,10 @@ export function GetHostInfo() {
   return window['go']['main']['App']['GetHostInfo']();
 }
 
+export function GetSystemTheme() {
+  return window['go']['main']['App']['GetSystemTheme']();
+}
+
 export function ListRecentFolders() {
   return window['go']['main']['App']['ListRecentFolders']();
 }
