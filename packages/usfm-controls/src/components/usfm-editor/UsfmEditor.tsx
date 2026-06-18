@@ -252,6 +252,12 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
             backgroundColor: "var(--usfm-cm-bg)",
             color: "var(--usfm-cm-fg)",
           },
+          // No drawSelection() extension is enabled, so the editor uses the
+          // native browser caret. Its color comes from `caret-color`, not the
+          // `.cm-cursor` DOM layer (which is never rendered here).
+          ".cm-content": {
+            caretColor: "var(--usfm-cm-caret)",
+          },
           ".cm-scroller": {
             overflow: "auto",
             fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",

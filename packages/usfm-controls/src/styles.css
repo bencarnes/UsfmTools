@@ -22,6 +22,7 @@
 
     --usfm-cm-bg: #ffffff;
     --usfm-cm-fg: #111827;
+    --usfm-cm-caret: #2563eb;
     --usfm-cm-gutter: #f3f4f6;
     --usfm-cm-gutter-fg: #9ca3af;
     --usfm-cm-selection: #dbeafe;
@@ -62,6 +63,7 @@
 
     --usfm-cm-bg: #111827;
     --usfm-cm-fg: #f3f4f6;
+    --usfm-cm-caret: #60a5fa;
     --usfm-cm-gutter: #1f2937;
     --usfm-cm-gutter-fg: #6b7280;
     --usfm-cm-selection: rgb(37 99 235 / 0.35);
