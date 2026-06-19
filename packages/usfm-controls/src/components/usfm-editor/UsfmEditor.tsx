@@ -298,6 +298,20 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
           ".cm-usfm-attrvalue": {
             color: "var(--usfm-syntax-attrvalue)",
           },
+          // Autocomplete (intellisense) dropdown. The default CodeMirror theme
+          // assumes light mode, so drive its colors from our CSS variables.
+          ".cm-tooltip.cm-tooltip-autocomplete": {
+            backgroundColor: "var(--usfm-cm-tooltip-bg)",
+            color: "var(--usfm-cm-fg)",
+            border: "1px solid var(--usfm-cm-tooltip-border)",
+          },
+          ".cm-tooltip.cm-tooltip-autocomplete > ul > li": {
+            color: "var(--usfm-cm-fg)",
+          },
+          ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
+            backgroundColor: "var(--usfm-cm-tooltip-selected-bg)",
+            color: "var(--usfm-cm-tooltip-selected-fg)",
+          },
         }),
       ],
     });
