@@ -17,6 +17,8 @@
     --usfm-accent: #2563eb;
     --usfm-accent-muted: #eff6ff;
     --usfm-accent-fg: #1e3a8a;
+    --usfm-accent-bg: #dbeafe;
+    --usfm-accent-border: #93c5fd;
     --usfm-control-bg: color-mix(in srgb, var(--usfm-surface) 96%, var(--usfm-fg) 4%);
     --usfm-shadow-popover: 0 4px 12px rgb(15 23 42 / 0.12);
 
@@ -62,6 +64,8 @@
     --usfm-accent: #60a5fa;
     --usfm-accent-muted: rgb(30 58 138 / 0.35);
     --usfm-accent-fg: #bfdbfe;
+    --usfm-accent-bg: rgb(37 99 235 / 0.35);
+    --usfm-accent-border: #60a5fa;
     --usfm-control-bg: color-mix(in srgb, var(--usfm-surface) 92%, var(--usfm-fg) 8%);
     --usfm-shadow-popover: 0 4px 12px rgb(0 0 0 / 0.45);
 
