@@ -26,6 +26,10 @@
     --usfm-cm-gutter: #f3f4f6;
     --usfm-cm-gutter-fg: #9ca3af;
     --usfm-cm-selection: #dbeafe;
+    --usfm-cm-tooltip-bg: #ffffff;
+    --usfm-cm-tooltip-border: #d1d5db;
+    --usfm-cm-tooltip-selected-bg: #dbeafe;
+    --usfm-cm-tooltip-selected-fg: #1e3a8a;
     --usfm-syntax-marker: #1e40af;
     --usfm-syntax-endmarker: #6b21a8;
     --usfm-syntax-verse: #b91c1c;
@@ -67,6 +71,10 @@
     --usfm-cm-gutter: #1f2937;
     --usfm-cm-gutter-fg: #6b7280;
     --usfm-cm-selection: rgb(37 99 235 / 0.35);
+    --usfm-cm-tooltip-bg: #1f2937;
+    --usfm-cm-tooltip-border: #4b5563;
+    --usfm-cm-tooltip-selected-bg: rgb(37 99 235 / 0.45);
+    --usfm-cm-tooltip-selected-fg: #bfdbfe;
     --usfm-syntax-marker: #60a5fa;
     --usfm-syntax-endmarker: #c084fc;
     --usfm-syntax-verse: #f87171;
