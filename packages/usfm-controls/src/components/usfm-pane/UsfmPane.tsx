@@ -35,6 +35,7 @@ import {
   sourceOffsetForChapterVerse,
 } from "./scroll-sync.js";
 import { ScrollSyncToggleButton } from "./scroll-sync-toggle.js";
+import { WordWrapToggleButton } from "./word-wrap-toggle.js";
 import { nextViewMode, ViewModeCycleButton, type UsfmPaneViewMode } from "./view-mode-toggle.js";
 import { FindToolbarButton } from "./find-toolbar-button.js";
 import { SaveToolbarButton } from "./save-toolbar-button.js";
@@ -135,6 +136,7 @@ export function UsfmPane({
   const [editorTopOffset, setEditorTopOffset] = useState(0);
   const [previewTopChapter, setPreviewTopChapter] = useState<string | null>(null);
   const [scrollSyncEnabled, setScrollSyncEnabled] = useState(defaultScrollSyncEnabled);
+  const [wordWrapEnabled, setWordWrapEnabled] = useState(true);
 
   const editorRef = useRef<UsfmEditorHandle>(null);
   const valueRef = useRef(value);
@@ -439,6 +441,12 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
         onToggle={() => setScrollSyncEnabled((v) => !v)}
       />
 
+      <WordWrapToggleButton
+        wordWrapEnabled={wordWrapEnabled}
+        buttonStyle={btnBase}
+        onToggle={() => setWordWrapEnabled((v) => !v)}
+      />
+
       <FindToolbarButton
         disabled={viewMode === "preview"}
         buttonStyle={btnBase}
@@ -496,6 +504,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
             diagnostics={diagnostics}
             onSave={handleSave}
             onViewportAnchorChange={onEditorViewportAnchor}
+            wordWrap={wordWrapEnabled}
             className="flex-1 min-h-0 h-full border-0 rounded-none"
           />
         )}
@@ -523,6 +532,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 diagnostics={diagnostics}
                 onSave={handleSave}
                 onViewportAnchorChange={onEditorViewportAnchor}
+                wordWrap={wordWrapEnabled}
                 className="flex-1 min-h-0 h-full border-0 rounded-none"
               />
             </div>

@@ -5,7 +5,7 @@ import {
   useRef,
 } from "react";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
-import { EditorState, EditorSelection, Prec } from "@codemirror/state";
+import { EditorState, EditorSelection, Prec, Compartment } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { setDiagnostics } from "@codemirror/lint";
@@ -62,6 +62,8 @@ export interface UsfmEditorProps {
   onRegisterDocumentReader?: (readDocument: () => string) => void | (() => void);
   /** When set, Ctrl+S / Cmd+S triggers this callback instead of the browser save dialog. */
   onSave?: () => void;
+  /** When true (default), long lines soft-wrap; when false, the editor scrolls horizontally. */
+  wordWrap?: boolean;
   className?: string;
   /**
    * Fired (debounced ~120ms after scroll or selection-driven viewport changes) with the
@@ -81,12 +83,14 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     onRegisterDocumentReader,
     onSave,
     onViewportAnchorChange,
+    wordWrap = true,
     className,
   },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const wordWrapCompartmentRef = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
   const onDirtyRef = useRef(onDirty);
   const onDocumentChangeRef = useRef(onDocumentChange);
@@ -223,6 +227,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     const state = EditorState.create({
       doc: value,
       extensions: [
+        wordWrapCompartmentRef.current.of(wordWrap ? EditorView.lineWrapping : []),
         lineNumbers(),
         history(),
         bracketMatching(),
@@ -330,6 +335,16 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     if (!view) return;
     view.dispatch(setDiagnostics(view.state, languageDiagnosticsToCm(view.state.doc, diagnostics)));
   }, [diagnostics]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: wordWrapCompartmentRef.current.reconfigure(
+        wordWrap ? EditorView.lineWrapping : [],
+      ),
+    });
+  }, [wordWrap]);
 
   // Update content when value prop changes externally
   useEffect(() => {
