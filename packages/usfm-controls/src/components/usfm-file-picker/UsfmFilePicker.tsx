@@ -59,7 +59,7 @@ const fileButtonBase: CSSProperties = {
 const activeFileButton: CSSProperties = {
   background: "var(--usfm-accent-bg, #dbeafe)",
   color: "var(--usfm-accent-fg, #1e3a8a)",
-  borderColor: "var(--usfm-accent-border, #93c5fd)",
+  border: "2px solid var(--usfm-accent-fg, #1e3a8a)",
 };
 
 const dividerStyle: CSSProperties = themedControlDivider;
