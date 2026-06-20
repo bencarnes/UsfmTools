@@ -55,6 +55,19 @@ wails dev
 
 `wails dev` runs the Vite dev server and opens the desktop window with hot reload.
 
+On systems that only have WebKitGTK 4.1 (Ubuntu 24.04+), the default `wails dev`
+fails to compile with `Package 'webkit2gtk-4.0' ... not found`. Pass the same tag
+`build.sh` uses for builds:
+
+```bash
+wails dev -tags webkit2_41
+```
+
+The app runs in the native window `wails dev` opens — not in the browser. The
+URLs printed in the terminal are for debugging: only the Wails dev server
+(`http://localhost:34115`) injects the Go bindings, so the raw Vite URL renders a
+blank page for this app.
+
 ## Build
 
 ```bash
