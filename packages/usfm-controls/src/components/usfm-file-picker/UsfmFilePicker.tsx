@@ -188,6 +188,8 @@ export function UsfmFilePicker({
             files={resolvedGroups.newTestament}
             activeFileId={activeFileId}
             onFileSelect={onFileSelect}
+            onFileDragStart={onFileDragStart}
+            consumeFileDragEnd={consumeFileDragEnd}
             fileTestIdPrefix={fileTestIdPrefix}
           />
         </>
@@ -199,6 +201,8 @@ export function UsfmFilePicker({
             files={resolvedGroups.other}
             activeFileId={activeFileId}
             onFileSelect={onFileSelect}
+            onFileDragStart={onFileDragStart}
+            consumeFileDragEnd={consumeFileDragEnd}
             fileTestIdPrefix={fileTestIdPrefix}
           />
         </>
@@ -210,6 +214,8 @@ export function UsfmFilePicker({
             files={resolvedGroups.nonStandard}
             activeFileId={activeFileId}
             onFileSelect={onFileSelect}
+            onFileDragStart={onFileDragStart}
+            consumeFileDragEnd={consumeFileDragEnd}
             fileTestIdPrefix={fileTestIdPrefix}
           />
         </>
