@@ -17,6 +17,7 @@ import { UsfmPane } from "../usfm-pane/UsfmPane.js";
 import { SettingsPane } from "../settings-pane/SettingsPane.js";
 import { TabGroupLayoutSelector } from "../tab-group-layout-selector/TabGroupLayoutSelector.js";
 import { TabListDropdown } from "./tab-list-dropdown.js";
+import { TabContextMenu, type TabContextMenuItem } from "./tab-context-menu.js";
 import { dropTargetAtPoint } from "./drop-target.js";
 import type { Diagnostic } from "../../language-service/protocol.js";
 import type {
@@ -190,6 +191,8 @@ interface TabStripProps {
   readonly tabsById: Readonly<Record<string, UsfmWorkspaceTabState>>;
   readonly onActivate: (tabId: string) => void;
   readonly onClose: (tabId: string) => void;
+  readonly onCloseOthers: (keepTabId: string) => void;
+  readonly onCloseAll: () => void;
 }
 
 function TabStrip({
@@ -199,9 +202,30 @@ function TabStrip({
   tabsById,
   onActivate,
   onClose,
+  onCloseOthers,
+  onCloseAll,
 }: TabStripProps) {
   const drag = useContext(TabDragContext);
   const isDropTarget = drag?.active != null && drag.active.overGroupId === groupId;
+
+  // Right-click menu anchored at the pointer for the tab identified by `tabId`.
+  const [menu, setMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+
+  const openMenu = (e: ReactMouseEvent, tabId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenu({ tabId, x: e.clientX, y: e.clientY });
+  };
+
+  const menuItems = useMemo<readonly TabContextMenuItem[]>(() => {
+    if (!menu) return [];
+    return [
+      { label: "Close", onSelect: () => onClose(menu.tabId) },
+      { label: "Close Others", disabled: tabIds.length <= 1, onSelect: () => onCloseOthers(menu.tabId) },
+      { label: "Close All", disabled: tabIds.length === 0, onSelect: () => onCloseAll() },
+    ];
+  }, [menu, tabIds.length, onClose, onCloseOthers, onCloseAll]);
 
   return (
     <div className="flex min-w-0 flex-1 items-stretch">
@@ -224,6 +248,7 @@ function TabStrip({
                   : "border-transparent bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
               }`}
               data-workspace-tab-id={tid}
+              onContextMenu={(ev) => openMenu(ev, tid)}
             >
               <button
                 type="button"
@@ -269,6 +294,7 @@ function TabStrip({
         tabsById={tabsById}
         onActivate={onActivate}
       />
+      {menu ? <TabContextMenu x={menu.x} y={menu.y} items={menuItems} onDismiss={closeMenu} /> : null}
     </div>
   );
 }
@@ -303,6 +329,8 @@ interface EditorGroupPanelProps {
   readonly onActivateTab: (groupId: string, tabId: string) => void;
   readonly onActivateGroup?: (groupId: string) => void;
   readonly onCloseTab: (groupId: string, tabId: string) => void;
+  readonly onCloseOtherTabs?: (groupId: string, keepTabId: string) => void;
+  readonly onCloseAllTabs?: (groupId: string) => void;
   readonly onUpdateValue: (tabId: string, value: string) => void;
   readonly onMarkTabDirty?: (tabId: string) => void;
   readonly onSaveValue?: (tabId: string, value: string) => void;
@@ -320,6 +348,8 @@ function EditorGroupPanel({
   onActivateTab,
   onActivateGroup,
   onCloseTab,
+  onCloseOtherTabs,
+  onCloseAllTabs,
   onUpdateValue,
   onMarkTabDirty,
   onSaveValue,
@@ -332,6 +362,25 @@ function EditorGroupPanel({
 }: EditorGroupPanelProps) {
   const [toolbarEl, setToolbarEl] = useState<HTMLDivElement | null>(null);
   const isEmpty = group.tabIds.length === 0;
+
+  // "Close Others" / "Close All" use the dedicated handlers when the host provides them (so the shell
+  // can prompt once per unsaved file); otherwise fall back to closing the target tabs individually.
+  const handleCloseOthers = (keepTabId: string) => {
+    if (onCloseOtherTabs) {
+      onCloseOtherTabs(group.id, keepTabId);
+      return;
+    }
+    for (const tid of group.tabIds) {
+      if (tid !== keepTabId) onCloseTab(group.id, tid);
+    }
+  };
+  const handleCloseAll = () => {
+    if (onCloseAllTabs) {
+      onCloseAllTabs(group.id);
+      return;
+    }
+    for (const tid of group.tabIds) onCloseTab(group.id, tid);
+  };
 
   // Pressing anywhere inside a group (tab strip, pane body, toolbar) makes it the active tab page.
   const handleActivateGroup = onActivateGroup ? () => onActivateGroup(group.id) : undefined;
@@ -360,6 +409,8 @@ function EditorGroupPanel({
           tabsById={tabsById}
           onActivate={(tabId) => onActivateTab(group.id, tabId)}
           onClose={(tabId) => onCloseTab(group.id, tabId)}
+          onCloseOthers={handleCloseOthers}
+          onCloseAll={handleCloseAll}
         />
         <div
           ref={setToolbarEl}
@@ -429,6 +480,8 @@ interface WorkspaceGridRowProps {
   readonly onActivateTab: UsfmWorkspaceProps["onActivateTab"];
   readonly onActivateGroup?: UsfmWorkspaceProps["onActivateGroup"];
   readonly onCloseTab: UsfmWorkspaceProps["onCloseTab"];
+  readonly onCloseOtherTabs?: UsfmWorkspaceProps["onCloseOtherTabs"];
+  readonly onCloseAllTabs?: UsfmWorkspaceProps["onCloseAllTabs"];
   readonly onUpdateTabValue: UsfmWorkspaceProps["onUpdateTabValue"];
   readonly onMarkTabDirty?: UsfmWorkspaceProps["onMarkTabDirty"];
   readonly onSaveTab?: UsfmWorkspaceProps["onSaveTab"];
@@ -449,6 +502,8 @@ function WorkspaceGridRow({
   onActivateTab,
   onActivateGroup,
   onCloseTab,
+  onCloseOtherTabs,
+  onCloseAllTabs,
   onUpdateTabValue,
   onMarkTabDirty,
   onSaveTab,
@@ -499,6 +554,8 @@ function WorkspaceGridRow({
               onActivateTab={onActivateTab}
               onActivateGroup={onActivateGroup}
               onCloseTab={onCloseTab}
+              onCloseOtherTabs={onCloseOtherTabs}
+              onCloseAllTabs={onCloseAllTabs}
               onUpdateValue={onUpdateTabValue}
               onMarkTabDirty={onMarkTabDirty}
               onSaveValue={onSaveTab}
@@ -530,6 +587,8 @@ export function UsfmWorkspace({
   onEditorDocumentChange,
   onRegisterDocumentReader,
   onCloseTab,
+  onCloseOtherTabs,
+  onCloseAllTabs,
   onReorderTabInGroup,
   onMoveTabToGroup,
   onChangeGridLayout,
@@ -726,6 +785,8 @@ export function UsfmWorkspace({
                 onActivateTab={onActivateTab}
                 onActivateGroup={onActivateGroup}
                 onCloseTab={onCloseTab}
+                onCloseOtherTabs={onCloseOtherTabs}
+                onCloseAllTabs={onCloseAllTabs}
                 onUpdateTabValue={onUpdateTabValue}
                 onMarkTabDirty={onMarkTabDirty}
                 onSaveTab={onSaveTab}

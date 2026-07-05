@@ -18,6 +18,7 @@ import {
   workspaceActivateTab,
   workspaceAppendTab,
   workspaceCloseTab,
+  workspaceCloseTabs,
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
   workspaceOpenSettingsTab,
@@ -200,6 +201,43 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
       })();
     },
     [askUnsavedClose, closeTabNow, saveTabById],
+  );
+
+  // Close a batch of tabs from one group (the "Close Others" / "Close All" tab menu actions),
+  // prompting once per unsaved file. Cancelling any prompt aborts the whole action so nothing closes.
+  const closeTabs = useCallback(
+    (groupId: string, tabIds: readonly string[]) => {
+      if (tabIds.length === 0) return;
+      void (async () => {
+        for (const tabId of tabIds) {
+          const tab = modelRef.current.tabsById[tabId];
+          if (!tab || tab.kind === "settings" || !tab.dirty) continue;
+          const choice = await askUnsavedClose(tab.fileName, { kind: "tab", groupId, tabId });
+          if (choice === "cancel") return;
+          if (choice === "save") await saveTabById(tabId);
+        }
+        setModel((p) => workspaceCloseTabs(p, groupId, tabIds));
+      })();
+    },
+    [askUnsavedClose, saveTabById],
+  );
+
+  const handleCloseOtherTabs = useCallback(
+    (groupId: string, keepTabId: string) => {
+      const group = modelRef.current.slots.find((s) => s.id === groupId);
+      if (!group) return;
+      closeTabs(groupId, group.tabIds.filter((t) => t !== keepTabId));
+    },
+    [closeTabs],
+  );
+
+  const handleCloseAllTabs = useCallback(
+    (groupId: string) => {
+      const group = modelRef.current.slots.find((s) => s.id === groupId);
+      if (!group) return;
+      closeTabs(groupId, [...group.tabIds]);
+    },
+    [closeTabs],
   );
 
   const confirmExit = useCallback(async (): Promise<boolean> => {
@@ -699,6 +737,8 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             onEditorDocumentChange={handleEditorDocumentChange}
             onRegisterDocumentReader={handleRegisterDocumentReader}
             onCloseTab={handleCloseTab}
+            onCloseOtherTabs={handleCloseOtherTabs}
+            onCloseAllTabs={handleCloseAllTabs}
             onReorderTabInGroup={handleReorderTabInGroup}
             onMoveTabToGroup={handleMoveTabToGroup}
             onChangeGridLayout={handleChangeGridLayout}

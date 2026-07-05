@@ -305,6 +305,26 @@ describe("UsfmShell", () => {
     expect(screen.getByRole("tab", { name: /A\.usfm/i })).toBeTruthy();
   });
 
+  it("closes every tab in a group from the tab context menu", async () => {
+    const host = makeHost([
+      { id: "f://a", name: "A.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n\\v 1 hi" },
+      { id: "f://b", name: "B.usfm", usfm: "\\id EXO\n\\c 1\n\\p\n\\v 1 hi" },
+    ]);
+    render(<UsfmShell host={host} />);
+    await waitFor(() => screen.getByTestId("usfm-shell-file-A.usfm"));
+
+    fireEvent.click(screen.getByTestId("usfm-shell-file-A.usfm"));
+    await waitFor(() => screen.getByRole("tab", { name: /A\.usfm/i }));
+    fireEvent.click(screen.getByTestId("usfm-shell-file-B.usfm"));
+    await waitFor(() => screen.getByRole("tab", { name: /B\.usfm/i }));
+
+    fireEvent.contextMenu(screen.getByRole("tab", { name: /A\.usfm/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Close All" }));
+
+    await waitFor(() => expect(screen.queryByRole("tab", { name: /A\.usfm/i })).toBeNull());
+    expect(screen.queryByRole("tab", { name: /B\.usfm/i })).toBeNull();
+  });
+
   it("toggles the bottom bar between expanded and collapsed", () => {
     const host = makeHost([]);
     render(<UsfmShell host={host} />);
