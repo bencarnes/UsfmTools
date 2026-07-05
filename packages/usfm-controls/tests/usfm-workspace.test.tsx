@@ -10,6 +10,7 @@ import {
   workspaceActivateTab,
   workspaceAppendTab,
   workspaceCloseTab,
+  workspaceCloseTabs,
   workspaceMoveTabToGroup,
   workspaceReorderTabInGroup,
   workspaceSetGridLayout,
@@ -60,6 +61,18 @@ function Harness({
         });
       }}
       onCloseTab={(groupId, tabId) => setModel((p) => workspaceCloseTab(p, groupId, tabId))}
+      onCloseOtherTabs={(groupId, keepTabId) =>
+        setModel((p) => {
+          const group = p.slots.find((s) => s.id === groupId);
+          return group ? workspaceCloseTabs(p, groupId, group.tabIds.filter((t) => t !== keepTabId)) : p;
+        })
+      }
+      onCloseAllTabs={(groupId) =>
+        setModel((p) => {
+          const group = p.slots.find((s) => s.id === groupId);
+          return group ? workspaceCloseTabs(p, groupId, [...group.tabIds]) : p;
+        })
+      }
       onReorderTabInGroup={(groupId, tabId, toIndex) =>
         setModel((p) => workspaceReorderTabInGroup(p, groupId, tabId, toIndex))
       }
@@ -334,6 +347,76 @@ describe("UsfmWorkspace", () => {
     const remaining = merged.slots[0]!.tabIds.filter((id) => merged.tabsById[id]?.fileId === "doc");
     expect(remaining).toHaveLength(1);
     expect(Object.keys(merged.tabsById)).toHaveLength(1);
+  });
+
+  it("workspaceCloseTabs closes several tabs at once and keeps the active tab valid", () => {
+    const m0 = buildWorkspaceModelFromInitialTabs([
+      { id: "a", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
+      { id: "b", fileName: "B.usfm", value: "\\id EXO\n\\c 1\n\\p\n\\v 1 B" },
+      { id: "c", fileName: "C.usfm", value: "\\id LEV\n\\c 1\n\\p\n\\v 1 C" },
+    ]);
+    const gid = m0.slots[0]!.id;
+    const active = workspaceActivateTab(m0, gid, "b");
+
+    // Closing the active tab plus another leaves the surviving tab active.
+    const closed = workspaceCloseTabs(active, gid, ["a", "b"]);
+    expect(closed.slots[0]!.tabIds).toEqual(["c"]);
+    expect(closed.slots[0]!.activeTabId).toBe("c");
+    expect(Object.keys(closed.tabsById).sort()).toEqual(["c"]);
+
+    // Closing every tab empties the slot without creating a replacement tab.
+    const all = workspaceCloseTabs(m0, gid, [...m0.slots[0]!.tabIds]);
+    expect(all.slots[0]!.tabIds).toEqual([]);
+    expect(all.slots[0]!.activeTabId).toBeNull();
+    expect(Object.keys(all.tabsById)).toHaveLength(0);
+  });
+
+  it("closes other tabs from the tab context menu, keeping only the right-clicked one", () => {
+    render(
+      <Harness
+        initialTabs={[
+          { id: "t-a", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
+          { id: "t-b", fileName: "B.usfm", value: "\\id EXO\n\\c 1\n\\p\n\\v 1 B" },
+          { id: "t-c", fileName: "C.usfm", value: "\\id LEV\n\\c 1\n\\p\n\\v 1 C" },
+        ]}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByRole("tab", { name: /B\.usfm/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Close Others" }));
+
+    expect(screen.getByRole("tab", { name: /B\.usfm/i })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: /A\.usfm/i })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /C\.usfm/i })).toBeNull();
+  });
+
+  it("closes all tabs from the tab context menu", () => {
+    render(
+      <Harness
+        initialTabs={[
+          { id: "t-a", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" },
+          { id: "t-b", fileName: "B.usfm", value: "\\id EXO\n\\c 1\n\\p\n\\v 1 B" },
+        ]}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByRole("tab", { name: /A\.usfm/i }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Close All" }));
+
+    expect(screen.queryByRole("tab", { name: /A\.usfm/i })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /B\.usfm/i })).toBeNull();
+  });
+
+  it("disables Close Others in the context menu when a group holds a single tab", () => {
+    render(
+      <Harness
+        initialTabs={[{ id: "t-only", fileName: "A.usfm", value: "\\id GEN\n\\c 1\n\\p\n\\v 1 A" }]}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByRole("tab", { name: /A\.usfm/i }));
+    const closeOthers = screen.getByRole("menuitem", { name: "Close Others" }) as HTMLButtonElement;
+    expect(closeOthers.disabled).toBe(true);
   });
 
   it("changes the grid layout from the tab group toolbar selector", () => {

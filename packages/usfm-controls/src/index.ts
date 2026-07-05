@@ -26,6 +26,7 @@ export {
   workspaceActivateTab,
   workspaceAppendTab,
   workspaceCloseTab,
+  workspaceCloseTabs,
   workspaceFlattenGroups,
   workspaceFlattenNonEmptyGroups,
   workspaceMoveTabToGroup,

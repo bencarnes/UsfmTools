@@ -86,6 +86,16 @@ export interface UsfmWorkspaceProps {
   readonly onMarkTabDirty?: (tabId: string) => void;
   readonly onSaveTab?: (tabId: string, value: string) => void;
   readonly onCloseTab: (groupId: string, tabId: string) => void;
+  /**
+   * Close every tab in the group except `keepTabId` (the "Close Others" context-menu action). When
+   * omitted, the tab strip falls back to closing the other tabs one by one via {@link onCloseTab}.
+   */
+  readonly onCloseOtherTabs?: (groupId: string, keepTabId: string) => void;
+  /**
+   * Close every tab in the group (the "Close All" context-menu action). When omitted, the tab strip
+   * falls back to closing each tab via {@link onCloseTab}.
+   */
+  readonly onCloseAllTabs?: (groupId: string) => void;
   readonly onReorderTabInGroup: (groupId: string, tabId: string, toIndex: number) => void;
   readonly onMoveTabToGroup: (detail: {
     readonly tabId: string;
@@ -349,12 +359,28 @@ export function workspaceListDirtyEditorTabs(model: UsfmWorkspaceModel): UsfmWor
 }
 
 export function workspaceCloseTab(model: UsfmWorkspaceModel, groupId: string, tabId: string): UsfmWorkspaceModel {
+  return workspaceCloseTabs(model, groupId, [tabId]);
+}
+
+/**
+ * Close several tabs from one group at once (e.g. the "Close Others" / "Close All" tab context-menu
+ * actions). Tabs not present in the group are ignored. If the active tab is among those closed, the
+ * first surviving tab becomes active (or none, leaving an empty slot — no tab is created).
+ */
+export function workspaceCloseTabs(
+  model: UsfmWorkspaceModel,
+  groupId: string,
+  tabIds: readonly string[],
+): UsfmWorkspaceModel {
   const si = findSlotIndex(model.slots, groupId);
   if (si < 0) return model;
+  const closing = new Set(tabIds);
+  if (closing.size === 0) return model;
   const g = model.slots[si]!;
-  const nextIds = removeTabFromGroup(g.tabIds, tabId);
+  const nextIds = g.tabIds.filter((t) => !closing.has(t));
+  if (nextIds.length === g.tabIds.length) return model;
   let nextActive = g.activeTabId;
-  if (nextActive === tabId) nextActive = nextIds[0] ?? null;
+  if (nextActive != null && closing.has(nextActive)) nextActive = nextIds[0] ?? null;
 
   const slots = model.slots.map((s, i) =>
     i === si ? { ...cloneGroup(s), tabIds: nextIds, activeTabId: nextActive } : cloneGroup(s),
