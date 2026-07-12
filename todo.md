@@ -65,7 +65,7 @@ Ask clarifying questions as needed.
 
 ### Docs & cleanup
 
-- [ ] **README.md for the Go module** — architecture overview (library / engine / CLI), the LSP-like protocol (document sync, versioning, feature requests), how to use it as a library, CLI usage, and how bible-edit integrates it.
+- [x] **README.md for the Go module** — architecture overview (library / engine / CLI), the LSP-like protocol (document sync, versioning, feature requests), how to use it as a library, CLI usage, and how bible-edit integrates it. _Done: `usfm-parser-go/README.md` covers the package layout, the UTF-16/byte position model, library examples (parse/diagnostics/preview), the engine's LSP-like protocol (lifecycle, version gating, edit-batch convention, coalescing, push vs pull, per-feature request table), CLI usage and exit codes, the bible-edit integration path (bindings → `usfm:analysis` event → frontend adapter/DocumentSync, incl. the TS fallback), the three-layer testing story (unit / BSB corpus / byte-identical differential dumps), and the inherited-quirk fidelity notes. `doc.go` package list updated to include `preview`; README commands verified to run._
 - [ ] **Update repo docs** — `AGENTS.md` / root `README.md`: new package layout, Go toolchain requirement, build commands.
 
 ### Performance revisit
