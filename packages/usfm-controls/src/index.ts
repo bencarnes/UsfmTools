@@ -113,6 +113,8 @@ export type {
 export {
   UsfmLanguageService,
   createLanguageClient,
+  changesFromChangeSet,
+  DocumentSync,
   DiagnosticSeverity,
   TokenType,
 } from "./language-service/index.js";
@@ -124,4 +126,14 @@ export type {
   Diagnostic,
   CompletionItem,
   TokenClassification,
+  AnalysisEvent,
+  BookInfo,
+  ChapterInfo,
+  ChangeSetLike,
+  DiagnosticsResult,
+  DocumentChange,
+  DocumentSyncOptions,
+  StructureResult,
+  TokensResult,
+  UsfmLanguageClient,
 } from "./language-service/index.js";
