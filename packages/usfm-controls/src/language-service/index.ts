@@ -19,3 +19,9 @@ export type {
 export { DiagnosticSeverity, TokenType } from "./protocol.js";
 export { changesFromChangeSet, DocumentSync } from "./document-sync.js";
 export type { ChangeSetLike, DocumentSyncOptions } from "./document-sync.js";
+export {
+  applyChangesToText,
+  createLocalLanguageClient,
+  sharedLocalLanguageClient,
+} from "./local-client.js";
+export type { LocalLanguageClientOptions } from "./local-client.js";

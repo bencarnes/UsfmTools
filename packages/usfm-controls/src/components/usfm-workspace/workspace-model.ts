@@ -2,7 +2,7 @@
  * What a workspace tab renders. `editor` tabs hold USFM content edited in a {@link UsfmPane};
  * `settings` tabs render the {@link SettingsPane}. Defaults to `editor` when omitted.
  */
-import type { Diagnostic } from "../../language-service/protocol.js";
+import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
 
 export type UsfmWorkspaceTabKind = "editor" | "settings";
 
@@ -105,10 +105,10 @@ export interface UsfmWorkspaceProps {
   }) => void;
   /** Change the tab-group grid layout (max 2×2). When omitted, the layout selector is hidden. */
   readonly onChangeGridLayout?: (rows: WorkspaceGridDimension, cols: WorkspaceGridDimension) => void;
-  /** Diagnostics for editor tabs (from unified shell validation). */
-  readonly getDiagnosticsForTab?: (tabId: string) => readonly Diagnostic[];
-  /** Fired when an editor tab's document changes (before workspace value sync). */
-  readonly onEditorDocumentChange?: (tabId: string) => void;
+  /** Language client serving diagnostics/highlighting/completions for editor tabs. */
+  readonly languageClient?: UsfmLanguageClient;
+  /** Fired with fresh diagnostics for a tab whenever its engine analysis lands. */
+  readonly onTabDiagnostics?: (tabId: string, diagnostics: readonly Diagnostic[]) => void;
   /** Register a reader for a tab's live editor buffer; return value unregisters. */
   readonly onRegisterDocumentReader?: (tabId: string, reader: () => string) => () => void;
   /**

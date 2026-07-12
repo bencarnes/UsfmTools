@@ -9,12 +9,18 @@ import { EditorState, EditorSelection, Prec, Compartment } from "@codemirror/sta
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { setDiagnostics } from "@codemirror/lint";
-import type { Diagnostic as LanguageDiagnostic } from "../../language-service/protocol.js";
+import type {
+  Diagnostic as LanguageDiagnostic,
+  UsfmLanguageClient,
+} from "../../language-service/protocol.js";
+import { DocumentSync } from "../../language-service/document-sync.js";
+import { sharedLocalLanguageClient } from "../../language-service/local-client.js";
 import {
   languageDiagnosticsToCm,
   usfmHighlighter,
   usfmLintExtension,
   usfmAutocomplete,
+  type EditorLanguageSession,
 } from "./codemirror-usfm.js";
 import {
   usfmSearchExtensions,
@@ -53,8 +59,15 @@ export interface UsfmEditorProps {
   onDirty?: () => void;
   /** Fired on every document edit (before any `onChange` debounce). */
   onDocumentChange?: () => void;
-  /** Parse diagnostics for the current tab (owned by the shell; drives lint squiggles). */
-  diagnostics?: readonly LanguageDiagnostic[];
+  /**
+   * Language client serving diagnostics, highlighting, and completions. The
+   * editor opens its own engine document, forwards CodeMirror change sets
+   * incrementally, and closes it on unmount. Must be stable for the editor's
+   * lifetime; defaults to the in-process TypeScript client.
+   */
+  languageClient?: UsfmLanguageClient;
+  /** Fired with fresh parse diagnostics whenever the engine re-analyzes. */
+  onDiagnostics?: (diagnostics: readonly LanguageDiagnostic[]) => void;
   /**
    * Registers a reader for the live document buffer. Called on mount/update;
    * return value unregisters on cleanup.
@@ -79,7 +92,8 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     onChangeDebounceMs = 0,
     onDirty,
     onDocumentChange,
-    diagnostics = [],
+    languageClient,
+    onDiagnostics,
     onRegisterDocumentReader,
     onSave,
     onViewportAnchorChange,
@@ -94,6 +108,8 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   const onChangeRef = useRef(onChange);
   const onDirtyRef = useRef(onDirty);
   const onDocumentChangeRef = useRef(onDocumentChange);
+  const onDiagnosticsRef = useRef(onDiagnostics);
+  const languageClientRef = useRef(languageClient);
   const onSaveRef = useRef(onSave);
   const onViewportAnchorChangeRef = useRef(onViewportAnchorChange);
   const viewportDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,6 +120,8 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   onChangeRef.current = onChange;
   onDirtyRef.current = onDirty;
   onDocumentChangeRef.current = onDocumentChange;
+  onDiagnosticsRef.current = onDiagnostics;
+  languageClientRef.current = languageClient;
   onSaveRef.current = onSave;
   onViewportAnchorChangeRef.current = onViewportAnchorChange;
 
@@ -195,6 +213,24 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Each mounted editor owns one engine document: open with the initial
+    // text, forward every CodeMirror change set incrementally, close on
+    // unmount. A unique id isolates this instance from other tabs/editors
+    // (including other editors showing the same file).
+    const client = languageClientRef.current ?? sharedLocalLanguageClient();
+    const documentId = `usfm-editor-${crypto.randomUUID()}`;
+    const sync = new DocumentSync({
+      client,
+      id: documentId,
+      getText: readDocument,
+    });
+    const session: EditorLanguageSession = {
+      classifyRange: (from, to) =>
+        sync.request(() => client.classifyRange(documentId, from, to)).then((r) => r.tokens),
+      getCompletions: (line, column) =>
+        sync.request(() => client.getCompletions(documentId, line, column)),
+    };
+
     const scheduleViewportReport = () => {
       if (!onViewportAnchorChangeRef.current) return;
       if (viewportDebounceRef.current) clearTimeout(viewportDebounceRef.current);
@@ -212,6 +248,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
 
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
+        sync.applyChanges(update.changes);
         onDocumentChangeRef.current?.();
         if (!dirtyReportedRef.current) {
           dirtyReportedRef.current = true;
@@ -245,9 +282,9 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
             },
           ]),
         ),
-        usfmHighlighter,
+        usfmHighlighter(session),
         usfmLintExtension,
-        usfmAutocomplete,
+        usfmAutocomplete(session),
         usfmSearchExtensions,
         updateListener,
         EditorView.theme({
@@ -324,7 +361,22 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     viewRef.current = view;
     view.scrollDOM.addEventListener("scroll", scheduleViewportReport, { passive: true });
 
+    // Open the engine document (after viewRef is set, so getText reads the
+    // live buffer) and route its pushed analyses into lint squiggles and the
+    // onDiagnostics callback.
+    sync.open();
+    const unsubscribeAnalysis = client.onAnalysis((event) => {
+      if (event.id !== documentId) return;
+      const v = viewRef.current;
+      if (v) {
+        v.dispatch(setDiagnostics(v.state, languageDiagnosticsToCm(v.state.doc, event.diagnostics)));
+      }
+      onDiagnosticsRef.current?.(event.diagnostics);
+    });
+
     return () => {
+      unsubscribeAnalysis();
+      sync.close();
       view.scrollDOM.removeEventListener("scroll", scheduleViewportReport);
       if (viewportDebounceRef.current) clearTimeout(viewportDebounceRef.current);
       viewportDebounceRef.current = null;
@@ -343,12 +395,6 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     if (!onRegisterDocumentReader) return;
     return onRegisterDocumentReader(readDocument) ?? undefined;
   }, [onRegisterDocumentReader]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    view.dispatch(setDiagnostics(view.state, languageDiagnosticsToCm(view.state.doc, diagnostics)));
-  }, [diagnostics]);
 
   useEffect(() => {
     const view = viewRef.current;

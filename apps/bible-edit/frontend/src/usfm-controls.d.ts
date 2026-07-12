@@ -38,6 +38,7 @@ declare module "@usfm-tools/controls" {
 
   export interface UsfmShellProps {
     readonly host: UsfmShellHost;
+    readonly languageClient?: UsfmLanguageClient;
     readonly defaultSidebarExpanded?: boolean;
     readonly defaultBottomExpanded?: boolean;
     readonly className?: string;

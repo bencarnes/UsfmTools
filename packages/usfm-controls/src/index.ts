@@ -113,6 +113,7 @@ export type {
 export {
   UsfmLanguageService,
   createLanguageClient,
+  createLocalLanguageClient,
   changesFromChangeSet,
   DocumentSync,
   DiagnosticSeverity,

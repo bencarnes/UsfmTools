@@ -94,6 +94,23 @@ export class DocumentSync {
     });
   }
 
+  /**
+   * Run a feature request ordered after everything forwarded so far, so the
+   * client has seen all preceding edits when the task runs. Rejects
+   * immediately once the document is closed.
+   */
+  request<T>(task: () => Promise<T>): Promise<T> {
+    if (this.#closed) {
+      return Promise.reject(new Error(`document closed: ${this.id}`));
+    }
+    const result = this.#queue.then(task, task);
+    this.#queue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
   /** Close the document in the client. Further calls are ignored. */
   close(): void {
     if (this.#closed) return;

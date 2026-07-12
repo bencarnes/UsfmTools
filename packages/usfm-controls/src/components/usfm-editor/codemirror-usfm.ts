@@ -9,17 +9,27 @@ import {
 } from "@codemirror/view";
 import { linter } from "@codemirror/lint";
 import type { Diagnostic as CmDiagnostic } from "@codemirror/lint";
-import type { Diagnostic as LanguageDiagnostic } from "../../language-service/protocol.js";
+import type {
+  CompletionItem,
+  Diagnostic as LanguageDiagnostic,
+} from "../../language-service/protocol.js";
 import {
   autocompletion,
   type CompletionContext,
   type CompletionResult,
 } from "@codemirror/autocomplete";
-import { createLanguageClient } from "../../language-service/index.js";
 import type { TokenClassification } from "../../language-service/index.js";
 import { TokenType } from "../../language-service/index.js";
 
-const client = createLanguageClient();
+/**
+ * The language features the editor extensions need, already bound to the
+ * synced engine copy of this editor's document (see UsfmEditor): requests
+ * carry no content and are ordered after all forwarded edits.
+ */
+export interface EditorLanguageSession {
+  classifyRange(from: number, to: number): Promise<TokenClassification[]>;
+  getCompletions(line: number, column: number): Promise<CompletionItem[]>;
+}
 
 // --- Custom tags for USFM token types ---
 const usfmMarkerTag = Tag.define(tags.keyword);
@@ -86,7 +96,13 @@ function decoForTokenType(type: TokenType) {
   }
 }
 
-function posToOffset(doc: { line: (n: number) => { from: number } }, pos: { line: number; column: number }): number {
+function posToOffset(
+  doc: { line: (n: number) => { from: number } },
+  pos: { line: number; column: number; offset?: number },
+): number {
+  // Engine positions carry the UTF-16 document offset, which is exactly a
+  // CodeMirror position; fall back to line/column arithmetic otherwise.
+  if (pos.offset != null) return pos.offset;
   const lineInfo = doc.line(pos.line + 1); // CodeMirror lines are 1-based
   return lineInfo.from + pos.column;
 }
@@ -135,7 +151,8 @@ function decorationsForTokens(
 }
 
 // --- Highlight plugin (viewport-scoped, incremental decorations) ---
-export const usfmHighlighter = ViewPlugin.fromClass(
+export const usfmHighlighter = (session: EditorLanguageSession) =>
+  ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
     view: EditorView;
@@ -195,8 +212,12 @@ export const usfmHighlighter = ViewPlugin.fromClass(
       const gen = ++this.generation;
       const view = this.view;
       const { from, to } = viewportCharRange(view);
-      const content = view.state.doc.toString();
-      const tokens = await client.classifyRange(content, from, to);
+      let tokens: TokenClassification[];
+      try {
+        tokens = await session.classifyRange(from, to);
+      } catch {
+        return; // document closed mid-flight (editor unmounting)
+      }
       if (gen !== this.generation || !view.dom.isConnected) return;
 
       const ranges = decorationsForTokens(view.state.doc, tokens);
@@ -208,57 +229,71 @@ export const usfmHighlighter = ViewPlugin.fromClass(
     }
   },
   { decorations: (v) => v.decorations },
-);
+  );
 
 // --- Linter (diagnostics supplied by the shell via setDiagnostics) ---
 export function languageDiagnosticsToCm(
   doc: { length: number; line: (n: number) => { from: number } },
   diagnostics: readonly LanguageDiagnostic[],
 ): CmDiagnostic[] {
-  return diagnostics.map((d) => {
-    const from = posToOffset(doc, d.range.start);
-    const to = posToOffset(doc, d.range.end);
-    return {
-      from: Math.max(0, from),
-      to: Math.min(doc.length, to),
-      severity: "error",
-      message: d.message,
-    };
-  });
+  const out: CmDiagnostic[] = [];
+  for (const d of diagnostics) {
+    // An analysis can land after further edits moved or removed the flagged
+    // text; skip positions that no longer resolve (the next analysis
+    // replaces the set anyway) and clamp the rest.
+    let from: number;
+    let to: number;
+    try {
+      from = posToOffset(doc, d.range.start);
+      to = posToOffset(doc, d.range.end);
+    } catch {
+      continue;
+    }
+    from = Math.max(0, Math.min(doc.length, from));
+    to = Math.max(from, Math.min(doc.length, to));
+    out.push({ from, to, severity: "error", message: d.message });
+  }
+  return out;
 }
 
 /** Enables lint UI; diagnostics are pushed with {@link setDiagnostics} from UsfmEditor. */
 export const usfmLintExtension = linter(null);
 
 // --- Autocomplete ---
-async function usfmCompletionSource(
-  context: CompletionContext,
-): Promise<CompletionResult | null> {
-  const before = context.matchBefore(/\\[+a-zA-Z0-9-]*/);
-  if (!before) return null;
+export const usfmAutocomplete = (session: EditorLanguageSession) => {
+  async function usfmCompletionSource(
+    context: CompletionContext,
+  ): Promise<CompletionResult | null> {
+    const before = context.matchBefore(/\\[+a-zA-Z0-9-]*/);
+    if (!before) return null;
 
-  const content = context.state.doc.toString();
-  const line = context.state.doc.lineAt(context.pos);
-  const lineNum = line.number - 1; // 0-based
-  const col = context.pos - line.from;
+    const line = context.state.doc.lineAt(context.pos);
+    const lineNum = line.number - 1; // 0-based
+    const col = context.pos - line.from;
 
-  const items = await client.complete(content, lineNum, col);
-  if (items.length === 0) return null;
+    let items: CompletionItem[];
+    try {
+      items = await session.getCompletions(lineNum, col);
+    } catch {
+      return null; // document closed mid-flight (editor unmounting)
+    }
+    if (items.length === 0) return null;
 
-  return {
-    from: before.from,
-    options: items.map((item) => ({
-      label: item.label,
-      detail: item.detail,
-      apply: item.insertText,
-    })),
-  };
-}
+    return {
+      from: before.from,
+      options: items.map((item) => ({
+        label: item.label,
+        detail: item.detail,
+        apply: item.insertText,
+      })),
+    };
+  }
 
-export const usfmAutocomplete = autocompletion({
-  override: [usfmCompletionSource],
-  activateOnTyping: true,
-});
+  return autocompletion({
+    override: [usfmCompletionSource],
+    activateOnTyping: true,
+  });
+};
 
 // Suppress unused exports — these are used for theming extensibility
 void tagForTokenType;

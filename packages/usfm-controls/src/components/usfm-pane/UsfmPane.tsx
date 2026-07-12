@@ -14,7 +14,7 @@ import {
   listChapterMarkersInUsfm,
   type ChapterMarkerInBook,
 } from "@usfm-tools/model";
-import type { Diagnostic } from "../../language-service/protocol.js";
+import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
 import type { ChapterPickerSelectDetail } from "../chapter-picker/ChapterPicker.js";
 import { ChapterNavigator } from "./chapter-navigator.js";
 import { UsfmEditor, type UsfmEditorHandle } from "../usfm-editor/UsfmEditor.js";
@@ -62,10 +62,10 @@ export interface UsfmPaneProps {
   readonly onSave?: (value: string) => void;
   /** When true, the tab has unsaved edits and the save control is enabled. */
   readonly dirty?: boolean;
-  /** Parse diagnostics for this tab (from unified shell validation). */
-  readonly diagnostics?: readonly Diagnostic[];
-  /** Fired on every editor document edit to schedule shell validation. */
-  readonly onValidationDocumentChange?: () => void;
+  /** Language client serving diagnostics/highlighting/completions (stable for the pane's lifetime). */
+  readonly languageClient?: UsfmLanguageClient;
+  /** Fired with fresh parse diagnostics for this tab whenever the engine re-analyzes. */
+  readonly onDiagnostics?: (diagnostics: readonly Diagnostic[]) => void;
   /** Register a reader for the live editor buffer with the shell. */
   readonly onRegisterDocumentReader?: (readDocument: () => string) => void | (() => void);
   /**
@@ -120,8 +120,8 @@ export function UsfmPane({
   onDirty,
   onSave,
   dirty = false,
-  diagnostics,
-  onValidationDocumentChange,
+  languageClient,
+  onDiagnostics,
   onRegisterDocumentReader,
   toolbarMount,
   toolbarActive = true,
@@ -231,8 +231,7 @@ export function UsfmPane({
 
   const notifyDocumentChange = useCallback(() => {
     scheduleIdleScrollSync();
-    onValidationDocumentChange?.();
-  }, [scheduleIdleScrollSync, onValidationDocumentChange]);
+  }, [scheduleIdleScrollSync]);
 
   const registerDocumentReader = useCallback(() => {
     return editorRef.current?.getDocument() ?? valueRef.current;
@@ -501,7 +500,8 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
             onChangeDebounceMs={EDITOR_VALUE_SYNC_DEBOUNCE_MS}
             onDirty={handleDirty}
             onDocumentChange={notifyDocumentChange}
-            diagnostics={diagnostics}
+            languageClient={languageClient}
+            onDiagnostics={onDiagnostics}
             onSave={handleSave}
             onViewportAnchorChange={onEditorViewportAnchor}
             wordWrap={wordWrapEnabled}
@@ -529,7 +529,8 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 onChangeDebounceMs={EDITOR_VALUE_SYNC_DEBOUNCE_MS}
                 onDirty={handleDirty}
                 onDocumentChange={notifyDocumentChange}
-                diagnostics={diagnostics}
+                languageClient={languageClient}
+                onDiagnostics={onDiagnostics}
                 onSave={handleSave}
                 onViewportAnchorChange={onEditorViewportAnchor}
                 wordWrap={wordWrapEnabled}

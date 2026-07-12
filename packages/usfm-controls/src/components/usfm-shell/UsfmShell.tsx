@@ -9,8 +9,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
 } from "react";
-import { createLanguageClient } from "../../language-service/service.js";
-import type { Diagnostic } from "../../language-service/protocol.js";
+import { createLocalLanguageClient } from "../../language-service/local-client.js";
+import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
 import { UsfmWorkspace } from "../usfm-workspace/UsfmWorkspace.js";
 import { dropTargetAtPoint } from "../usfm-workspace/drop-target.js";
 import {
@@ -54,6 +54,12 @@ import { buildUsfmFilePickerCatalog, EMPTY_FILE_CATALOG } from "./file-catalog.j
 
 export interface UsfmShellProps {
   readonly host: UsfmShellHost;
+  /**
+   * Language client serving diagnostics, syntax highlighting, and
+   * completions for all editor tabs (e.g. the Wails-backed Go engine in
+   * bible-edit). Defaults to the in-process TypeScript client.
+   */
+  readonly languageClient?: UsfmLanguageClient;
   /** Initial expanded state for the left sidebar. Default `true`. */
   readonly defaultSidebarExpanded?: boolean;
   /** Initial expanded state for the bottom bar. Default `true`. */
@@ -85,20 +91,24 @@ type PendingClose = PendingTabClose | PendingAppClose;
 type SidebarTab = "files" | "search";
 type BottomTab = "errors";
 
-const VALIDATE_DEBOUNCE_MS = 300;
-
 /** Pixels the pointer must travel before a file-row press is treated as a drag rather than a click. */
 const FILE_DRAG_THRESHOLD_PX = 5;
 
 export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function UsfmShell(
   {
     host,
+    languageClient: languageClientProp,
     defaultSidebarExpanded = true,
     defaultBottomExpanded = true,
     className,
   },
   ref,
 ) {
+  // One client instance serves every editor tab for the shell's lifetime.
+  const languageClient = useMemo(
+    () => languageClientProp ?? createLocalLanguageClient(),
+    [languageClientProp],
+  );
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs([]));
   const [fileEntries, setFileEntries] = useState<readonly UsfmShellFileEntry[]>([]);
   const [fileCatalog, setFileCatalog] = useState<UsfmFilePickerGroups>(EMPTY_FILE_CATALOG);
@@ -120,9 +130,6 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   const [diagnostics, setDiagnostics] = useState<readonly Diagnostic[]>([]);
   const [validating, setValidating] = useState(false);
 
-  const clientRef = useRef(createLanguageClient());
-  const validateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const validateGenerationRef = useRef(0);
   const documentReadersRef = useRef(new Map<string, () => string>());
   const diagnosticsByTabRef = useRef(new Map<string, readonly Diagnostic[]>());
   const activeTabIdRef = useRef<string | null>(null);
@@ -325,67 +332,38 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
     setActiveGroupId(model.slots[0]?.id ?? null);
   }, [model, activeGroupId]);
 
-  const scheduleValidation = useCallback((tabId: string) => {
-    const tab = modelRef.current.tabsById[tabId];
-    if (!tab || tab.kind === "settings") return;
-
-    if (validateDebounceRef.current) clearTimeout(validateDebounceRef.current);
-    const showLoading = !diagnosticsByTabRef.current.has(tabId);
-    if (showLoading) setValidating(true);
-    validateDebounceRef.current = setTimeout(() => {
-      validateDebounceRef.current = null;
-      const gen = ++validateGenerationRef.current;
-      const readDocument = documentReadersRef.current.get(tabId);
-      const content = readDocument?.() ?? tab.value;
-      void clientRef.current.validate(content).then((diags) => {
-        if (gen !== validateGenerationRef.current) return;
-        diagnosticsByTabRef.current.set(tabId, diags);
-        if (activeTabIdRef.current === tabId) {
-          setDiagnostics(diags);
-        }
-        setValidating(false);
-      });
-    }, VALIDATE_DEBOUNCE_MS);
+  // Diagnostics are pushed per tab by the language client (via each tab's
+  // editor) whenever an analysis lands; no debounce or polling here.
+  const handleTabDiagnostics = useCallback((tabId: string, diags: readonly Diagnostic[]) => {
+    diagnosticsByTabRef.current.set(tabId, diags);
+    if (activeTabIdRef.current === tabId) {
+      setDiagnostics(diags);
+      setValidating(false);
+    }
   }, []);
-
-  const handleEditorDocumentChange = useCallback((tabId: string) => {
-    if (tabId === activeTabIdRef.current) scheduleValidation(tabId);
-  }, [scheduleValidation]);
 
   const handleRegisterDocumentReader = useCallback((tabId: string, reader: () => string) => {
     documentReadersRef.current.set(tabId, reader);
     return () => documentReadersRef.current.delete(tabId);
   }, []);
 
-  const getDiagnosticsForTab = useCallback((tabId: string): readonly Diagnostic[] => {
-    if (tabId === activeTabId) return diagnostics;
-    return diagnosticsByTabRef.current.get(tabId) ?? [];
-  }, [activeTabId, diagnostics]);
-
-  // Validate when the active editor tab changes.
+  // Show the active editor tab's latest diagnostics when it changes; a tab
+  // without any yet is still waiting for its first pushed analysis.
   useEffect(() => {
     if (!activeTabId) {
-      validateGenerationRef.current++;
       setDiagnostics([]);
       setValidating(false);
       return;
     }
     const tab = modelRef.current.tabsById[activeTabId];
     if (!tab || tab.kind === "settings") {
-      validateGenerationRef.current++;
       setDiagnostics([]);
       setValidating(false);
       return;
     }
     setDiagnostics(diagnosticsByTabRef.current.get(activeTabId) ?? []);
-    scheduleValidation(activeTabId);
-    return () => {
-      if (validateDebounceRef.current) {
-        clearTimeout(validateDebounceRef.current);
-        validateDebounceRef.current = null;
-      }
-    };
-  }, [activeTabId, scheduleValidation]);
+    setValidating(!diagnosticsByTabRef.current.has(activeTabId));
+  }, [activeTabId]);
 
   // ---- workspace callbacks ----
 
@@ -596,9 +574,14 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   const onSelectDiagnostic = useCallback(
     (d: Diagnostic) => {
       if (!activeTabId) return;
-      const readDocument = documentReadersRef.current.get(activeTabId);
-      const content = readDocument?.() ?? modelRef.current.tabsById[activeTabId]?.value ?? "";
-      const offset = lineColumnToSourceOffset(content, d.range.start.line, d.range.start.column);
+      // Engine diagnostics carry the document offset directly; fall back to
+      // line/column arithmetic over the live buffer otherwise.
+      let offset = d.range.start.offset;
+      if (offset == null) {
+        const readDocument = documentReadersRef.current.get(activeTabId);
+        const content = readDocument?.() ?? modelRef.current.tabsById[activeTabId]?.value ?? "";
+        offset = lineColumnToSourceOffset(content, d.range.start.line, d.range.start.column);
+      }
       setModel((p) => workspaceRequestTabSelection(p, activeTabId, offset, offset));
     },
     [activeTabId],
@@ -733,8 +716,8 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             onUpdateTabValue={handleUpdateTabValue}
             onMarkTabDirty={handleMarkTabDirty}
             onSaveTab={handleSaveTab}
-            getDiagnosticsForTab={getDiagnosticsForTab}
-            onEditorDocumentChange={handleEditorDocumentChange}
+            languageClient={languageClient}
+            onTabDiagnostics={handleTabDiagnostics}
             onRegisterDocumentReader={handleRegisterDocumentReader}
             onCloseTab={handleCloseTab}
             onCloseOtherTabs={handleCloseOtherTabs}

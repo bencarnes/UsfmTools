@@ -19,7 +19,7 @@ import { TabGroupLayoutSelector } from "../tab-group-layout-selector/TabGroupLay
 import { TabListDropdown } from "./tab-list-dropdown.js";
 import { TabContextMenu, type TabContextMenuItem } from "./tab-context-menu.js";
 import { dropTargetAtPoint } from "./drop-target.js";
-import type { Diagnostic } from "../../language-service/protocol.js";
+import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
 import type {
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceProps,
@@ -334,8 +334,8 @@ interface EditorGroupPanelProps {
   readonly onUpdateValue: (tabId: string, value: string) => void;
   readonly onMarkTabDirty?: (tabId: string) => void;
   readonly onSaveValue?: (tabId: string, value: string) => void;
-  readonly getDiagnosticsForTab?: (tabId: string) => readonly Diagnostic[];
-  readonly onEditorDocumentChange?: (tabId: string) => void;
+  readonly languageClient?: UsfmLanguageClient;
+  readonly onTabDiagnostics?: (tabId: string, diagnostics: readonly Diagnostic[]) => void;
   readonly onRegisterDocumentReader?: (tabId: string, reader: () => string) => () => void;
   readonly gridRows: WorkspaceGridDimension;
   readonly gridCols: WorkspaceGridDimension;
@@ -353,8 +353,8 @@ function EditorGroupPanel({
   onUpdateValue,
   onMarkTabDirty,
   onSaveValue,
-  getDiagnosticsForTab,
-  onEditorDocumentChange,
+  languageClient,
+  onTabDiagnostics,
   onRegisterDocumentReader,
   gridRows,
   gridCols,
@@ -445,9 +445,9 @@ function EditorGroupPanel({
                   onChange={(v) => onUpdateValue(tid, v)}
                   onDirty={onMarkTabDirty ? () => onMarkTabDirty(tid) : undefined}
                   onSave={onSaveValue ? (content) => onSaveValue(tid, content) : undefined}
-                  diagnostics={getDiagnosticsForTab?.(tid)}
-                  onValidationDocumentChange={
-                    onEditorDocumentChange ? () => onEditorDocumentChange(tid) : undefined
+                  languageClient={languageClient}
+                  onDiagnostics={
+                    onTabDiagnostics ? (diags) => onTabDiagnostics(tid, diags) : undefined
                   }
                   onRegisterDocumentReader={
                     onRegisterDocumentReader
@@ -485,8 +485,8 @@ interface WorkspaceGridRowProps {
   readonly onUpdateTabValue: UsfmWorkspaceProps["onUpdateTabValue"];
   readonly onMarkTabDirty?: UsfmWorkspaceProps["onMarkTabDirty"];
   readonly onSaveTab?: UsfmWorkspaceProps["onSaveTab"];
-  readonly getDiagnosticsForTab?: UsfmWorkspaceProps["getDiagnosticsForTab"];
-  readonly onEditorDocumentChange?: UsfmWorkspaceProps["onEditorDocumentChange"];
+  readonly languageClient?: UsfmWorkspaceProps["languageClient"];
+  readonly onTabDiagnostics?: UsfmWorkspaceProps["onTabDiagnostics"];
   readonly onRegisterDocumentReader?: UsfmWorkspaceProps["onRegisterDocumentReader"];
   readonly onChangeGridLayout?: UsfmWorkspaceProps["onChangeGridLayout"];
 }
@@ -507,8 +507,8 @@ function WorkspaceGridRow({
   onUpdateTabValue,
   onMarkTabDirty,
   onSaveTab,
-  getDiagnosticsForTab,
-  onEditorDocumentChange,
+  languageClient,
+  onTabDiagnostics,
   onRegisterDocumentReader,
   onChangeGridLayout,
 }: WorkspaceGridRowProps) {
@@ -559,8 +559,8 @@ function WorkspaceGridRow({
               onUpdateValue={onUpdateTabValue}
               onMarkTabDirty={onMarkTabDirty}
               onSaveValue={onSaveTab}
-              getDiagnosticsForTab={getDiagnosticsForTab}
-              onEditorDocumentChange={onEditorDocumentChange}
+              languageClient={languageClient}
+              onTabDiagnostics={onTabDiagnostics}
               onRegisterDocumentReader={onRegisterDocumentReader}
               gridRows={gridRows}
               gridCols={gridCols}
@@ -583,8 +583,8 @@ export function UsfmWorkspace({
   onUpdateTabValue,
   onMarkTabDirty,
   onSaveTab,
-  getDiagnosticsForTab,
-  onEditorDocumentChange,
+  languageClient,
+  onTabDiagnostics,
   onRegisterDocumentReader,
   onCloseTab,
   onCloseOtherTabs,
@@ -790,8 +790,8 @@ export function UsfmWorkspace({
                 onUpdateTabValue={onUpdateTabValue}
                 onMarkTabDirty={onMarkTabDirty}
                 onSaveTab={onSaveTab}
-                getDiagnosticsForTab={getDiagnosticsForTab}
-                onEditorDocumentChange={onEditorDocumentChange}
+                languageClient={languageClient}
+                onTabDiagnostics={onTabDiagnostics}
                 onRegisterDocumentReader={onRegisterDocumentReader}
                 onChangeGridLayout={onChangeGridLayout}
               />
