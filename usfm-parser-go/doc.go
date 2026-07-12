@@ -9,7 +9,8 @@
 //   - lexer: tokenizer with byte + UTF-16 position tracking
 //   - parser: error-tolerant USFM parser producing the AST
 //   - diagnostics: converts parse errors to editor diagnostics with ranges
-//   - engine: added as the port from packages/usfm-parser progresses
+//   - engine: stateful LSP-like engine (document sync now; async analysis
+//     and feature requests to come)
 //   - cmd/usfm: standalone CLI tool
 //
 // It is consumed as a library by the bible-edit Wails app and usable as a
