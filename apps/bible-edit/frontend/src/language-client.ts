@@ -16,6 +16,7 @@ import {
   GetDiagnostics,
   GetStructure,
   OpenDocument,
+  RenderPreviewText,
 } from "../wailsjs/go/main/UsfmService.js";
 import { EventsOff, EventsOn } from "../wailsjs/runtime/runtime.js";
 import type { engine } from "../wailsjs/go/models";
@@ -70,6 +71,10 @@ export function createWailsLanguageClient(): UsfmLanguageClient {
 
     async getCompletions(id: string, line: number, column: number): Promise<CompletionItem[]> {
       return (await GetCompletions(id, line, column)) ?? [];
+    },
+
+    renderPreview(text: string, options?: { versePerLine?: boolean }): Promise<string> {
+      return RenderPreviewText(text, options?.versePerLine ?? false);
     },
 
     onAnalysis(listener: (event: AnalysisEvent) => void): () => void {

@@ -515,7 +515,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
             className="flex-1 min-h-0 overflow-auto p-3"
             onScroll={onPreviewScroll}
           >
-            <UsfmPreview value={value} versePerLine={versePerLine} />
+            <UsfmPreview value={value} versePerLine={versePerLine} languageClient={languageClient} />
           </div>
         )}
 
@@ -550,7 +550,11 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 className="flex-1 min-h-0 overflow-auto border-l border-gray-200 p-3 dark:border-gray-700"
                 onScroll={onPreviewScroll}
               >
-                <UsfmPreview value={previewValue} versePerLine={versePerLine} />
+                <UsfmPreview
+                  value={previewValue}
+                  versePerLine={versePerLine}
+                  languageClient={languageClient}
+                />
               </div>
             </div>
           </div>

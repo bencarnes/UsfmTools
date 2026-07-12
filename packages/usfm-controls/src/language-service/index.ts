@@ -8,6 +8,7 @@ export type {
   DiagnosticsResult,
   DocumentChange,
   Position,
+  PreviewOptions,
   Range,
   RequestMessage,
   ResponseMessage,

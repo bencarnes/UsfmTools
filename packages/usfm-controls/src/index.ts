@@ -134,6 +134,7 @@ export type {
   DiagnosticsResult,
   DocumentChange,
   DocumentSyncOptions,
+  PreviewOptions,
   StructureResult,
   TokensResult,
   UsfmLanguageClient,

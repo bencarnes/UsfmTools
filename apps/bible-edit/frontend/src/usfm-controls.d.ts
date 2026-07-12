@@ -132,6 +132,10 @@ declare module "@usfm-tools/controls" {
 
   export type AnalysisEvent = { id: string } & DiagnosticsResult;
 
+  export interface PreviewOptions {
+    versePerLine?: boolean;
+  }
+
   export interface UsfmLanguageClient {
     openDocument(id: string, version: number, text: string): Promise<void>;
     applyChanges(id: string, version: number, changes: DocumentChange[]): Promise<void>;
@@ -141,6 +145,7 @@ declare module "@usfm-tools/controls" {
     classifyDocument(id: string): Promise<TokensResult>;
     classifyRange(id: string, from: number, to: number): Promise<TokensResult>;
     getCompletions(id: string, line: number, column: number): Promise<CompletionItem[]>;
+    renderPreview(text: string, options?: PreviewOptions): Promise<string>;
     onAnalysis(listener: (event: AnalysisEvent) => void): () => void;
   }
 

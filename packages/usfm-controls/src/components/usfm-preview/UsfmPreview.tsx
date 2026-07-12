@@ -1,5 +1,6 @@
-import { memo, useEffect, useMemo, useState } from "react";
-import { renderPreviewHtml } from "@usfm-tools/model";
+import { memo, useEffect, useRef, useState } from "react";
+import type { UsfmLanguageClient } from "../../language-service/protocol.js";
+import { sharedLocalLanguageClient } from "../../language-service/local-client.js";
 
 /** Storybook (and URL state) may supply boolean controls as strings. */
 function normalizeVersePerLine(raw: unknown): boolean {
@@ -18,9 +19,14 @@ export interface UsfmPreviewProps {
   versePerLine?: boolean;
   /**
    * Milliseconds to wait after the last `value` change before re-rendering the preview.
-   * Use in split editor+preview layouts to avoid re-parsing on every keystroke.
+   * Use in split editor+preview layouts to avoid re-rendering on every keystroke.
    */
   updateDebounceMs?: number;
+  /**
+   * Language client whose `renderPreview` produces the HTML (e.g. the Go
+   * engine in bible-edit). Defaults to the in-process TypeScript renderer.
+   */
+  languageClient?: UsfmLanguageClient;
   className?: string;
 }
 
@@ -32,10 +38,13 @@ export const UsfmPreview = memo(function UsfmPreview({
   value,
   versePerLine,
   updateDebounceMs = 0,
+  languageClient,
   className,
 }: UsfmPreviewProps) {
   const versePerLineOn = normalizeVersePerLine(versePerLine);
   const [renderValue, setRenderValue] = useState(value);
+  const [html, setHtml] = useState("");
+  const generationRef = useRef(0);
 
   useEffect(() => {
     if (updateDebounceMs <= 0) {
@@ -46,15 +55,25 @@ export const UsfmPreview = memo(function UsfmPreview({
     return () => clearTimeout(timer);
   }, [value, updateDebounceMs]);
 
-  const html = useMemo(
-    () => renderPreviewHtml(renderValue, { versePerLine: versePerLineOn }),
-    [renderValue, versePerLineOn],
-  );
+  useEffect(() => {
+    const client = languageClient ?? sharedLocalLanguageClient();
+    const generation = ++generationRef.current;
+    client
+      .renderPreview(renderValue, { versePerLine: versePerLineOn })
+      .then((rendered) => {
+        // Keep showing the previous preview if a newer render is already
+        // underway (or the component re-rendered with different input).
+        if (generation === generationRef.current) setHtml(rendered);
+      })
+      .catch(() => {
+        // Client unavailable (e.g. backend restarting): keep the last HTML.
+      });
+  }, [renderValue, versePerLineOn, languageClient]);
 
   return (
     <div
       className={`usfm-preview-root ${className ?? ""}`}
-      // Trusted HTML: renderPreviewHtml escapes all user-supplied text.
+      // Trusted HTML: renderPreview escapes all user-supplied text.
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

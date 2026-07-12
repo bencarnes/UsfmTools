@@ -7,6 +7,7 @@ import (
 	usfm "github.com/usfm-tools/usfm-parser-go"
 	"github.com/usfm-tools/usfm-parser-go/internal/jsstr"
 	"github.com/usfm-tools/usfm-parser-go/lexer"
+	"github.com/usfm-tools/usfm-parser-go/preview"
 )
 
 // This file implements the engine's feature requests, tailored to USFM
@@ -116,6 +117,17 @@ func (e *Engine) analysisFor(id string) (Analysis, error) {
 	}
 	e.mu.Unlock()
 	return a, nil
+}
+
+// RenderPreview renders the engine's current copy of a document as
+// publication-style preview HTML (see the preview package), along with the
+// rendered document version.
+func (e *Engine) RenderPreview(id string, opts preview.Options) (string, int, error) {
+	snap, err := e.store.Snapshot(id)
+	if err != nil {
+		return "", 0, err
+	}
+	return preview.Render(snap.Text, opts), snap.Version, nil
 }
 
 // Classify classifies the whole document for syntax highlighting.

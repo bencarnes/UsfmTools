@@ -103,6 +103,12 @@ export interface StructureResult {
 /** A pushed analysis result for one document. */
 export type AnalysisEvent = { id: string } & DiagnosticsResult;
 
+/** Options for {@link UsfmLanguageClient.renderPreview}. */
+export interface PreviewOptions {
+  /** Render each verse on its own preview line. */
+  versePerLine?: boolean;
+}
+
 /**
  * Stateful USFM language client, modeled on the LSP document lifecycle but
  * simplified. The client keeps a copy of each open document, synced by the
@@ -134,6 +140,13 @@ export interface UsfmLanguageClient {
   classifyRange(id: string, from: number, to: number): Promise<TokensResult>;
   /** Completions at a cursor position (0-based line, UTF-16 column). */
   getCompletions(id: string, line: number, column: number): Promise<CompletionItem[]>;
+  /**
+   * Render a USFM string as publication-style preview HTML. Takes text
+   * rather than a document id because the preview renders debounced
+   * snapshots and must work for tabs whose editor (and therefore synced
+   * document) is not mounted, e.g. in preview-only view mode.
+   */
+  renderPreview(text: string, options?: PreviewOptions): Promise<string>;
   /** Subscribe to pushed analyses. Returns an unsubscribe function. */
   onAnalysis(listener: (event: AnalysisEvent) => void): () => void;
 }

@@ -1,4 +1,5 @@
 import { parse } from "@usfm-tools/parser";
+import { renderPreviewHtml } from "@usfm-tools/model";
 import type {
   AnalysisEvent,
   BookInfo,
@@ -152,6 +153,16 @@ export function createLocalLanguageClient(
       try {
         const doc = mustGet(id);
         return Promise.resolve(getCompletions(doc.text, line, column));
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    },
+
+    renderPreview(text, options) {
+      try {
+        return Promise.resolve(
+          renderPreviewHtml(text, { versePerLine: options?.versePerLine }),
+        );
       } catch (err) {
         return Promise.reject(err);
       }

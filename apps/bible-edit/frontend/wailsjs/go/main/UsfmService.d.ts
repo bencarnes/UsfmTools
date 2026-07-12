@@ -18,3 +18,5 @@ export function GetDiagnostics(arg1:string):Promise<main.DiagnosticsResult>;
 export function GetStructure(arg1:string):Promise<main.StructureResult>;
 
 export function OpenDocument(arg1:string,arg2:number,arg3:string):Promise<void>;
+
+export function RenderPreviewText(arg1:string,arg2:boolean):Promise<string>;

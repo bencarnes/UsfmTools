@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	usfm "github.com/usfm-tools/usfm-parser-go"
+	"github.com/usfm-tools/usfm-parser-go/preview"
 )
 
 // Classification and completion behavior ported from
@@ -322,5 +323,34 @@ func TestFeaturesOnClosedDocument(t *testing.T) {
 	}
 	if _, _, err := e.Structure("nope"); err == nil {
 		t.Error("Structure on closed doc succeeded")
+	}
+}
+
+func TestRenderPreview(t *testing.T) {
+	e := New(Options{})
+	defer e.Shutdown()
+	if err := e.Open("doc", 1, "\\id GEN\n\\c 1\n\\p\n\\v 1 A. \\v 2 B."); err != nil {
+		t.Fatal(err)
+	}
+	html, version, err := e.RenderPreview("doc", preview.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != 1 {
+		t.Errorf("version = %d, want 1", version)
+	}
+	if !strings.Contains(html, `<sup class="usfm-v" data-verse="1">1</sup>`) {
+		t.Errorf("html = %q", html)
+	}
+	plain := html
+	vpl, _, err := e.RenderPreview("doc", preview.Options{VersePerLine: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vpl == plain {
+		t.Error("versePerLine should change the HTML")
+	}
+	if _, _, err := e.RenderPreview("nope", preview.Options{}); err == nil {
+		t.Error("want error for unopened document")
 	}
 }

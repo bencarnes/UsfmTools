@@ -5,6 +5,7 @@ import (
 
 	usfm "github.com/usfm-tools/usfm-parser-go"
 	"github.com/usfm-tools/usfm-parser-go/engine"
+	"github.com/usfm-tools/usfm-parser-go/preview"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -149,4 +150,12 @@ func (s *UsfmService) ClassifyRange(id string, from, to int) (TokensResult, erro
 // in the argument of \id.
 func (s *UsfmService) GetCompletions(id string, line, column int) ([]engine.CompletionItem, error) {
 	return s.engine.Completions(id, line, column)
+}
+
+// RenderPreviewText renders a USFM string as publication-style preview HTML.
+// Stateless by design: the preview renders debounced snapshots and must work
+// for tabs whose editor (and therefore engine document) is not mounted, e.g.
+// in preview-only view mode.
+func (s *UsfmService) RenderPreviewText(text string, versePerLine bool) string {
+	return preview.Render(text, preview.Options{VersePerLine: versePerLine})
 }

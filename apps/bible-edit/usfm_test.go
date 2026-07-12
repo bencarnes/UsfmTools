@@ -191,3 +191,14 @@ func TestGetCompletions(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderPreviewText(t *testing.T) {
+	s, _ := newTestService(t)
+	html := s.RenderPreviewText("\\id GEN\n\\c 1\n\\p\n\\v 1 A. \\v 2 B.", false)
+	if !strings.Contains(html, `<article class="usfm-document" data-usfm-id="GEN">`) {
+		t.Errorf("html = %q", html)
+	}
+	if html == s.RenderPreviewText("\\id GEN\n\\c 1\n\\p\n\\v 1 A. \\v 2 B.", true) {
+		t.Error("versePerLine should change the HTML")
+	}
+}
