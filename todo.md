@@ -40,7 +40,7 @@ Ask clarifying questions as needed.
 ### Core parser (Go library)
 
 - [x] **Port the grammar** — translate `packages/usfm-parser/src/grammar.ts` (marker definitions, nesting rules, attributes) into Go data structures. _Done: `usfm-parser-go/grammar/` with all grammar.test.ts cases ported._
-- [ ] **Port the lexer** — tokenizer equivalent to `lexer.ts`, producing tokens with byte/UTF-16 position info suitable for editor integration.
+- [x] **Port the lexer** — tokenizer equivalent to `lexer.ts`, producing tokens with byte/UTF-16 position info suitable for editor integration. _Done: `usfm-parser-go/lexer/`; all lexer.test.ts cases ported plus UTF-16 tests; token streams verified byte-identical to the TS lexer across all 66 BSB books (differential tool kept at `internal/lexdump`)._
 - [ ] **Port the parser and AST types** — equivalent of `parser.ts` / `types.ts`; error-tolerant parsing (never panic on malformed input, collect diagnostics instead).
 - [ ] **Diagnostics** — structured errors/warnings with ranges and codes, matching what `language-service/diagnostics.ts` surfaces today.
 - [ ] **Unit tests** — table-driven tests for lexer, parser, and diagnostics; port the existing TS parser test cases; run the Berean Standard Bible corpus tests (`packages/usfm-parser-integration-tests/`) against the Go parser.

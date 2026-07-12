@@ -5,7 +5,8 @@
 //
 //   - the root package (this one): shared types used across the module
 //   - grammar: marker categories, nesting groups, default attributes
-//   - further subpackages (lexer, parser, engine): added as the port from
+//   - lexer: tokenizer with byte + UTF-16 position tracking
+//   - further subpackages (parser, engine): added as the port from
 //     packages/usfm-parser progresses
 //   - cmd/usfm: standalone CLI tool
 //
