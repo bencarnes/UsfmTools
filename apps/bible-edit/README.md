@@ -19,11 +19,28 @@ The session file stores the current USFM folder, recent folders, and UI settings
 
 ```
 apps/bible-edit/
-  main.go, app.go          # Wails entry + bound methods
+  main.go, app.go          # Wails entry + bound host methods (files, session, theme)
+  usfm.go                  # UsfmService: binds the Go USFM engine (see below)
   internal/files/          # Allowlist + read/write service
   internal/session/        # Session JSON types
   frontend/                # React + Vite UI (UsfmShell)
+    src/language-client.ts # UsfmLanguageClient over the Wails bindings
+    wailsjs/               # generated bindings (do not edit; `wails generate module`)
 ```
+
+## USFM engine
+
+Language features (diagnostics, syntax highlighting, completions, book/chapter
+structure, preview HTML) are served by the Go engine from
+[`usfm-parser-go`](../../usfm-parser-go/README.md), a dependency wired through a
+`replace` directive in `go.mod`. `UsfmService` (`usfm.go`) exposes the engine's
+LSP-like lifecycle (`OpenDocument` / `ApplyChanges` / `CloseDocument`, versioned)
+and feature pulls as bound methods; analyses run asynchronously and fresh
+diagnostics are pushed to the frontend as the `usfm:analysis` Wails event. The
+frontend adapter (`frontend/src/language-client.ts`) implements the
+`UsfmLanguageClient` protocol from `@usfm-tools/controls` on top of those
+bindings, so every parse runs in Go off the UI thread. After changing bound
+methods or their types, regenerate the JS bindings with `wails generate module`.
 
 ## Drag-and-drop in the webview
 
