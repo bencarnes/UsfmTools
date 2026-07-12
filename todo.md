@@ -48,7 +48,7 @@ Ask clarifying questions as needed.
 ### Engine (LSP-like, simplified)
 
 - [x] **Document store with sync** — engine keeps its own copy of each open document; API modeled on LSP lifecycle: `Open`, `ApplyChanges` (incremental edits with ranges + version numbers), `Close`. _Done: `usfm-parser-go/engine/store.go`; edits are `{from,to,text}` batches in UTF-16 offsets addressing the pre-batch document (CodeMirror `iterChanges` convention), version-gated, atomic on error, mutex-guarded (tested with `-race`)._
-- [ ] **Async processing** — parsing/analysis runs off the caller's goroutine; results are versioned so stale results can be discarded; debounce/coalesce rapid edits.
+- [x] **Async processing** — parsing/analysis runs off the caller's goroutine; results are versioned so stale results can be discarded; debounce/coalesce rapid edits. _Done: `usfm-parser-go/engine/engine.go`; per-document worker goroutine, capacity-1 dirty signal coalesces edits (always analyzes the latest snapshot), optional debounce window, version-stamped `Analysis` (AST + diagnostics) delivered via `OnAnalysis` with monotonic versions — stale results are dropped, close discards in-flight work._
 - [ ] **Feature requests** — tailored to USFM editing needs (no go-to-definition): diagnostics (push or pull), semantic tokens / syntax classification for a range or viewport (replaces `language-service/classifier.ts`), completions for markers and book codes (replaces `language-service/completions.ts`), and whatever else `language-service/service.ts` currently provides (e.g. chapter/verse structure for the outline/preview).
 - [ ] **Engine unit tests** — cover document sync (out-of-order versions, incremental edits), cancellation/staleness, and each feature request.
 
