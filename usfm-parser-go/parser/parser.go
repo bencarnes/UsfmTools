@@ -14,11 +14,10 @@ package parser
 import (
 	"fmt"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	usfm "github.com/usfm-tools/usfm-parser-go"
 	"github.com/usfm-tools/usfm-parser-go/grammar"
+	"github.com/usfm-tools/usfm-parser-go/internal/jsstr"
 	"github.com/usfm-tools/usfm-parser-go/lexer"
 )
 
@@ -147,12 +146,12 @@ func (p *parser) parseId() *usfm.Node {
 	// The text following \id is: CODE optional-description
 	if t := p.current(); t != nil && (t.Type == lexer.Text || t.Type == lexer.Newline) {
 		text := p.consumeTextLine()
-		fields := fieldsJS(trimStartJS(text))
+		fields := jsstr.Fields(jsstr.TrimStart(text))
 		if len(fields) > 0 {
 			code = fields[0]
 		}
 		if len(fields) > 1 {
-			description = trimJS(strings.Join(fields[1:], " "))
+			description = jsstr.Trim(strings.Join(fields[1:], " "))
 		}
 	}
 
@@ -185,7 +184,7 @@ func (p *parser) parseChapter() *usfm.Node {
 
 	number := ""
 	if t := p.current(); t != nil && t.Type == lexer.Text {
-		fields := fieldsJS(trimStartJS(t.Value))
+		fields := jsstr.Fields(jsstr.TrimStart(t.Value))
 		if len(fields) > 0 {
 			number = fields[0]
 		}
@@ -223,10 +222,10 @@ func (p *parser) parseVerse() *usfm.Node {
 
 	number := ""
 	if t := p.current(); t != nil && t.Type == lexer.Text {
-		text := trimStartJS(t.Value)
+		text := jsstr.TrimStart(t.Value)
 		if text != "" {
 			var remaining string
-			number, remaining = splitFirstField(text)
+			number, remaining = jsstr.SplitFirstField(text)
 			if remaining != "" {
 				// Keep the rest of the text in place for the enclosing node
 				// (position stays at the token start, matching the TS parser)
@@ -388,7 +387,7 @@ func (p *parser) parseNote() *usfm.Node {
 
 	// First text token after note marker is the caller (e.g. "+", "-", "a")
 	if t := p.current(); t != nil && t.Type == lexer.Text {
-		fields := fieldsJS(trimStartJS(t.Value))
+		fields := jsstr.Fields(jsstr.TrimStart(t.Value))
 		if len(fields) > 0 {
 			caller = fields[0]
 		}
@@ -573,7 +572,7 @@ func (p *parser) parseFigure() *usfm.Node {
 		if cur.Type == lexer.Text {
 			// Figure description text stored as caption attribute
 			if node.Attributes["caption"] == "" {
-				node.Attributes["caption"] = trimJS(cur.Value)
+				node.Attributes["caption"] = jsstr.Trim(cur.Value)
 			}
 		}
 		p.advance()
@@ -899,45 +898,4 @@ func (p *parser) addError(code, message string, position usfm.Position) {
 	if p.strict {
 		panic(abort{fmt.Errorf("parse error at %d:%d: %s", position.Line, position.Column, message)})
 	}
-}
-
-// jsSpace matches JavaScript's \s / trim() whitespace: Unicode White_Space
-// plus U+FEFF (which JS includes but Unicode does not).
-func jsSpace(r rune) bool {
-	return unicode.IsSpace(r) || r == '\uFEFF'
-}
-
-// trimStartJS mirrors String.prototype.trimStart.
-func trimStartJS(s string) string {
-	return strings.TrimLeftFunc(s, jsSpace)
-}
-
-// trimJS mirrors String.prototype.trim.
-func trimJS(s string) string {
-	return strings.TrimFunc(s, jsSpace)
-}
-
-// fieldsJS mirrors str.split(/\s+/) on a string with no leading whitespace,
-// including the empty final element JS produces for trailing whitespace —
-// it is observable: rejoining note-caller fields keeps a trailing space.
-func fieldsJS(s string) []string {
-	fields := strings.FieldsFunc(s, jsSpace)
-	if last, _ := utf8.DecodeLastRuneInString(s); last != utf8.RuneError && jsSpace(last) {
-		fields = append(fields, "")
-	}
-	return fields
-}
-
-// splitFirstField mirrors /^(\S+)\s*(.*)/ on a string with no leading
-// whitespace: the first whitespace-delimited field, and the rest with the
-// separating whitespace removed.
-func splitFirstField(s string) (first, rest string) {
-	end := len(s)
-	for i, r := range s {
-		if jsSpace(r) {
-			end = i
-			break
-		}
-	}
-	return s[:end], trimStartJS(s[end:])
 }
