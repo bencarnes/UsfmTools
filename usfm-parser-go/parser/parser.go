@@ -120,6 +120,7 @@ func (p *parser) parseTopLevel() *usfm.Node {
 
 	if token.Type == lexer.EndMarker {
 		p.addError(
+			usfm.CodeUnexpectedEndMarker,
 			fmt.Sprintf("Unexpected end marker '\\%s*' with no matching opening marker", token.Value),
 			token.Position,
 		)
@@ -649,7 +650,7 @@ func (p *parser) parseUnknown() *usfm.Node {
 	marker := token.Value
 	p.advance()
 
-	p.addError(fmt.Sprintf("Unknown marker '\\%s'", marker), position)
+	p.addError(usfm.CodeUnknownMarker, fmt.Sprintf("Unknown marker '\\%s'", marker), position)
 
 	return &usfm.Node{
 		Type:     usfm.NodeUnknown,
@@ -713,6 +714,7 @@ func (p *parser) parseInlineContent() *usfm.Node {
 
 	case lexer.EndMarker:
 		p.addError(
+			usfm.CodeUnexpectedEndMarker,
 			fmt.Sprintf("Unexpected end marker '\\%s*' with no matching opening marker", cur.Value),
 			cur.Position,
 		)
@@ -726,7 +728,7 @@ func (p *parser) parseInlineContent() *usfm.Node {
 
 	case lexer.Attribute:
 		// Attribute token not consumed by a char/note-char node — skip but warn
-		p.addError("Attribute data not attached to any marker", cur.Position)
+		p.addError(usfm.CodeUnattachedAttribute, "Attribute data not attached to any marker", cur.Position)
 		p.advance()
 		return nil
 	}
@@ -892,8 +894,8 @@ func (p *parser) applyAttributes(node *usfm.Node, token *lexer.Token) {
 	}
 }
 
-func (p *parser) addError(message string, position usfm.Position) {
-	p.errors = append(p.errors, usfm.ParseError{Message: message, Position: &position})
+func (p *parser) addError(code, message string, position usfm.Position) {
+	p.errors = append(p.errors, usfm.ParseError{Message: message, Position: &position, Code: code})
 	if p.strict {
 		panic(abort{fmt.Errorf("parse error at %d:%d: %s", position.Line, position.Column, message)})
 	}

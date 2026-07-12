@@ -8,6 +8,7 @@
 //   - grammar: marker categories, nesting groups, default attributes
 //   - lexer: tokenizer with byte + UTF-16 position tracking
 //   - parser: error-tolerant USFM parser producing the AST
+//   - diagnostics: converts parse errors to editor diagnostics with ranges
 //   - engine: added as the port from packages/usfm-parser progresses
 //   - cmd/usfm: standalone CLI tool
 //

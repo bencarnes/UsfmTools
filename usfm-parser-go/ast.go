@@ -52,10 +52,13 @@ type Node struct {
 	Text string `json:"text,omitempty"`
 }
 
-// ParseError is a parsing problem with optional position info.
+// ParseError is a parsing problem with optional position info. Code is one
+// of the diagnostic code constants (diagnostic.go), identifying the kind of
+// problem independently of the message text.
 type ParseError struct {
 	Message  string    `json:"message"`
 	Position *Position `json:"position,omitempty"`
+	Code     string    `json:"code,omitempty"`
 }
 
 // ParseResult is the outcome of parsing: the document tree plus any errors
