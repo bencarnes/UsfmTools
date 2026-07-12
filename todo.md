@@ -54,7 +54,7 @@ Ask clarifying questions as needed.
 
 ### CLI tool
 
-- [ ] **`usfm` CLI** — standalone binary using the library: at minimum `check` (parse a file/dir, print diagnostics, non-zero exit on errors); consider `parse --json` for AST dumps to help debugging and test fixtures.
+- [x] **`usfm` CLI** — standalone binary using the library: at minimum `check` (parse a file/dir, print diagnostics, non-zero exit on errors); consider `parse --json` for AST dumps to help debugging and test fixtures. _Done: `cmd/usfm` with `check [path ...]` (files, recursive dirs, `-` for stdin; compiler-style `file:line:col: severity: message [code]` output, 1-based positions; exit 1 on error diagnostics, 2 on usage/I/O problems) and `parse [-compact] <file|->` (JSON ParseResult dump, always exit 0). Unit tests in `cmd/usfm/main_test.go`; already covered by `go vet`/`go test ./...` in build.sh; BSB corpus checks clean in ~0.2 s._
 
 ### Wails integration (bible-edit)
 
