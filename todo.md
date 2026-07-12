@@ -34,7 +34,7 @@ Ask clarifying questions as needed.
 
 ### Scaffolding
 
-- [ ] **Create the Go module** — new Go module at `usfm-parser-go/` (top-level; `packages/` is for JS packages) separate from the `bible-edit` app so it is usable as a standalone library. Layout: `pkg/` (or root packages) for the library, `cmd/usfm/` for the CLI. Wire `go vet` / `go test` into `build.sh`.
+- [x] **Create the Go module** — new Go module at `usfm-parser-go/` (top-level; `packages/` is for JS packages) separate from the `bible-edit` app so it is usable as a standalone library. Layout: `pkg/` (or root packages) for the library, `cmd/usfm/` for the CLI. Wire `go vet` / `go test` into `build.sh`.
 - [ ] **Keep the old TS parser for reference only** — leave `packages/usfm-parser/` in the repo but remove it from the workspace build/check/test pipeline (and eventually from `usfm-controls`/`usfm-model` imports) so it is not part of the final build.
 
 ### Core parser (Go library)

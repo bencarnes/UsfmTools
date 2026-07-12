@@ -12,6 +12,11 @@ if ! command -v deno >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v go >/dev/null 2>&1; then
+  echo "Error: go is not installed or not on PATH (needed for usfm-parser-go)." >&2
+  exit 1
+fi
+
 check_package() {
   local rel="$1"
   local dir="$ROOT/$rel"
@@ -41,6 +46,13 @@ test_package "packages/usfm-parser"
 test_package "packages/usfm-model"
 test_package "packages/usfm-controls"
 test_package "packages/usfm-parser-integration-tests"
+
+echo ""
+echo "==> [usfm-parser-go] go vet"
+(cd "$ROOT/usfm-parser-go" && go vet ./...)
+echo ""
+echo "==> [usfm-parser-go] go test"
+(cd "$ROOT/usfm-parser-go" && go test ./...)
 
 echo ""
 echo "Done. Packages export TypeScript source via deno.json exports. Run tasks from individual packages/ paths as needed."

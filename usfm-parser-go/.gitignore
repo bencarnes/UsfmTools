@@ -1,0 +1,6 @@
+# Binary from `go build ./cmd/usfm` run in this directory
+/usfm
+
+# Test artifacts
+coverage.out
+*.test
