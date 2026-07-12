@@ -21,3 +21,65 @@ Preview HTML regeneration is debounced (1.5 s) in split mode. Scroll sync is pau
 - `packages/usfm-controls/src/components/usfm-editor/codemirror-usfm.ts`
 - `packages/usfm-controls/src/components/usfm-shell/UsfmShell.tsx`
 - `packages/usfm-controls/src/components/usfm-pane/scroll-sync.ts`
+
+# Rewrite parser in GO
+
+I want to rewrite the USFM parser using GO lang. I want to keep the old parser for reference, but not include it in the final build. I want the new parser to be runnable as a standalone CLI tool and also includable as a GO library. I want the bible-edit app to include that library use it to find errors, do syntax highlighting, and provide intellisense (basically things the old parser is used for). I want the new parser to be modeled after the way the LSP protocol works except much simpler and tailored to the needs of USFM editing (e.g. we don't need a go-to-definition feature). Like the LSP protocol, the new parser engine should keep a copy of the text and stay in sync with the editor. Like the LSP, the new parser engine should run asynchronously. Unlike the LSP protocol, the new parser engine be integrated with the editor via the js/go integration mechanism in Wails and via regular function calls (not JSON-RPC).
+
+I want the new parser engine to have good unit tests and good documentation in a README.md.
+
+Ask clarifying questions as needed.
+
+## Todo
+
+### Scaffolding
+
+- [ ] **Create the Go module** — new Go module at `usfm-parser-go/` (top-level; `packages/` is for JS packages) separate from the `bible-edit` app so it is usable as a standalone library. Layout: `pkg/` (or root packages) for the library, `cmd/usfm/` for the CLI. Wire `go vet` / `go test` into `build.sh`.
+- [ ] **Keep the old TS parser for reference only** — leave `packages/usfm-parser/` in the repo but remove it from the workspace build/check/test pipeline (and eventually from `usfm-controls`/`usfm-model` imports) so it is not part of the final build.
+
+### Core parser (Go library)
+
+- [ ] **Port the grammar** — translate `packages/usfm-parser/src/grammar.ts` (marker definitions, nesting rules, attributes) into Go data structures.
+- [ ] **Port the lexer** — tokenizer equivalent to `lexer.ts`, producing tokens with byte/UTF-16 position info suitable for editor integration.
+- [ ] **Port the parser and AST types** — equivalent of `parser.ts` / `types.ts`; error-tolerant parsing (never panic on malformed input, collect diagnostics instead).
+- [ ] **Diagnostics** — structured errors/warnings with ranges and codes, matching what `language-service/diagnostics.ts` surfaces today.
+- [ ] **Unit tests** — table-driven tests for lexer, parser, and diagnostics; port the existing TS parser test cases; run the Berean Standard Bible corpus tests (`packages/usfm-parser-integration-tests/`) against the Go parser.
+
+### Engine (LSP-like, simplified)
+
+- [ ] **Document store with sync** — engine keeps its own copy of each open document; API modeled on LSP lifecycle: `Open`, `ApplyChanges` (incremental edits with ranges + version numbers), `Close`.
+- [ ] **Async processing** — parsing/analysis runs off the caller's goroutine; results are versioned so stale results can be discarded; debounce/coalesce rapid edits.
+- [ ] **Feature requests** — tailored to USFM editing needs (no go-to-definition): diagnostics (push or pull), semantic tokens / syntax classification for a range or viewport (replaces `language-service/classifier.ts`), completions for markers and book codes (replaces `language-service/completions.ts`), and whatever else `language-service/service.ts` currently provides (e.g. chapter/verse structure for the outline/preview).
+- [ ] **Engine unit tests** — cover document sync (out-of-order versions, incremental edits), cancellation/staleness, and each feature request.
+
+### CLI tool
+
+- [ ] **`usfm` CLI** — standalone binary using the library: at minimum `check` (parse a file/dir, print diagnostics, non-zero exit on errors); consider `parse --json` for AST dumps to help debugging and test fixtures.
+
+### Wails integration (bible-edit)
+
+- [ ] **Bind the engine into the app** — add the engine to `apps/bible-edit` (Go dependency on the parser module, e.g. via `go.work` or a replace directive), expose bound methods on the app struct (regular function calls, not JSON-RPC), and push async results (diagnostics) to the frontend via Wails events.
+- [ ] **Frontend adapter** — implement the `usfm-controls` `language-service/protocol.ts` interface backed by the Wails bindings, keeping editor edits in sync with the engine (forward CodeMirror change sets as incremental updates).
+- [ ] **Switch features over** — errors panel + squiggles, syntax highlighting, and intellisense/completions in the editor all served by the Go engine; remove the TS parser from the `usfm-controls`/`usfm-model` runtime paths.
+- [ ] **Preview HTML rendering via the Go engine** — move `usfm-model`'s preview rendering (`render-preview-html.ts`) and the other `usfm-model` parser consumers (chapter lists, book picker) onto the new parser, e.g. an engine request that returns preview HTML (or the structure needed to render it) for the current document.
+
+### Docs & cleanup
+
+- [ ] **README.md for the Go module** — architecture overview (library / engine / CLI), the LSP-like protocol (document sync, versioning, feature requests), how to use it as a library, CLI usage, and how bible-edit integrates it.
+- [ ] **Update repo docs** — `AGENTS.md` / root `README.md`: new package layout, Go toolchain requirement, build commands.
+
+### Performance revisit
+
+- [ ] **Re-evaluate the existing debounce/throttle layers** — the perf work above (see "USFM editor typing performance") added debouncing because parsing was synchronous and on the UI thread: 300 ms validation debounce, 500 ms workspace model sync, 1.5 s preview HTML regeneration, scroll-sync pause while typing, viewport-only highlighting. With parsing async in Go, decide per feature whether the debounce still earns its latency or should shrink/go away.
+- [ ] **Prefer engine-side coalescing over frontend debouncing** — forward edits to the engine immediately (cheap sync of the document copy) and let the engine coalesce/cancel stale parses by version; the frontend then just applies whatever versioned results arrive, instead of gating requests with timers.
+- [ ] **Watch the new costs asynchrony introduces** — Wails bridge call overhead per keystroke, serialization of large results (semantic tokens, preview HTML), and stale-result flicker (e.g. squiggles or highlights lagging the text); batch or range-scope results where needed.
+- [ ] **Verify performance end-to-end** — profile typing in large books (e.g. Psalms) with the Go engine doing validation/highlighting/preview; confirm it's at least as smooth as the tuned TS setup before deleting the old optimizations.
+
+## Key files
+
+- `packages/usfm-parser/src/{grammar,lexer,parser,types}.ts` — old parser to port
+- `packages/usfm-controls/src/language-service/` — existing LSP-like TS layer (protocol, service, diagnostics, classifier, completions) to be backed by the Go engine
+- `packages/usfm-model/src/` — other consumers of the old parser (preview rendering, chapter lists, book picker)
+- `packages/usfm-parser-integration-tests/` — Berean corpus tests to port
+- `apps/bible-edit/{main.go,app.go}` — Wails app where the engine gets bound
+
