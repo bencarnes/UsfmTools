@@ -41,7 +41,7 @@ Ask clarifying questions as needed.
 
 - [x] **Port the grammar** — translate `packages/usfm-parser/src/grammar.ts` (marker definitions, nesting rules, attributes) into Go data structures. _Done: `usfm-parser-go/grammar/` with all grammar.test.ts cases ported._
 - [x] **Port the lexer** — tokenizer equivalent to `lexer.ts`, producing tokens with byte/UTF-16 position info suitable for editor integration. _Done: `usfm-parser-go/lexer/`; all lexer.test.ts cases ported plus UTF-16 tests; token streams verified byte-identical to the TS lexer across all 66 BSB books (differential tool kept at `internal/lexdump`)._
-- [ ] **Port the parser and AST types** — equivalent of `parser.ts` / `types.ts`; error-tolerant parsing (never panic on malformed input, collect diagnostics instead).
+- [x] **Port the parser and AST types** — equivalent of `parser.ts` / `types.ts`; error-tolerant parsing (never panic on malformed input, collect diagnostics instead). _Done: `usfm-parser-go/parser/` + flat `Node` AST in the root package; all parser.test.ts cases ported; ASTs and error lists verified identical to the TS parser across all 66 BSB books (`internal/astdump`)._
 - [ ] **Diagnostics** — structured errors/warnings with ranges and codes, matching what `language-service/diagnostics.ts` surfaces today.
 - [ ] **Unit tests** — table-driven tests for lexer, parser, and diagnostics; port the existing TS parser test cases; run the Berean Standard Bible corpus tests (`packages/usfm-parser-integration-tests/`) against the Go parser.
 
@@ -77,6 +77,7 @@ Ask clarifying questions as needed.
 
 ### Follow-ups
 
+- [ ] **Decide whether to fix parser quirks carried over from the TS parser** — the Go parser port reproduces these faithfully (verified identical on the BSB corpus; also noted in the `parser` package comment): text after a chapter number is silently dropped (`\c 1 extra` loses "extra"); `\fig` in inline context (e.g. inside a paragraph) is reported as "Unknown marker" instead of being parsed as a figure; note-caller splitting collapses interior whitespace in the note's first text run and keeps a trailing space before the end marker (see `TestNoteTextKeepsTrailingSpace`). Decide per quirk whether it's correct USFM handling or a bug; fix in both parsers or document as intentional.
 - [ ] **Investigate suspected typos carried over from the TS grammar** — the grammar port copied two oddities faithfully rather than fixing them silently: the cell list has `tch12` where the pattern suggests `thc12` should be, and `wl` has a default attribute (`lang`) but appears in no category (so it's `unknown`). Check against the USFM 3.x spec and fix both `grammar.ts` and `usfm-parser-go/grammar/grammar.go` (or document why they're intentional).
 
 ## Key files
