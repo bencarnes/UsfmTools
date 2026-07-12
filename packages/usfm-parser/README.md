@@ -1,5 +1,12 @@
 # @usfm-tools/parser
 
+> **⚠️ Reference only.** This TypeScript parser is being superseded by the Go
+> rewrite in [`usfm-parser-go/`](../../usfm-parser-go/) and is excluded from
+> the build/check/test pipeline (see the "Rewrite parser in GO" section of the
+> root `todo.md`). It remains a workspace member only so that the remaining
+> imports in `usfm-model`/`usfm-controls` resolve until those consumers switch
+> to the Go engine. Do not add new functionality here.
+
 A TypeScript parser for [USFM](https://docs.usfm.bible/usfm/3.1.1/index.html) (Unified Standard Format Markers) — the standard markup format for encoding Bible/scripture text.
 
 This parser tokenizes and parses USFM source text into a structured AST (Abstract Syntax Tree) that can be traversed, transformed, or serialized by downstream tools.

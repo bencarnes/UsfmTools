@@ -39,13 +39,15 @@ echo "UsfmTools — check and test Deno workspace packages (under packages/)"
 # Remove it so Deno resolves npm: imports from its cache without invoking npm.
 rm -rf "$ROOT/node_modules" "$ROOT"/packages/*/node_modules
 
-check_package "packages/usfm-parser"
+# packages/usfm-parser is reference-only (superseded by usfm-parser-go) and is
+# not checked or tested here; it stays a workspace member only so remaining
+# imports in usfm-model/usfm-controls resolve until they switch to the Go
+# engine. Its integration tests (usfm-parser-integration-tests) are skipped
+# for the same reason; the Berean corpus tests are being ported to Go.
 check_package "packages/usfm-model"
 check_package "packages/usfm-controls"
-test_package "packages/usfm-parser"
 test_package "packages/usfm-model"
 test_package "packages/usfm-controls"
-test_package "packages/usfm-parser-integration-tests"
 
 echo ""
 echo "==> [usfm-parser-go] go vet"
