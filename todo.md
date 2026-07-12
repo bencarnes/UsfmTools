@@ -39,7 +39,7 @@ Ask clarifying questions as needed.
 
 ### Core parser (Go library)
 
-- [ ] **Port the grammar** — translate `packages/usfm-parser/src/grammar.ts` (marker definitions, nesting rules, attributes) into Go data structures.
+- [x] **Port the grammar** — translate `packages/usfm-parser/src/grammar.ts` (marker definitions, nesting rules, attributes) into Go data structures. _Done: `usfm-parser-go/grammar/` with all grammar.test.ts cases ported._
 - [ ] **Port the lexer** — tokenizer equivalent to `lexer.ts`, producing tokens with byte/UTF-16 position info suitable for editor integration.
 - [ ] **Port the parser and AST types** — equivalent of `parser.ts` / `types.ts`; error-tolerant parsing (never panic on malformed input, collect diagnostics instead).
 - [ ] **Diagnostics** — structured errors/warnings with ranges and codes, matching what `language-service/diagnostics.ts` surfaces today.
@@ -74,6 +74,10 @@ Ask clarifying questions as needed.
 - [ ] **Prefer engine-side coalescing over frontend debouncing** — forward edits to the engine immediately (cheap sync of the document copy) and let the engine coalesce/cancel stale parses by version; the frontend then just applies whatever versioned results arrive, instead of gating requests with timers.
 - [ ] **Watch the new costs asynchrony introduces** — Wails bridge call overhead per keystroke, serialization of large results (semantic tokens, preview HTML), and stale-result flicker (e.g. squiggles or highlights lagging the text); batch or range-scope results where needed.
 - [ ] **Verify performance end-to-end** — profile typing in large books (e.g. Psalms) with the Go engine doing validation/highlighting/preview; confirm it's at least as smooth as the tuned TS setup before deleting the old optimizations.
+
+### Follow-ups
+
+- [ ] **Investigate suspected typos carried over from the TS grammar** — the grammar port copied two oddities faithfully rather than fixing them silently: the cell list has `tch12` where the pattern suggests `thc12` should be, and `wl` has a default attribute (`lang`) but appears in no category (so it's `unknown`). Check against the USFM 3.x spec and fix both `grammar.ts` and `usfm-parser-go/grammar/grammar.go` (or document why they're intentional).
 
 ## Key files
 

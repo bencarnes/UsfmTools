@@ -4,7 +4,8 @@
 // The module is organized as:
 //
 //   - the root package (this one): shared types used across the module
-//   - subpackages (lexer, parser, engine): added as the port from
+//   - grammar: marker categories, nesting groups, default attributes
+//   - further subpackages (lexer, parser, engine): added as the port from
 //     packages/usfm-parser progresses
 //   - cmd/usfm: standalone CLI tool
 //
