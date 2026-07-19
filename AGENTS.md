@@ -34,7 +34,8 @@ All packages under `packages/` are **Deno projects** wired together as a [Deno w
 | Vet/test Go | `go vet ./...` / `go test ./...` | `usfm-parser-go/` (also `apps/bible-edit/`) |
 | Engine race suite | `go test -race ./engine/` | `usfm-parser-go/` |
 | Build the CLI | `go build ./cmd/usfm` | `usfm-parser-go/` |
-| Build the desktop app | `./build.sh` | `apps/bible-edit/` |
+| Build the desktop app | `./build.sh` | `apps/bible-edit/` (auto-adds `-tags webkit2_41` when WebKitGTK 4.0 is absent) |
+| Run the app in dev mode | `wails dev -tags webkit2_41` | `apps/bible-edit/` (tag required on distros without WebKitGTK 4.0, e.g. Debian 13+; plain `wails dev` fails with "webkit2gtk-4.0 not found") |
 | Regenerate Wails JS bindings | `wails generate module` | `apps/bible-edit/` (after changing bound Go types/methods) |
 | Component stories (Ladle) | `deno task ladle` | `packages/usfm-controls/` |
 

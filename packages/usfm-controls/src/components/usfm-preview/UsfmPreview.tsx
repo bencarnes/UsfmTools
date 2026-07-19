@@ -34,6 +34,11 @@ export interface UsfmPreviewProps {
    * engine in bible-edit). Defaults to the in-process TypeScript renderer.
    */
   languageClient?: UsfmLanguageClient;
+  /**
+   * Fired after freshly rendered HTML has been committed to the DOM (the
+   * moment scroll positions may have been perturbed by the swap).
+   */
+  onRendered?: () => void;
   className?: string;
 }
 
@@ -47,12 +52,21 @@ export const UsfmPreview = memo(function UsfmPreview({
   versePerLine,
   updateDebounceMs = 0,
   languageClient,
+  onRendered,
   className,
 }: UsfmPreviewProps) {
   const versePerLineOn = normalizeVersePerLine(versePerLine);
   const [renderValue, setRenderValue] = useState(value);
   const [html, setHtml] = useState("");
   const generationRef = useRef(0);
+  const onRenderedRef = useRef(onRendered);
+  onRenderedRef.current = onRendered;
+
+  // Runs after a new `html` has been committed to the DOM (unlike the render
+  // promise's `.then`, which resolves before React re-renders).
+  useEffect(() => {
+    if (html) onRenderedRef.current?.();
+  }, [html]);
 
   useEffect(() => {
     if (updateDebounceMs <= 0) {

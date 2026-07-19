@@ -71,6 +71,53 @@ describe("UsfmEditor debounced onChange", () => {
     expect(onChange.calls.length).toBe(1);
   });
 
+  it("ignores stale value echoes and applies genuine external changes", async () => {
+    const initial = "\\id GEN\n\\p\n\\v 1 Hello.";
+    const onChange = spy((_value: string) => {});
+    const ref = createRef<UsfmEditorHandle>();
+    const { container, rerender } = render(
+      <UsfmEditor
+        ref={ref}
+        value={initial}
+        onChange={onChange}
+        onChangeDebounceMs={5000}
+        className="h-48"
+      />,
+    );
+    await waitFor(() => {
+      expect(ref.current).toBeTruthy();
+    });
+    const view = viewFromContainer(container);
+
+    // Two emissions in a row (as when a debounce timer fires while an earlier
+    // echo is still round-tripping through the parent's state).
+    view.dispatch({ changes: { from: view.state.doc.length, insert: "A" } });
+    const first = ref.current!.flushChange();
+    view.dispatch({ changes: { from: view.state.doc.length, insert: "B" } });
+    const second = ref.current!.flushChange();
+    expect(second).toBe(`${initial}AB`);
+
+    // The stale echo of the first emission arrives late: it must NOT replace
+    // the document (that would wipe "B" and reset the caret to offset 0).
+    rerender(
+      <UsfmEditor ref={ref} value={first} onChange={onChange} onChangeDebounceMs={5000} className="h-48" />,
+    );
+    expect(viewFromContainer(container).state.doc.toString()).toBe(second);
+
+    // The fresh echo clears the pending flag...
+    rerender(
+      <UsfmEditor ref={ref} value={second} onChange={onChange} onChangeDebounceMs={5000} className="h-48" />,
+    );
+    expect(viewFromContainer(container).state.doc.toString()).toBe(second);
+
+    // ...after which a genuinely external value still applies.
+    const external = "\\id EXO\n\\p\n\\v 1 Other.";
+    rerender(
+      <UsfmEditor ref={ref} value={external} onChange={onChange} onChangeDebounceMs={5000} className="h-48" />,
+    );
+    expect(viewFromContainer(container).state.doc.toString()).toBe(external);
+  });
+
   it("fires onDirty once before debounced onChange", async () => {
     const onChange = spy((_value: string) => {});
     const onDirty = spy(() => {});

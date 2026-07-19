@@ -123,6 +123,9 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   const viewportDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const changeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastEmittedRef = useRef(value);
+  // True while an emitted change is still round-tripping through the parent
+  // as a `value` echo (cleared when the echo arrives). See the value effect.
+  const echoPendingRef = useRef(false);
   const dirtyReportedRef = useRef(false);
 
   onChangeRef.current = onChange;
@@ -138,6 +141,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
 
   const emitChange = (content: string) => {
     lastEmittedRef.current = content;
+    echoPendingRef.current = onChangeRef.current != null;
     onChangeRef.current?.(content);
   };
 
@@ -379,6 +383,12 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     onDocumentIdChangeRef.current?.(documentId);
     const unsubscribeAnalysis = client.onAnalysis((event) => {
       if (event.id !== documentId) return;
+      // An analysis older than the edits already forwarded carries pre-edit
+      // positions, and the client is guaranteed to re-analyze after every
+      // edit, so a fresh push follows. Skip it: CodeMirror has been mapping
+      // the previously applied squiggles through the edits meanwhile, which
+      // is more accurate than painting stale offsets.
+      if (event.version < sync.version) return;
       const v = viewRef.current;
       if (v) {
         v.dispatch(setDiagnostics(v.state, languageDiagnosticsToCm(v.state.doc, event.diagnostics)));
@@ -428,7 +438,18 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-    if (value === lastEmittedRef.current) return;
+    if (value === lastEmittedRef.current) {
+      echoPendingRef.current = false;
+      return;
+    }
+    // While an emitted change is still echoing back through the parent, a
+    // differing prop is a *stale* echo of an older emission (this effect runs
+    // after paint, so under main-thread congestion the next debounced
+    // emission can land before the previous echo's effect does). Treating it
+    // as an external change would replace the document with old content —
+    // wiping the newest edits and throwing the caret to offset 0. Skip it;
+    // the echo of the latest emission follows and clears the flag.
+    if (echoPendingRef.current) return;
     const currentContent = view.state.doc.toString();
     if (currentContent !== value) {
       view.dispatch({

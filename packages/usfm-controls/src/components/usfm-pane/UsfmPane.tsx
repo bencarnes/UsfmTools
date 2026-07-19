@@ -43,13 +43,18 @@ import { themedControlButton } from "../../theme-tokens.js";
 
 /**
  * Delay preview regeneration while typing in split editor+preview mode. Parsing and
- * rendering run off the UI thread (language client), but each refresh still ships the
- * full document to the client and swaps the whole preview DOM, so it stays debounced —
- * driven from the live editor buffer, independent of the React value-lift debounce.
+ * rendering run off the UI thread (language client), but swapping the full-book
+ * preview DOM (parse + layout) blocks the UI thread for a long time on modest
+ * hardware, so refreshes must not fire at every between-sentences pause — hence a
+ * generous idle window, driven from the live editor buffer.
  */
-const PREVIEW_UPDATE_DEBOUNCE_MS = 700;
+const PREVIEW_UPDATE_DEBOUNCE_MS = 1500;
 /** Defer scroll sync until typing pauses in split mode. */
 const SCROLL_SYNC_TYPING_IDLE_MS = 500;
+/** Coalesce preview scroll events before syncing the editor (layout + text scans). */
+const PREVIEW_TO_EDITOR_SYNC_DEBOUNCE_MS = 120;
+/** Ignore preview scroll activity this long after a preview DOM swap. */
+const PREVIEW_SWAP_SYNC_SUPPRESS_MS = 300;
 /** Defer chapter-marker rescans while typing in split mode (markers rarely change per keystroke). */
 const NAV_MARKERS_DEBOUNCE_MS = 300;
 /** Defer lifting the full document string to React while typing in the workspace. */
@@ -157,6 +162,10 @@ export function UsfmPane({
   const previewScrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingIdleScrollSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingAtRef = useRef(0);
+  const lastPreviewScrollTopRef = useRef(0);
+  const previewSwapAtRef = useRef(0);
   const [previewValue, setPreviewValue] = useState(value);
   const [navSource, setNavSource] = useState(value);
 
@@ -204,6 +213,7 @@ export function UsfmPane({
   useEffect(() => {
     return () => {
       if (typingIdleScrollSyncRef.current) clearTimeout(typingIdleScrollSyncRef.current);
+      if (previewSyncDebounceRef.current) clearTimeout(previewSyncDebounceRef.current);
     };
   }, []);
 
@@ -263,6 +273,7 @@ export function UsfmPane({
   }, [viewMode, scrollSyncEnabled, syncPreviewToEditorOffset]);
 
   const notifyDocumentChange = useCallback(() => {
+    lastTypingAtRef.current = Date.now();
     schedulePreviewRefresh();
     scheduleIdleScrollSync();
   }, [schedulePreviewRefresh, scheduleIdleScrollSync]);
@@ -418,10 +429,40 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
     [markers, viewMode, readPreviewChapter],
   );
 
+  // Preview→editor sync is debounced (scroll events arrive at frame rate and
+  // each sync forces layout over the large preview DOM plus text scans),
+  // paused while typing (mirroring the editor→preview direction), and
+  // suppressed briefly after a preview DOM swap — the swap itself perturbs
+  // scroll positions, and reacting to that used to drag the editor to the
+  // top of the book.
+  const schedulePreviewToEditorSync = useCallback(() => {
+    if (previewSyncDebounceRef.current) clearTimeout(previewSyncDebounceRef.current);
+    previewSyncDebounceRef.current = setTimeout(() => {
+      previewSyncDebounceRef.current = null;
+      if (Date.now() - lastTypingAtRef.current < SCROLL_SYNC_TYPING_IDLE_MS) return;
+      if (Date.now() - previewSwapAtRef.current < PREVIEW_SWAP_SYNC_SUPPRESS_MS) return;
+      syncEditorToPreviewTop();
+    }, PREVIEW_TO_EDITOR_SYNC_DEBOUNCE_MS);
+  }, [syncEditorToPreviewTop]);
+
+  // After a preview DOM swap, restore the scroll position the user (or the
+  // last sync) had established — replacing the innerHTML can reset or clamp
+  // it — and mark the swap so scroll sync ignores the resulting events.
+  const handlePreviewRendered = useCallback(() => {
+    if (viewMode !== "split") return;
+    previewSwapAtRef.current = Date.now();
+    const root = previewScrollRef.current;
+    if (root) root.scrollTop = lastPreviewScrollTopRef.current;
+  }, [viewMode]);
+
   const onPreviewScroll = useCallback(() => {
+    const root = previewScrollRef.current;
+    if (root && Date.now() - previewSwapAtRef.current >= PREVIEW_SWAP_SYNC_SUPPRESS_MS) {
+      lastPreviewScrollTopRef.current = root.scrollTop;
+    }
     if (viewMode === "preview") schedulePreviewChapterRead();
-    if (viewMode === "split") syncEditorToPreviewTop();
-  }, [viewMode, schedulePreviewChapterRead, syncEditorToPreviewTop]);
+    if (viewMode === "split") schedulePreviewToEditorSync();
+  }, [viewMode, schedulePreviewChapterRead, schedulePreviewToEditorSync]);
 
   const onSplitMouseDown = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -591,6 +632,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                   documentId={editorDocumentId}
                   versePerLine={versePerLine}
                   languageClient={languageClient}
+                  onRendered={handlePreviewRendered}
                 />
               </div>
             </div>
