@@ -135,6 +135,7 @@ export type {
   DocumentChange,
   DocumentSyncOptions,
   PreviewOptions,
+  PreviewResult,
   StructureResult,
   TokensResult,
   UsfmLanguageClient,

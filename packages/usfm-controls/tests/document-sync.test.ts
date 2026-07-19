@@ -59,6 +59,7 @@ function fakeClient() {
     classifyDocument: () => Promise.resolve({ version: 0, tokens: [] }),
     classifyRange: () => Promise.resolve({ version: 0, tokens: [] }),
     getCompletions: () => Promise.resolve([]),
+    renderPreviewDocument: () => Promise.resolve({ version: 0, html: "" }),
     renderPreview: () => Promise.resolve(""),
     onAnalysis: () => () => {},
   };

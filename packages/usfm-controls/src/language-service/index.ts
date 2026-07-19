@@ -9,6 +9,7 @@ export type {
   DocumentChange,
   Position,
   PreviewOptions,
+  PreviewResult,
   Range,
   RequestMessage,
   ResponseMessage,

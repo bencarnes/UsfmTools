@@ -158,6 +158,18 @@ export function createLocalLanguageClient(
       }
     },
 
+    renderPreviewDocument(id, options) {
+      try {
+        const doc = mustGet(id);
+        return Promise.resolve({
+          version: doc.version,
+          html: renderPreviewHtml(doc.text, { versePerLine: options?.versePerLine }),
+        });
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    },
+
     renderPreview(text, options) {
       try {
         return Promise.resolve(

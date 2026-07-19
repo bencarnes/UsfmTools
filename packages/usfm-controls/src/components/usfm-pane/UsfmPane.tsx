@@ -41,8 +41,13 @@ import { FindToolbarButton } from "./find-toolbar-button.js";
 import { SaveToolbarButton } from "./save-toolbar-button.js";
 import { themedControlButton } from "../../theme-tokens.js";
 
-/** Delay preview HTML regeneration while typing in split editor+preview mode. */
-const PREVIEW_UPDATE_DEBOUNCE_MS = 1500;
+/**
+ * Delay preview regeneration while typing in split editor+preview mode. Parsing and
+ * rendering run off the UI thread (language client), but each refresh still ships the
+ * full document to the client and swaps the whole preview DOM, so it stays debounced —
+ * driven from the live editor buffer, independent of the React value-lift debounce.
+ */
+const PREVIEW_UPDATE_DEBOUNCE_MS = 700;
 /** Defer scroll sync until typing pauses in split mode. */
 const SCROLL_SYNC_TYPING_IDLE_MS = 500;
 /** Defer chapter-marker rescans while typing in split mode (markers rarely change per keystroke). */
@@ -137,6 +142,10 @@ export function UsfmPane({
   const [previewTopChapter, setPreviewTopChapter] = useState<string | null>(null);
   const [scrollSyncEnabled, setScrollSyncEnabled] = useState(defaultScrollSyncEnabled);
   const [wordWrapEnabled, setWordWrapEnabled] = useState(true);
+  // Language-client document id of the mounted editor (null when no editor is
+  // mounted, e.g. preview-only mode). Lets the split-pane preview render the
+  // engine's synced copy instead of shipping the full text per refresh.
+  const [editorDocumentId, setEditorDocumentId] = useState<string | null>(null);
 
   const editorRef = useRef<UsfmEditorHandle>(null);
   const valueRef = useRef(value);
@@ -147,17 +156,41 @@ export function UsfmPane({
   const splitDragRef = useRef<{ startX: number; startPct: number } | null>(null);
   const previewScrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingIdleScrollSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [previewValue, setPreviewValue] = useState(value);
   const [navSource, setNavSource] = useState(value);
 
+  // Outside split mode the preview tracks `value` directly. In split mode it
+  // instead follows the live editor buffer (schedulePreviewRefresh below), so
+  // its latency does not stack on the value-lift debounce; `value` echoes of
+  // our own edits are ignored, and external replacements reach the preview
+  // through the editor's document-change notifications.
   useEffect(() => {
-    if (viewMode !== "split") {
-      setPreviewValue(value);
-      return;
-    }
-    const timer = setTimeout(() => setPreviewValue(value), PREVIEW_UPDATE_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    if (viewMode !== "split") setPreviewValue(value);
   }, [value, viewMode]);
+
+  // Entering split mode: snap the preview to the current buffer once instead
+  // of waiting out a debounce for the first render.
+  useEffect(() => {
+    if (viewMode === "split") {
+      setPreviewValue(editorRef.current?.getDocument() ?? valueRef.current);
+    }
+    return () => {
+      if (previewRefreshRef.current) {
+        clearTimeout(previewRefreshRef.current);
+        previewRefreshRef.current = null;
+      }
+    };
+  }, [viewMode]);
+
+  const schedulePreviewRefresh = useCallback(() => {
+    if (viewMode !== "split") return;
+    if (previewRefreshRef.current) clearTimeout(previewRefreshRef.current);
+    previewRefreshRef.current = setTimeout(() => {
+      previewRefreshRef.current = null;
+      setPreviewValue(editorRef.current?.getDocument() ?? valueRef.current);
+    }, PREVIEW_UPDATE_DEBOUNCE_MS);
+  }, [viewMode]);
 
   useEffect(() => {
     if (viewMode !== "split") {
@@ -230,8 +263,9 @@ export function UsfmPane({
   }, [viewMode, scrollSyncEnabled, syncPreviewToEditorOffset]);
 
   const notifyDocumentChange = useCallback(() => {
+    schedulePreviewRefresh();
     scheduleIdleScrollSync();
-  }, [scheduleIdleScrollSync]);
+  }, [schedulePreviewRefresh, scheduleIdleScrollSync]);
 
   const registerDocumentReader = useCallback(() => {
     return editorRef.current?.getDocument() ?? valueRef.current;
@@ -502,6 +536,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
             onDocumentChange={notifyDocumentChange}
             languageClient={languageClient}
             onDiagnostics={onDiagnostics}
+            onDocumentIdChange={setEditorDocumentId}
             onSave={handleSave}
             onViewportAnchorChange={onEditorViewportAnchor}
             wordWrap={wordWrapEnabled}
@@ -531,6 +566,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 onDocumentChange={notifyDocumentChange}
                 languageClient={languageClient}
                 onDiagnostics={onDiagnostics}
+                onDocumentIdChange={setEditorDocumentId}
                 onSave={handleSave}
                 onViewportAnchorChange={onEditorViewportAnchor}
                 wordWrap={wordWrapEnabled}
@@ -552,6 +588,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
               >
                 <UsfmPreview
                   value={previewValue}
+                  documentId={editorDocumentId}
                   versePerLine={versePerLine}
                   languageClient={languageClient}
                 />

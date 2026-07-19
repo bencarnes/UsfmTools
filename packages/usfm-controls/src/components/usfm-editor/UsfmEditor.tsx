@@ -69,6 +69,12 @@ export interface UsfmEditorProps {
   /** Fired with fresh parse diagnostics whenever the engine re-analyzes. */
   onDiagnostics?: (diagnostics: readonly LanguageDiagnostic[]) => void;
   /**
+   * Reports the language-client document id backing this editor: the id on
+   * mount, `null` on unmount. Lets siblings (e.g. the split-pane preview)
+   * issue requests against the editor's synced document copy.
+   */
+  onDocumentIdChange?: (id: string | null) => void;
+  /**
    * Registers a reader for the live document buffer. Called on mount/update;
    * return value unregisters on cleanup.
    */
@@ -94,6 +100,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     onDocumentChange,
     languageClient,
     onDiagnostics,
+    onDocumentIdChange,
     onRegisterDocumentReader,
     onSave,
     onViewportAnchorChange,
@@ -109,6 +116,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   const onDirtyRef = useRef(onDirty);
   const onDocumentChangeRef = useRef(onDocumentChange);
   const onDiagnosticsRef = useRef(onDiagnostics);
+  const onDocumentIdChangeRef = useRef(onDocumentIdChange);
   const languageClientRef = useRef(languageClient);
   const onSaveRef = useRef(onSave);
   const onViewportAnchorChangeRef = useRef(onViewportAnchorChange);
@@ -121,6 +129,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   onDirtyRef.current = onDirty;
   onDocumentChangeRef.current = onDocumentChange;
   onDiagnosticsRef.current = onDiagnostics;
+  onDocumentIdChangeRef.current = onDocumentIdChange;
   languageClientRef.current = languageClient;
   onSaveRef.current = onSave;
   onViewportAnchorChangeRef.current = onViewportAnchorChange;
@@ -142,16 +151,18 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     return content;
   };
 
-  const scheduleChange = (content: string) => {
+  // The document string is materialized when the change is emitted, not per
+  // keystroke — toString() over a large book on every edit is avoidable work.
+  const scheduleChange = () => {
     if (!onChangeRef.current) return;
     if (onChangeDebounceMs <= 0) {
-      emitChange(content);
+      emitChange(readDocument());
       return;
     }
     if (changeDebounceRef.current) clearTimeout(changeDebounceRef.current);
     changeDebounceRef.current = setTimeout(() => {
       changeDebounceRef.current = null;
-      emitChange(content);
+      emitChange(readDocument());
     }, onChangeDebounceMs);
   };
 
@@ -254,7 +265,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
           dirtyReportedRef.current = true;
           onDirtyRef.current?.();
         }
-        scheduleChange(update.state.doc.toString());
+        scheduleChange();
       }
       // Typing moves the selection every keystroke; skip viewport sync then so split-pane
       // scroll alignment does not walk the preview DOM on each character.
@@ -365,6 +376,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     // live buffer) and route its pushed analyses into lint squiggles and the
     // onDiagnostics callback.
     sync.open();
+    onDocumentIdChangeRef.current?.(documentId);
     const unsubscribeAnalysis = client.onAnalysis((event) => {
       if (event.id !== documentId) return;
       const v = viewRef.current;
@@ -375,13 +387,19 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     });
 
     return () => {
+      onDocumentIdChangeRef.current?.(null);
       unsubscribeAnalysis();
       sync.close();
       view.scrollDOM.removeEventListener("scroll", scheduleViewportReport);
       if (viewportDebounceRef.current) clearTimeout(viewportDebounceRef.current);
       viewportDebounceRef.current = null;
-      if (changeDebounceRef.current) clearTimeout(changeDebounceRef.current);
-      changeDebounceRef.current = null;
+      if (changeDebounceRef.current) {
+        clearTimeout(changeDebounceRef.current);
+        changeDebounceRef.current = null;
+        // Flush rather than drop: unmounting mid-debounce (e.g. a view-mode
+        // switch remounting the editor) must not lose the last edits.
+        emitChange(readDocument());
+      }
       view.destroy();
       viewRef.current = null;
     };

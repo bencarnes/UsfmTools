@@ -108,7 +108,6 @@ function posToOffset(
 }
 
 const HIGHLIGHT_MARGIN_LINES = 5;
-const HIGHLIGHT_DEBOUNCE_MS = 100;
 
 function viewportCharRange(view: EditorView): { from: number; to: number } {
   const doc = view.state.doc;
@@ -156,13 +155,18 @@ export const usfmHighlighter = (session: EditorLanguageSession) =>
   class {
     decorations: DecorationSet;
     view: EditorView;
-    pending: ReturnType<typeof setTimeout> | null = null;
-    generation = 0;
+    dirty = false;
+    inflight = false;
+    destroyed = false;
 
     constructor(view: EditorView) {
       this.view = view;
       this.decorations = Decoration.none;
-      this.scheduleRefresh();
+      // Defer past the caller's synchronous mount code so the editor's
+      // engine document is opened before the first classify request.
+      queueMicrotask(() => {
+        if (!this.destroyed) this.scheduleRefresh();
+      });
     }
 
     update(update: ViewUpdate) {
@@ -197,19 +201,33 @@ export const usfmHighlighter = (session: EditorLanguageSession) =>
     }
 
     destroy() {
-      if (this.pending) clearTimeout(this.pending);
+      this.destroyed = true;
     }
 
+    // Classification runs off the UI thread (in the language engine), so
+    // instead of a timer-based debounce the plugin keeps at most one request
+    // in flight and refetches when edits or scrolling arrive mid-flight:
+    // highlight latency is one engine round trip, and request volume
+    // self-clocks to round-trip time during bursts.
     scheduleRefresh() {
-      if (this.pending) clearTimeout(this.pending);
-      this.pending = setTimeout(() => {
-        this.pending = null;
-        void this.refreshViewport();
-      }, HIGHLIGHT_DEBOUNCE_MS);
+      this.dirty = true;
+      void this.pump();
+    }
+
+    async pump() {
+      if (this.inflight) return;
+      this.inflight = true;
+      try {
+        while (this.dirty && !this.destroyed) {
+          this.dirty = false;
+          await this.refreshViewport();
+        }
+      } finally {
+        this.inflight = false;
+      }
     }
 
     async refreshViewport() {
-      const gen = ++this.generation;
       const view = this.view;
       const { from, to } = viewportCharRange(view);
       let tokens: TokenClassification[];
@@ -218,7 +236,10 @@ export const usfmHighlighter = (session: EditorLanguageSession) =>
       } catch {
         return; // document closed mid-flight (editor unmounting)
       }
-      if (gen !== this.generation || !view.dom.isConnected) return;
+      if (this.destroyed || !view.dom.isConnected) return;
+      // The document or viewport moved while the request was in flight, so
+      // these tokens are stale; the loop in pump() fetches fresh ones.
+      if (this.dirty) return;
 
       const ranges = decorationsForTokens(view.state.doc, tokens);
       this.decorations = this.decorations.update({

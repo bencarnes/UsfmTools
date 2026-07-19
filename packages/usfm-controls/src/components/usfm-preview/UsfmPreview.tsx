@@ -13,6 +13,13 @@ export interface UsfmPreviewProps {
   /** Raw USFM source to render. */
   value: string;
   /**
+   * When set, render the language client's synced copy of this document
+   * instead of shipping `value` to the client (which stays as the fallback,
+   * e.g. when the document closes mid-request). Pass the id reported by the
+   * co-mounted editor's `onDocumentIdChange`.
+   */
+  documentId?: string | null;
+  /**
    * When true, a single USFM paragraph that contains multiple `\\v` milestones is split so
    * each verse appears on its own preview line.
    */
@@ -36,6 +43,7 @@ export interface UsfmPreviewProps {
  */
 export const UsfmPreview = memo(function UsfmPreview({
   value,
+  documentId,
   versePerLine,
   updateDebounceMs = 0,
   languageClient,
@@ -58,8 +66,15 @@ export const UsfmPreview = memo(function UsfmPreview({
   useEffect(() => {
     const client = languageClient ?? sharedLocalLanguageClient();
     const generation = ++generationRef.current;
-    client
-      .renderPreview(renderValue, { versePerLine: versePerLineOn })
+    const renderFromText = () => client.renderPreview(renderValue, { versePerLine: versePerLineOn });
+    const rendering = documentId
+      ? client
+          .renderPreviewDocument(documentId, { versePerLine: versePerLineOn })
+          .then((r) => r.html)
+          // Document closed mid-request (e.g. the editor is remounting).
+          .catch(() => renderFromText())
+      : renderFromText();
+    rendering
       .then((rendered) => {
         // Keep showing the previous preview if a newer render is already
         // underway (or the component re-rendered with different input).
@@ -68,7 +83,7 @@ export const UsfmPreview = memo(function UsfmPreview({
       .catch(() => {
         // Client unavailable (e.g. backend restarting): keep the last HTML.
       });
-  }, [renderValue, versePerLineOn, languageClient]);
+  }, [renderValue, versePerLineOn, languageClient, documentId]);
 
   return (
     <div

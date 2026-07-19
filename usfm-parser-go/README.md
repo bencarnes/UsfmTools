@@ -185,9 +185,11 @@ CodeMirror editor ──change sets──▶ DocumentSync (usfm-controls, TS)
 - `apps/bible-edit/go.mod` depends on this module via a `replace` directive
   pointing at `../../usfm-parser-go`.
 - `UsfmService` (bound alongside the app struct) exposes the lifecycle and
-  feature methods 1:1, plus stateless `RenderPreviewText` (the preview
-  renders debounced snapshots and must work when no editor — and therefore
-  no engine document — is mounted).
+  feature methods 1:1, plus two preview renderers: `RenderPreviewDocument`
+  (renders the engine's synced copy — preferred when an editor is mounted,
+  since the request ships only the id) and stateless `RenderPreviewText`
+  (fallback for preview-only view mode, where no editor — and therefore no
+  engine document — is mounted).
 - Fresh analyses are pushed to the frontend as the `usfm:analysis` Wails
   event carrying `{id, version, diagnostics}`; the AST never crosses the
   bridge.

@@ -113,6 +113,15 @@ describe("createLocalLanguageClient", () => {
     expect(books[0].chapters.map((ch) => ch.number)).toEqual(["1", "2"]);
   });
 
+  it("renders preview HTML from the synced copy by document id", async () => {
+    const c = client();
+    await c.openDocument("doc", 3, GOOD);
+    const result = await c.renderPreviewDocument("doc");
+    expect(result.version).toBe(3);
+    expect(result.html).toBe(await c.renderPreview(GOOD));
+    await expect(c.renderPreviewDocument("nope")).rejects.toThrow("not open");
+  });
+
   it("stops pushing after close", async () => {
     const c = client();
     await c.openDocument("doc", 1, GOOD);

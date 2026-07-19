@@ -109,6 +109,12 @@ export interface PreviewOptions {
   versePerLine?: boolean;
 }
 
+/** Rendered preview HTML for a document as of `version`. */
+export interface PreviewResult {
+  version: number;
+  html: string;
+}
+
 /**
  * Stateful USFM language client, modeled on the LSP document lifecycle but
  * simplified. The client keeps a copy of each open document, synced by the
@@ -141,10 +147,15 @@ export interface UsfmLanguageClient {
   /** Completions at a cursor position (0-based line, UTF-16 column). */
   getCompletions(id: string, line: number, column: number): Promise<CompletionItem[]>;
   /**
-   * Render a USFM string as publication-style preview HTML. Takes text
-   * rather than a document id because the preview renders debounced
-   * snapshots and must work for tabs whose editor (and therefore synced
-   * document) is not mounted, e.g. in preview-only view mode.
+   * Render the client's synced copy of an open document as preview HTML.
+   * Preferred when an editor document is mounted: the request ships only
+   * the id, not the text.
+   */
+  renderPreviewDocument(id: string, options?: PreviewOptions): Promise<PreviewResult>;
+  /**
+   * Render a USFM string as publication-style preview HTML. Text-based
+   * fallback for tabs whose editor (and therefore synced document) is not
+   * mounted, e.g. in preview-only view mode.
    */
   renderPreview(text: string, options?: PreviewOptions): Promise<string>;
   /** Subscribe to pushed analyses. Returns an unsubscribe function. */
