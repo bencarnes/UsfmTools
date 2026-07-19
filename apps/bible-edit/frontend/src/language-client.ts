@@ -3,6 +3,7 @@ import type {
   CompletionItem,
   DiagnosticsResult,
   DocumentChange,
+  PreviewResult,
   StructureResult,
   TokensResult,
   UsfmLanguageClient,
@@ -16,6 +17,7 @@ import {
   GetDiagnostics,
   GetStructure,
   OpenDocument,
+  RenderPreviewDocument,
   RenderPreviewText,
 } from "../wailsjs/go/main/UsfmService.js";
 import { EventsOff, EventsOn } from "../wailsjs/runtime/runtime.js";
@@ -71,6 +73,13 @@ export function createWailsLanguageClient(): UsfmLanguageClient {
 
     async getCompletions(id: string, line: number, column: number): Promise<CompletionItem[]> {
       return (await GetCompletions(id, line, column)) ?? [];
+    },
+
+    async renderPreviewDocument(
+      id: string,
+      options?: { versePerLine?: boolean },
+    ): Promise<PreviewResult> {
+      return await RenderPreviewDocument(id, options?.versePerLine ?? false);
     },
 
     renderPreview(text: string, options?: { versePerLine?: boolean }): Promise<string> {

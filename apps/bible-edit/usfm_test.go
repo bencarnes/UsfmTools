@@ -192,6 +192,27 @@ func TestGetCompletions(t *testing.T) {
 	}
 }
 
+func TestRenderPreviewDocument(t *testing.T) {
+	s, _ := newTestService(t)
+	text := "\\id GEN\n\\c 1\n\\p\n\\v 1 A. \\v 2 B."
+	if err := s.OpenDocument("doc", 1, text); err != nil {
+		t.Fatal(err)
+	}
+	res, err := s.RenderPreviewDocument("doc", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Version != 1 {
+		t.Errorf("version = %d, want 1", res.Version)
+	}
+	if res.Html != s.RenderPreviewText(text, false) {
+		t.Errorf("document render should match text render; got %q", res.Html)
+	}
+	if _, err := s.RenderPreviewDocument("missing", false); err == nil {
+		t.Error("expected error for unopened document")
+	}
+}
+
 func TestRenderPreviewText(t *testing.T) {
 	s, _ := newTestService(t)
 	html := s.RenderPreviewText("\\id GEN\n\\c 1\n\\p\n\\v 1 A. \\v 2 B.", false)

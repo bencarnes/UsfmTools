@@ -41,6 +41,12 @@ type StructureResult struct {
 	Books   []engine.BookInfo `json:"books"`
 }
 
+// PreviewResult is rendered preview HTML for a document as of Version.
+type PreviewResult struct {
+	Version int    `json:"version"`
+	Html    string `json:"html"`
+}
+
 // UsfmService exposes the Go USFM engine to the frontend as Wails bound
 // methods. The frontend keeps each open editor document in sync via
 // OpenDocument / ApplyChanges / CloseDocument (LSP-style, with versions) and
@@ -152,10 +158,20 @@ func (s *UsfmService) GetCompletions(id string, line, column int) ([]engine.Comp
 	return s.engine.Completions(id, line, column)
 }
 
+// RenderPreviewDocument renders the engine's synced copy of an open document
+// as publication-style preview HTML. Preferred over RenderPreviewText when an
+// editor document is mounted: the request ships only the id, not the text.
+func (s *UsfmService) RenderPreviewDocument(id string, versePerLine bool) (PreviewResult, error) {
+	html, version, err := s.engine.RenderPreview(id, preview.Options{VersePerLine: versePerLine})
+	if err != nil {
+		return PreviewResult{}, err
+	}
+	return PreviewResult{Version: version, Html: html}, nil
+}
+
 // RenderPreviewText renders a USFM string as publication-style preview HTML.
-// Stateless by design: the preview renders debounced snapshots and must work
-// for tabs whose editor (and therefore engine document) is not mounted, e.g.
-// in preview-only view mode.
+// Stateless fallback for tabs whose editor (and therefore engine document) is
+// not mounted, e.g. in preview-only view mode.
 func (s *UsfmService) RenderPreviewText(text string, versePerLine bool) string {
 	return preview.Render(text, preview.Options{VersePerLine: versePerLine})
 }

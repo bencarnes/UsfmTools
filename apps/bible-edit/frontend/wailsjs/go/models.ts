@@ -198,6 +198,20 @@ export namespace main {
 	        this.folderPath = source["folderPath"];
 	    }
 	}
+	export class PreviewResult {
+	    version: number;
+	    html: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PreviewResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.html = source["html"];
+	    }
+	}
 	export class StructureResult {
 	    version: number;
 	    books: engine.BookInfo[];

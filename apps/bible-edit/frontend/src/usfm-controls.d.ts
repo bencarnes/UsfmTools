@@ -136,6 +136,11 @@ declare module "@usfm-tools/controls" {
     versePerLine?: boolean;
   }
 
+  export interface PreviewResult {
+    version: number;
+    html: string;
+  }
+
   export interface UsfmLanguageClient {
     openDocument(id: string, version: number, text: string): Promise<void>;
     applyChanges(id: string, version: number, changes: DocumentChange[]): Promise<void>;
@@ -145,6 +150,7 @@ declare module "@usfm-tools/controls" {
     classifyDocument(id: string): Promise<TokensResult>;
     classifyRange(id: string, from: number, to: number): Promise<TokensResult>;
     getCompletions(id: string, line: number, column: number): Promise<CompletionItem[]>;
+    renderPreviewDocument(id: string, options?: PreviewOptions): Promise<PreviewResult>;
     renderPreview(text: string, options?: PreviewOptions): Promise<string>;
     onAnalysis(listener: (event: AnalysisEvent) => void): () => void;
   }

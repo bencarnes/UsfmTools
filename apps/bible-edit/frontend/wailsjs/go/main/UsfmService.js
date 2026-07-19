@@ -34,6 +34,10 @@ export function OpenDocument(arg1, arg2, arg3) {
   return window['go']['main']['UsfmService']['OpenDocument'](arg1, arg2, arg3);
 }
 
+export function RenderPreviewDocument(arg1, arg2) {
+  return window['go']['main']['UsfmService']['RenderPreviewDocument'](arg1, arg2);
+}
+
 export function RenderPreviewText(arg1, arg2) {
   return window['go']['main']['UsfmService']['RenderPreviewText'](arg1, arg2);
 }
