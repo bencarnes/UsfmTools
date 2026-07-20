@@ -88,7 +88,11 @@ export class DocumentSync {
     this.#enqueue(async () => {
       try {
         await this.#client.applyChanges(this.id, version, batch);
-      } catch {
+      } catch (err) {
+        console.warn(
+          `usfm document sync: update v${version} rejected for ${this.id}; reopening`,
+          err,
+        );
         await this.#reopen();
       }
     });
@@ -131,8 +135,14 @@ export class DocumentSync {
     const version = ++this.#version;
     try {
       await this.#client.openDocument(this.id, version, this.#getText());
-    } catch {
+    } catch (err) {
       // Client unavailable; the next applyChanges will retry via #reopen.
+      // Until then the client's copy is out of sync (stale positions in
+      // classifications/diagnostics), so make the failure visible.
+      console.error(
+        `usfm document sync: reopen failed for ${this.id}; language features may be stale`,
+        err,
+      );
     }
   }
 

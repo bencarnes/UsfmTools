@@ -461,8 +461,26 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     if (echoPendingRef.current) return;
     const currentContent = view.state.doc.toString();
     if (currentContent !== value) {
+      // Dispatch the minimal single-range change (common prefix/suffix
+      // trimmed) rather than a whole-document replace: the engine sync then
+      // forwards a few bytes instead of the full book, decorations and
+      // squiggles outside the edit survive unmapped, and this editor's
+      // caret/scroll stay put (a full replace maps the caret to offset 0).
+      let from = 0;
+      const maxFrom = Math.min(currentContent.length, value.length);
+      while (from < maxFrom && currentContent.charCodeAt(from) === value.charCodeAt(from)) from++;
+      let toOld = currentContent.length;
+      let toNew = value.length;
+      while (
+        toOld > from &&
+        toNew > from &&
+        currentContent.charCodeAt(toOld - 1) === value.charCodeAt(toNew - 1)
+      ) {
+        toOld--;
+        toNew--;
+      }
       view.dispatch({
-        changes: { from: 0, to: currentContent.length, insert: value },
+        changes: { from, to: toOld, insert: value.slice(from, toNew) },
       });
       lastEmittedRef.current = value;
       dirtyReportedRef.current = false;
