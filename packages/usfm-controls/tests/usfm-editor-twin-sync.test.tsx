@@ -189,6 +189,41 @@ describe("twin editors sharing one buffer", () => {
     });
   });
 
+  it("session-managed editors never apply value-prop changes (stale sibling echoes)", async () => {
+    // Regression: a delayed value echo of tab A's emission reaching tab B
+    // after further typing used to make B "correct" its buffer backward —
+    // deleting the newest keystrokes in both tabs via the session.
+    const client = createLocalLanguageClient();
+    const manager = createDocumentSessionManager(client);
+    const { container, rerender } = render(
+      <UsfmEditor
+        value={INITIAL}
+        languageClient={client}
+        documentSessions={manager}
+        documentKey="file-1"
+        className="h-48"
+      />,
+    );
+    await waitFor(() => {
+      expect(container.querySelector(".cm-editor")).toBeTruthy();
+    });
+    const view = EditorView.findFromDOM(container.querySelector(".cm-editor") as HTMLElement)!;
+    view.dispatch({ changes: { from: view.state.doc.length, insert: " newest" } });
+    const live = view.state.doc.toString();
+
+    // A stale echo (the pre-edit text) arrives as the value prop: no revert.
+    rerender(
+      <UsfmEditor
+        value={INITIAL}
+        languageClient={client}
+        documentSessions={manager}
+        documentKey="file-1"
+        className="h-48"
+      />,
+    );
+    expect(view.state.doc.toString()).toBe(live);
+  });
+
   it("keeps tab B's syntax highlighting aligned after edits in tab A", async () => {
     const { container } = render(<TwinEditors />);
     await waitFor(() => {

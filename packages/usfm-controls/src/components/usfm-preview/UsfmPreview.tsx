@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import type { UsfmLanguageClient } from "../../language-service/protocol.js";
 import { sharedLocalLanguageClient } from "../../language-service/local-client.js";
+import { applyPreviewHtml, type PreviewChunks } from "./preview-dom.js";
 
 /** Storybook (and URL state) may supply boolean controls as strings. */
 function normalizeVersePerLine(raw: unknown): boolean {
@@ -59,13 +60,20 @@ export const UsfmPreview = memo(function UsfmPreview({
   const [renderValue, setRenderValue] = useState(value);
   const [html, setHtml] = useState("");
   const generationRef = useRef(0);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const chunksRef = useRef<PreviewChunks | null>(null);
   const onRenderedRef = useRef(onRendered);
   onRenderedRef.current = onRendered;
 
-  // Runs after a new `html` has been committed to the DOM (unlike the render
-  // promise's `.then`, which resolves before React re-renders).
+  // Apply fresh HTML to the host imperatively, reusing the DOM of unchanged
+  // chapters (a full innerHTML swap restyles the entire book — seconds of
+  // main-thread freeze for large books). React never touches the host's
+  // children.
   useEffect(() => {
-    if (html) onRenderedRef.current?.();
+    const host = hostRef.current;
+    if (!host || !html) return;
+    chunksRef.current = applyPreviewHtml(host, html, chunksRef.current);
+    onRenderedRef.current?.();
   }, [html]);
 
   useEffect(() => {
@@ -99,11 +107,7 @@ export const UsfmPreview = memo(function UsfmPreview({
       });
   }, [renderValue, versePerLineOn, languageClient, documentId]);
 
-  return (
-    <div
-      className={`usfm-preview-root ${className ?? ""}`}
-      // Trusted HTML: renderPreview escapes all user-supplied text.
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  );
+  // Trusted HTML: renderPreview escapes all user-supplied text; it is
+  // applied in the effect above, chunk-diffed against the previous render.
+  return <div ref={hostRef} className={`usfm-preview-root ${className ?? ""}`} />;
 });

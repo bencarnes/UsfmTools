@@ -527,6 +527,13 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     // wiping the newest edits and throwing the caret to offset 0. Skip it;
     // the echo of the latest emission follows and clears the flag.
     if (echoPendingRef.current) return;
+    // In a shared document session, sibling views converge synchronously
+    // through the session itself; the value prop is workspace bookkeeping
+    // only. A differing value here is a stale echo of a *sibling's* emission
+    // (it lags the live buffer whenever the user typed during the echo's
+    // round trip) — applying it would revert those newest keystrokes in
+    // every view of the session.
+    if (documentSessionsRef.current && documentKeyRef.current) return;
     const currentContent = view.state.doc.toString();
     if (currentContent !== value) {
       // Dispatch the minimal single-range change (common prefix/suffix
