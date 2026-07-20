@@ -195,9 +195,11 @@ CodeMirror editor ──change sets──▶ DocumentSync (usfm-controls, TS)
   bridge.
 - On the frontend, `createWailsLanguageClient()`
   (`apps/bible-edit/frontend/src/language-client.ts`) implements the
-  `UsfmLanguageClient` protocol from `@usfm-tools/controls`, and each
-  mounted editor syncs its document through `DocumentSync` (ordered queue,
-  monotonic versions, self-healing reopen if an update is rejected).
+  `UsfmLanguageClient` protocol from `@usfm-tools/controls`. Editor views
+  showing the same file share one engine document (document sessions keyed
+  by file id; sibling views converge synchronously), synced through
+  `DocumentSync` (ordered queue, monotonic versions, self-healing reopen if
+  an update is rejected).
 
 Components fall back to an in-process TypeScript client when no engine is
 injected (component stories, tests), so `usfm-controls` remains usable

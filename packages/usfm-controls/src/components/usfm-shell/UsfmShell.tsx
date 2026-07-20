@@ -10,6 +10,7 @@ import {
   type ReactElement,
 } from "react";
 import { createLocalLanguageClient } from "../../language-service/local-client.js";
+import { createDocumentSessionManager } from "../../language-service/document-sessions.js";
 import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
 import { UsfmWorkspace } from "../usfm-workspace/UsfmWorkspace.js";
 import { dropTargetAtPoint } from "../usfm-workspace/drop-target.js";
@@ -108,6 +109,12 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   const languageClient = useMemo(
     () => languageClientProp ?? createLocalLanguageClient(),
     [languageClientProp],
+  );
+  // Tabs showing the same file share one client document through this
+  // manager (keyed by file id) and converge synchronously.
+  const documentSessions = useMemo(
+    () => createDocumentSessionManager(languageClient),
+    [languageClient],
   );
   const [model, setModel] = useState<UsfmWorkspaceModel>(() => buildWorkspaceModelFromInitialTabs([]));
   const [fileEntries, setFileEntries] = useState<readonly UsfmShellFileEntry[]>([]);
@@ -717,6 +724,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             onMarkTabDirty={handleMarkTabDirty}
             onSaveTab={handleSaveTab}
             languageClient={languageClient}
+            documentSessions={documentSessions}
             onTabDiagnostics={handleTabDiagnostics}
             onRegisterDocumentReader={handleRegisterDocumentReader}
             onCloseTab={handleCloseTab}

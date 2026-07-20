@@ -15,6 +15,7 @@ import {
   type ChapterMarkerInBook,
 } from "@usfm-tools/model";
 import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
+import type { DocumentSessionManager } from "../../language-service/document-sessions.js";
 import type { ChapterPickerSelectDetail } from "../chapter-picker/ChapterPicker.js";
 import { ChapterNavigator } from "./chapter-navigator.js";
 import { UsfmEditor, type UsfmEditorHandle } from "../usfm-editor/UsfmEditor.js";
@@ -74,6 +75,10 @@ export interface UsfmPaneProps {
   readonly dirty?: boolean;
   /** Language client serving diagnostics/highlighting/completions (stable for the pane's lifetime). */
   readonly languageClient?: UsfmLanguageClient;
+  /** Shared document sessions (created for `languageClient`); see UsfmEditor. */
+  readonly documentSessions?: DocumentSessionManager;
+  /** Identity of the shown document (e.g. the file id) for session sharing. */
+  readonly documentKey?: string;
   /** Fired with fresh parse diagnostics for this tab whenever the engine re-analyzes. */
   readonly onDiagnostics?: (diagnostics: readonly Diagnostic[]) => void;
   /** Register a reader for the live editor buffer with the shell. */
@@ -131,6 +136,8 @@ export function UsfmPane({
   onSave,
   dirty = false,
   languageClient,
+  documentSessions,
+  documentKey,
   onDiagnostics,
   onRegisterDocumentReader,
   toolbarMount,
@@ -576,6 +583,8 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
             onDirty={handleDirty}
             onDocumentChange={notifyDocumentChange}
             languageClient={languageClient}
+            documentSessions={documentSessions}
+            documentKey={documentKey}
             onDiagnostics={onDiagnostics}
             onDocumentIdChange={setEditorDocumentId}
             onSave={handleSave}
@@ -606,6 +615,8 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 onDirty={handleDirty}
                 onDocumentChange={notifyDocumentChange}
                 languageClient={languageClient}
+                documentSessions={documentSessions}
+                documentKey={documentKey}
                 onDiagnostics={onDiagnostics}
                 onDocumentIdChange={setEditorDocumentId}
                 onSave={handleSave}

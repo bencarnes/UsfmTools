@@ -21,6 +21,12 @@ export type {
 export { DiagnosticSeverity, TokenType } from "./protocol.js";
 export { changesFromChangeSet, DocumentSync } from "./document-sync.js";
 export type { ChangeSetLike, DocumentSyncOptions } from "./document-sync.js";
+export { createDocumentSessionManager } from "./document-sessions.js";
+export type {
+  DocumentSessionManager,
+  DocumentSessionMembership,
+  SessionViewPort,
+} from "./document-sessions.js";
 export {
   applyChangesToText,
   createLocalLanguageClient,

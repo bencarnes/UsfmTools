@@ -20,6 +20,7 @@ import { TabListDropdown } from "./tab-list-dropdown.js";
 import { TabContextMenu, type TabContextMenuItem } from "./tab-context-menu.js";
 import { dropTargetAtPoint } from "./drop-target.js";
 import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
+import type { DocumentSessionManager } from "../../language-service/document-sessions.js";
 import type {
   UsfmWorkspaceEditorGroupState,
   UsfmWorkspaceProps,
@@ -335,6 +336,7 @@ interface EditorGroupPanelProps {
   readonly onMarkTabDirty?: (tabId: string) => void;
   readonly onSaveValue?: (tabId: string, value: string) => void;
   readonly languageClient?: UsfmLanguageClient;
+  readonly documentSessions?: DocumentSessionManager;
   readonly onTabDiagnostics?: (tabId: string, diagnostics: readonly Diagnostic[]) => void;
   readonly onRegisterDocumentReader?: (tabId: string, reader: () => string) => () => void;
   readonly gridRows: WorkspaceGridDimension;
@@ -354,6 +356,7 @@ function EditorGroupPanel({
   onMarkTabDirty,
   onSaveValue,
   languageClient,
+  documentSessions,
   onTabDiagnostics,
   onRegisterDocumentReader,
   gridRows,
@@ -446,6 +449,8 @@ function EditorGroupPanel({
                   onDirty={onMarkTabDirty ? () => onMarkTabDirty(tid) : undefined}
                   onSave={onSaveValue ? (content) => onSaveValue(tid, content) : undefined}
                   languageClient={languageClient}
+                  documentSessions={documentSessions}
+                  documentKey={tab.fileId}
                   onDiagnostics={
                     onTabDiagnostics ? (diags) => onTabDiagnostics(tid, diags) : undefined
                   }
@@ -486,6 +491,7 @@ interface WorkspaceGridRowProps {
   readonly onMarkTabDirty?: UsfmWorkspaceProps["onMarkTabDirty"];
   readonly onSaveTab?: UsfmWorkspaceProps["onSaveTab"];
   readonly languageClient?: UsfmWorkspaceProps["languageClient"];
+  readonly documentSessions?: UsfmWorkspaceProps["documentSessions"];
   readonly onTabDiagnostics?: UsfmWorkspaceProps["onTabDiagnostics"];
   readonly onRegisterDocumentReader?: UsfmWorkspaceProps["onRegisterDocumentReader"];
   readonly onChangeGridLayout?: UsfmWorkspaceProps["onChangeGridLayout"];
@@ -508,6 +514,7 @@ function WorkspaceGridRow({
   onMarkTabDirty,
   onSaveTab,
   languageClient,
+  documentSessions,
   onTabDiagnostics,
   onRegisterDocumentReader,
   onChangeGridLayout,
@@ -560,6 +567,7 @@ function WorkspaceGridRow({
               onMarkTabDirty={onMarkTabDirty}
               onSaveValue={onSaveTab}
               languageClient={languageClient}
+              documentSessions={documentSessions}
               onTabDiagnostics={onTabDiagnostics}
               onRegisterDocumentReader={onRegisterDocumentReader}
               gridRows={gridRows}
@@ -584,6 +592,7 @@ export function UsfmWorkspace({
   onMarkTabDirty,
   onSaveTab,
   languageClient,
+  documentSessions,
   onTabDiagnostics,
   onRegisterDocumentReader,
   onCloseTab,
@@ -791,6 +800,7 @@ export function UsfmWorkspace({
                 onMarkTabDirty={onMarkTabDirty}
                 onSaveTab={onSaveTab}
                 languageClient={languageClient}
+                documentSessions={documentSessions}
                 onTabDiagnostics={onTabDiagnostics}
                 onRegisterDocumentReader={onRegisterDocumentReader}
                 onChangeGridLayout={onChangeGridLayout}

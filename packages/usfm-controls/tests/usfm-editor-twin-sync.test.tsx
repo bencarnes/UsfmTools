@@ -5,9 +5,14 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { useState } from "react";
 import { EditorView } from "@codemirror/view";
+import { undo } from "@codemirror/commands";
 import { render, waitFor } from "./testing-react.ts";
 import { UsfmEditor } from "../src/components/usfm-editor/UsfmEditor.js";
 import { createLocalLanguageClient } from "../src/language-service/local-client.js";
+import {
+  createDocumentSessionManager,
+  type DocumentSessionManager,
+} from "../src/language-service/document-sessions.js";
 import type { DocumentChange, UsfmLanguageClient } from "../src/language-service/protocol.js";
 
 const INITIAL = "\\id GEN Genesis\n\\c 1\n\\p\n\\v 1 In the beginning God created.\n\\v 2 The earth was formless.";
@@ -22,6 +27,43 @@ function TwinEditors() {
       </div>
       <div data-testid="ed-b">
         <UsfmEditor value={value} onChange={setValue} onChangeDebounceMs={30} className="h-48" />
+      </div>
+    </>
+  );
+}
+
+/** Two editors sharing one document session, like two tabs on one file. */
+function SharedTwinEditors({
+  client,
+  manager,
+}: {
+  client: UsfmLanguageClient;
+  manager: DocumentSessionManager;
+}) {
+  const [value, setValue] = useState(INITIAL);
+  return (
+    <>
+      <div data-testid="ed-a">
+        <UsfmEditor
+          value={value}
+          onChange={setValue}
+          onChangeDebounceMs={30}
+          languageClient={client}
+          documentSessions={manager}
+          documentKey="file-1"
+          className="h-48"
+        />
+      </div>
+      <div data-testid="ed-b">
+        <UsfmEditor
+          value={value}
+          onChange={setValue}
+          onChangeDebounceMs={30}
+          languageClient={client}
+          documentSessions={manager}
+          documentKey="file-1"
+          className="h-48"
+        />
       </div>
     </>
   );
@@ -79,6 +121,72 @@ describe("twin editors sharing one buffer", () => {
     expect(
       EditorView.findFromDOM(container.querySelector(".cm-editor") as HTMLElement)!.state.doc.toString(),
     ).toBe(updated);
+  });
+
+  it("shares one client document and converges synchronously when sessions are shared", async () => {
+    const inner = createLocalLanguageClient();
+    const opens: string[] = [];
+    const applies: DocumentChange[][] = [];
+    const client: UsfmLanguageClient = {
+      ...inner,
+      openDocument(id, version, text) {
+        opens.push(id);
+        return inner.openDocument(id, version, text);
+      },
+      applyChanges(id, version, changes) {
+        applies.push(changes);
+        return inner.applyChanges(id, version, changes);
+      },
+    };
+    const manager = createDocumentSessionManager(client);
+    const { container } = render(<SharedTwinEditors client={client} manager={manager} />);
+    await waitFor(() => {
+      expect(container.querySelectorAll(".cm-editor").length).toBe(2);
+    });
+    await waitFor(() => {
+      expect(opens.length).toBe(1); // one client document for both views
+    });
+
+    // Typing in A appears in B synchronously (no debounce round trip) and
+    // reaches the client exactly once, as the minimal edit.
+    const a = viewIn(container, "ed-a");
+    const b = viewIn(container, "ed-b");
+    const insertAt = a.state.doc.toString().indexOf("God");
+    a.dispatch({ changes: { from: insertAt, insert: "mighty " } });
+    expect(b.state.doc.toString()).toBe(a.state.doc.toString());
+    // The client call drains through the session's ordered queue.
+    await waitFor(() => {
+      expect(applies).toHaveLength(1);
+    });
+    expect(applies[0]).toEqual([{ from: insertAt, to: insertAt, text: "mighty " }]);
+
+    // A's edit must not enter B's undo history.
+    expect(undo(b)).toBe(false);
+    expect(b.state.doc.toString()).toBe(a.state.doc.toString());
+
+    // Typing in B flows back to A the same way.
+    b.dispatch({ changes: { from: insertAt, insert: "al" } });
+    expect(a.state.doc.toString()).toBe(b.state.doc.toString());
+    expect(a.state.doc.toString()).toContain("almighty God");
+    await waitFor(() => {
+      expect(applies).toHaveLength(2);
+    });
+
+    // The debounced value echo through the shared parent must not disturb
+    // the already-converged buffers.
+    await waitFor(() => {
+      expect(applies.length).toBe(2); // no further syncs after echo
+      expect(a.state.doc.toString()).toBe(b.state.doc.toString());
+    });
+
+    // Both editors still highlight markers correctly.
+    await waitFor(() => {
+      for (const id of ["ed-a", "ed-b"]) {
+        const spans = markerSpans(container, id);
+        expect(spans.length).toBeGreaterThan(0);
+        for (const s of spans) expect(s.startsWith("\\")).toBe(true);
+      }
+    });
   });
 
   it("keeps tab B's syntax highlighting aligned after edits in tab A", async () => {

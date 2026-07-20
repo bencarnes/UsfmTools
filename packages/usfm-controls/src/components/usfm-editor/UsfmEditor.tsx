@@ -5,7 +5,14 @@ import {
   useRef,
 } from "react";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
-import { EditorState, EditorSelection, Prec, Compartment } from "@codemirror/state";
+import {
+  EditorState,
+  EditorSelection,
+  Prec,
+  Compartment,
+  Annotation,
+  Transaction,
+} from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { setDiagnostics } from "@codemirror/lint";
@@ -13,7 +20,12 @@ import type {
   Diagnostic as LanguageDiagnostic,
   UsfmLanguageClient,
 } from "../../language-service/protocol.js";
-import { DocumentSync } from "../../language-service/document-sync.js";
+import {
+  createDocumentSessionManager,
+  type DocumentSessionManager,
+  type DocumentSessionMembership,
+  type SessionViewPort,
+} from "../../language-service/document-sessions.js";
 import { sharedLocalLanguageClient } from "../../language-service/local-client.js";
 import {
   languageDiagnosticsToCm,
@@ -27,6 +39,14 @@ import {
   openFindPanel,
   openFindReplacePanel,
 } from "./usfm-search-panel.js";
+
+/**
+ * Marks transactions that apply changes arriving from a sibling view of the
+ * same shared document (CodeMirror's split-view pattern): they must not be
+ * forwarded back to the session, must not mark the tab dirty or emit
+ * onChange, and must not enter this view's undo history.
+ */
+const siblingSyncAnnotation = Annotation.define<boolean>();
 
 export interface UsfmEditorHandle {
   /** Scroll so that {@link offset} sits at the top of the visible editor area. */
@@ -75,6 +95,15 @@ export interface UsfmEditorProps {
    */
   onDocumentIdChange?: (id: string | null) => void;
   /**
+   * Shared document sessions (must be created for the same `languageClient`).
+   * Together with `documentKey`, editors showing the same document share one
+   * client document and converge synchronously. Without them, this editor
+   * gets a private document (previous behavior).
+   */
+  documentSessions?: DocumentSessionManager;
+  /** Identity of the document this editor shows (e.g. the file id). */
+  documentKey?: string;
+  /**
    * Registers a reader for the live document buffer. Called on mount/update;
    * return value unregisters on cleanup.
    */
@@ -101,6 +130,8 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     languageClient,
     onDiagnostics,
     onDocumentIdChange,
+    documentSessions,
+    documentKey,
     onRegisterDocumentReader,
     onSave,
     onViewportAnchorChange,
@@ -118,6 +149,8 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   const onDiagnosticsRef = useRef(onDiagnostics);
   const onDocumentIdChangeRef = useRef(onDocumentIdChange);
   const languageClientRef = useRef(languageClient);
+  const documentSessionsRef = useRef(documentSessions);
+  const documentKeyRef = useRef(documentKey);
   const onSaveRef = useRef(onSave);
   const onViewportAnchorChangeRef = useRef(onViewportAnchorChange);
   const viewportDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,6 +167,8 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   onDiagnosticsRef.current = onDiagnostics;
   onDocumentIdChangeRef.current = onDocumentIdChange;
   languageClientRef.current = languageClient;
+  documentSessionsRef.current = documentSessions;
+  documentKeyRef.current = documentKey;
   onSaveRef.current = onSave;
   onViewportAnchorChangeRef.current = onViewportAnchorChange;
 
@@ -237,22 +272,36 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Each mounted editor owns one engine document: open with the initial
-    // text, forward every CodeMirror change set incrementally, close on
-    // unmount. A unique id isolates this instance from other tabs/editors
-    // (including other editors showing the same file).
+    // Each mounted editor joins the shared document session for its
+    // documentKey: all views of one document (e.g. the same file in two tab
+    // groups) share a single client document; edits made in any view are
+    // forwarded to the client once and to sibling views synchronously.
+    // Without an injected manager/key the editor gets a private session,
+    // which behaves like the previous one-document-per-editor model.
     const client = languageClientRef.current ?? sharedLocalLanguageClient();
-    const documentId = `usfm-editor-${crypto.randomUUID()}`;
-    const sync = new DocumentSync({
-      client,
-      id: documentId,
+    const manager = documentSessionsRef.current ?? createDocumentSessionManager(client);
+    const joinKey = documentKeyRef.current ?? crypto.randomUUID();
+    let membership!: DocumentSessionMembership; // assigned below, before any dispatch
+
+    const viewPort: SessionViewPort = {
       getText: readDocument,
-    });
+      applyChanges(batch) {
+        const v = viewRef.current;
+        if (!v) return;
+        v.dispatch({
+          changes: batch.map((c) => ({ from: c.from, to: c.to, insert: c.text })),
+          annotations: [siblingSyncAnnotation.of(true), Transaction.addToHistory.of(false)],
+        });
+      },
+    };
+
     const session: EditorLanguageSession = {
       classifyRange: (from, to) =>
-        sync.request(() => client.classifyRange(documentId, from, to)).then((r) => r.tokens),
+        membership
+          .request(() => client.classifyRange(membership.documentId, from, to))
+          .then((r) => r.tokens),
       getCompletions: (line, column) =>
-        sync.request(() => client.getCompletions(documentId, line, column)),
+        membership.request(() => client.getCompletions(membership.documentId, line, column)),
     };
 
     const scheduleViewportReport = () => {
@@ -272,13 +321,23 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
 
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
-        sync.applyChanges(update.changes);
-        onDocumentChangeRef.current?.();
-        if (!dirtyReportedRef.current) {
-          dirtyReportedRef.current = true;
-          onDirtyRef.current?.();
+        let localEdit = false;
+        for (const tr of update.transactions) {
+          // Sibling-sync transactions were already forwarded by the view
+          // that originated them; forwarding again would double-apply.
+          if (tr.docChanged && !tr.annotation(siblingSyncAnnotation)) {
+            localEdit = true;
+            membership.applyLocalChanges(tr.changes);
+          }
         }
-        scheduleChange();
+        if (localEdit) {
+          if (!dirtyReportedRef.current) {
+            dirtyReportedRef.current = true;
+            onDirtyRef.current?.();
+          }
+          scheduleChange();
+        }
+        onDocumentChangeRef.current?.();
       }
       // Typing moves the selection every keystroke; skip viewport sync then so split-pane
       // scroll alignment does not walk the preview DOM on each character.
@@ -385,19 +444,28 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     viewRef.current = view;
     view.scrollDOM.addEventListener("scroll", scheduleViewportReport, { passive: true });
 
-    // Open the engine document (after viewRef is set, so getText reads the
-    // live buffer) and route its pushed analyses into lint squiggles and the
-    // onDiagnostics callback.
-    sync.open();
-    onDocumentIdChangeRef.current?.(documentId);
+    // Join the shared document session (after viewRef is set, so getText
+    // reads the live buffer) and route its pushed analyses into lint
+    // squiggles and the onDiagnostics callback.
+    membership = manager.join(joinKey, viewPort);
+    if (membership.initialText != null && membership.initialText !== readDocument()) {
+      // Late joiner: adopt the session's authoritative text — the copy this
+      // editor was created from (e.g. the workspace model) may lag the live
+      // sibling buffer by a debounce window.
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: membership.initialText },
+        annotations: [siblingSyncAnnotation.of(true), Transaction.addToHistory.of(false)],
+      });
+    }
+    onDocumentIdChangeRef.current?.(membership.documentId);
     const unsubscribeAnalysis = client.onAnalysis((event) => {
-      if (event.id !== documentId) return;
+      if (event.id !== membership.documentId) return;
       // An analysis older than the edits already forwarded carries pre-edit
       // positions, and the client is guaranteed to re-analyze after every
       // edit, so a fresh push follows. Skip it: CodeMirror has been mapping
       // the previously applied squiggles through the edits meanwhile, which
       // is more accurate than painting stale offsets.
-      if (event.version < sync.version) return;
+      if (event.version < membership.version) return;
       const v = viewRef.current;
       if (v) {
         v.dispatch(setDiagnostics(v.state, languageDiagnosticsToCm(v.state.doc, event.diagnostics)));
@@ -408,7 +476,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     return () => {
       onDocumentIdChangeRef.current?.(null);
       unsubscribeAnalysis();
-      sync.close();
+      membership.leave();
       view.scrollDOM.removeEventListener("scroll", scheduleViewportReport);
       if (viewportDebounceRef.current) clearTimeout(viewportDebounceRef.current);
       viewportDebounceRef.current = null;

@@ -3,6 +3,7 @@
  * `settings` tabs render the {@link SettingsPane}. Defaults to `editor` when omitted.
  */
 import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
+import type { DocumentSessionManager } from "../../language-service/document-sessions.js";
 
 export type UsfmWorkspaceTabKind = "editor" | "settings";
 
@@ -107,6 +108,11 @@ export interface UsfmWorkspaceProps {
   readonly onChangeGridLayout?: (rows: WorkspaceGridDimension, cols: WorkspaceGridDimension) => void;
   /** Language client serving diagnostics/highlighting/completions for editor tabs. */
   readonly languageClient?: UsfmLanguageClient;
+  /**
+   * Shared document sessions (created for `languageClient`). Tabs showing the
+   * same file then share one client document and converge synchronously.
+   */
+  readonly documentSessions?: DocumentSessionManager;
   /** Fired with fresh diagnostics for a tab whenever its engine analysis lands. */
   readonly onTabDiagnostics?: (tabId: string, diagnostics: readonly Diagnostic[]) => void;
   /** Register a reader for a tab's live editor buffer; return value unregisters. */
