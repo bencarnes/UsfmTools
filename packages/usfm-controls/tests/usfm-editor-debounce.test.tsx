@@ -71,6 +71,44 @@ describe("UsfmEditor debounced onChange", () => {
     expect(onChange.calls.length).toBe(1);
   });
 
+  it("a clean flush emits nothing and does not block later external updates", async () => {
+    // Regression: flushing an unchanged document (as the pane does whenever a
+    // tab is deactivated) used to emit a no-op change, arming the echo guard
+    // with an echo that never arrives — after which edits from another tab
+    // sharing the same file buffer were silently dropped.
+    const initial = "\\id GEN\n\\p\n\\v 1 Hello.";
+    const onChange = spy((_value: string) => {});
+    const ref = createRef<UsfmEditorHandle>();
+    const { container, rerender } = render(
+      <UsfmEditor
+        ref={ref}
+        value={initial}
+        onChange={onChange}
+        onChangeDebounceMs={5000}
+        className="h-48"
+      />,
+    );
+    await waitFor(() => {
+      expect(ref.current).toBeTruthy();
+    });
+
+    expect(ref.current!.flushChange()).toBe(initial);
+    expect(onChange.calls.length).toBe(0);
+
+    // An edit made in another tab arrives as a new value prop: must apply.
+    const fromOtherTab = "\\id GEN\n\\p\n\\v 1 Hello there.";
+    rerender(
+      <UsfmEditor
+        ref={ref}
+        value={fromOtherTab}
+        onChange={onChange}
+        onChangeDebounceMs={5000}
+        className="h-48"
+      />,
+    );
+    expect(viewFromContainer(container).state.doc.toString()).toBe(fromOtherTab);
+  });
+
   it("ignores stale value echoes and applies genuine external changes", async () => {
     const initial = "\\id GEN\n\\p\n\\v 1 Hello.";
     const onChange = spy((_value: string) => {});

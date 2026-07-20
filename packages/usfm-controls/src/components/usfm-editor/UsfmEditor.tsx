@@ -145,14 +145,23 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     onChangeRef.current?.(content);
   };
 
+  // Emit only when the document actually changed since the last emission (or
+  // external replace). A no-op emission would produce no state change in the
+  // parent and therefore no `value` echo, leaving the echo guard armed
+  // forever — which would block all future external value updates (e.g.
+  // edits arriving from another tab sharing this file's buffer).
+  const emitChangedDocument = () => {
+    const content = readDocument();
+    if (content !== lastEmittedRef.current) emitChange(content);
+    return content;
+  };
+
   const emitPendingChange = () => {
     if (changeDebounceRef.current) {
       clearTimeout(changeDebounceRef.current);
       changeDebounceRef.current = null;
     }
-    const content = readDocument();
-    emitChange(content);
-    return content;
+    return emitChangedDocument();
   };
 
   // The document string is materialized when the change is emitted, not per
@@ -160,13 +169,13 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   const scheduleChange = () => {
     if (!onChangeRef.current) return;
     if (onChangeDebounceMs <= 0) {
-      emitChange(readDocument());
+      emitChangedDocument();
       return;
     }
     if (changeDebounceRef.current) clearTimeout(changeDebounceRef.current);
     changeDebounceRef.current = setTimeout(() => {
       changeDebounceRef.current = null;
-      emitChange(readDocument());
+      emitChangedDocument();
     }, onChangeDebounceMs);
   };
 
@@ -408,7 +417,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
         changeDebounceRef.current = null;
         // Flush rather than drop: unmounting mid-debounce (e.g. a view-mode
         // switch remounting the editor) must not lose the last edits.
-        emitChange(readDocument());
+        emitChangedDocument();
       }
       view.destroy();
       viewRef.current = null;
