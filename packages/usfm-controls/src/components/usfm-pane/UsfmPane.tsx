@@ -8,13 +8,13 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import {
-  bookIdMarkerOffsetInUsfm,
-  chapterNumberAtOrBeforeSourceOffset,
-  listChapterMarkersInUsfm,
-  type ChapterMarkerInBook,
-} from "@usfm-tools/model";
+import { chapterNumberAtOrBeforeSourceOffset } from "@usfm-tools/model";
 import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
+import {
+  chapterStructureFromEngine,
+  chapterStructureFromText,
+  type ChapterStructure,
+} from "./chapter-structure.js";
 import type { DocumentSessionManager } from "../../language-service/document-sessions.js";
 import type { ChapterPickerSelectDetail } from "../chapter-picker/ChapterPicker.js";
 import { ChapterNavigator } from "./chapter-navigator.js";
@@ -56,7 +56,11 @@ const SCROLL_SYNC_TYPING_IDLE_MS = 500;
 const PREVIEW_TO_EDITOR_SYNC_DEBOUNCE_MS = 120;
 /** Ignore preview scroll activity this long after a preview DOM swap. */
 const PREVIEW_SWAP_SYNC_SUPPRESS_MS = 300;
-/** Defer chapter-marker rescans while typing in split mode (markers rarely change per keystroke). */
+/**
+ * Throttle chapter-structure refetches while typing in split mode (markers
+ * rarely change per keystroke). Now off the UI thread (an engine request), so
+ * this only limits bridge round-trips rather than guarding a UI-thread scan.
+ */
 const NAV_MARKERS_DEBOUNCE_MS = 300;
 /** Defer lifting the full document string to React while typing in the workspace. */
 const EDITOR_VALUE_SYNC_DEBOUNCE_MS = 500;
@@ -224,13 +228,40 @@ export function UsfmPane({
     };
   }, []);
 
+  // Chapter navigation structure (markers, book start, has-id). Served by the
+  // Go engine's real parse whenever an editor document is mounted (edit/split
+  // modes) — off the UI thread, reusing the analysis that already runs on
+  // every edit. In preview-only mode no engine document exists, so fall back
+  // to the in-process regex scan (not on the typing hot path there). The
+  // regex `markerSource` (debounced in split mode) is both the fallback text
+  // and the refetch trigger, preserving the previous refresh cadence.
   const markerSource = viewMode === "split" ? navSource : value;
-  const markers: readonly ChapterMarkerInBook[] = useMemo(
-    () => listChapterMarkersInUsfm(markerSource),
-    [markerSource],
+  const [structure, setStructure] = useState<ChapterStructure>(() =>
+    chapterStructureFromText(value),
   );
+
+  useEffect(() => {
+    if (!editorDocumentId || !languageClient) {
+      setStructure(chapterStructureFromText(markerSource));
+      return;
+    }
+    let cancelled = false;
+    languageClient
+      .getStructure(editorDocumentId)
+      .then((result) => {
+        if (!cancelled) setStructure(chapterStructureFromEngine(result));
+      })
+      .catch(() => {
+        // Document closed mid-request (editor remounting) or client
+        // unavailable: keep the last structure until the next trigger.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editorDocumentId, languageClient, markerSource]);
+
+  const { markers, bookStartOffset, hasBookId } = structure;
   const chapterNumbers = useMemo(() => markers.map((m) => m.number), [markers]);
-  const hasBookId = useMemo(() => bookIdMarkerOffsetInUsfm(markerSource) != null, [markerSource]);
 
   const navChapterText = useMemo(() => {
     if (viewMode === "preview") return previewTopChapter ?? "—";
@@ -239,8 +270,6 @@ export function UsfmPane({
   }, [viewMode, previewTopChapter, markers, editorTopOffset]);
 
   const hasChapters = markers.length > 0;
-
-  const bookStartOffset = useMemo(() => bookIdMarkerOffsetInUsfm(markerSource) ?? 0, [markerSource]);
 
   const releaseSyncLockSoon = useCallback(() => {
     window.setTimeout(() => {

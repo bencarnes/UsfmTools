@@ -7,9 +7,30 @@ import { cleanup, render, screen, fireEvent, waitFor } from "./testing-react.ts"
 import { spy } from "@std/testing/mock";
 import { UsfmPane } from "../src/components/usfm-pane/UsfmPane.js";
 import { VIEW_MODE_LABELS } from "../src/components/usfm-pane/view-mode-toggle.js";
+import { createLocalLanguageClient } from "../src/language-service/local-client.js";
 
 
 describe("UsfmPane", () => {
+  it("populates chapter navigation from the engine when a client is injected", async () => {
+    // With a languageClient the pane serves chapter structure from the
+    // engine (async) instead of the UI-thread regex scan; the chapter list
+    // and scroll-sync affordance must still reflect the document's chapters.
+    render(
+      <UsfmPane
+        value={"\\id GEN\n\\c 1\n\\p\n\\v 1 Hello.\n\\c 2\n\\p\n\\v 1 More."}
+        defaultViewMode="split"
+        languageClient={createLocalLanguageClient()}
+      />,
+    );
+    const sw = screen.getByRole("switch", { name: /scroll sync between editor and preview/i });
+    await waitFor(() => {
+      expect(sw.hasAttribute("disabled")).toBe(false);
+    });
+    fireEvent.click(screen.getByLabelText(/select chapter/i));
+    expect(screen.getByRole("button", { name: /Open chapter 2/ })).toBeTruthy();
+  });
+
+
   it("shows the toolbar and view mode cycle control", () => {
     render(<UsfmPane value={"\\id GEN\n\\c 1\n\\p\n\\v 1 Hello."} defaultViewMode="edit" />);
     expect(screen.getByTestId("usfm-pane-toolbar")).toBeTruthy();
