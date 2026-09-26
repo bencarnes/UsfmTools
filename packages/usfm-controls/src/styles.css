@@ -135,16 +135,4 @@
   .usfm-preview-root .usfm-note-body {
     display: none;
   }
-  .usfm-preview-root .usfm-preview-errors {
-    @apply text-sm rounded p-2 mb-2;
-    color: #b91c1c;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-  }
-
-  .dark .usfm-preview-root .usfm-preview-errors {
-    color: #fca5a5;
-    background: rgb(127 29 29 / 0.35);
-    border-color: #991b1b;
-  }
 }

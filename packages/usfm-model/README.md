@@ -93,7 +93,7 @@ chapterNumberAtOrBeforeSourceOffset(fromText, fromText[1]!.markerOffset); // "2"
 
 ### HTML rendering (`renderPreviewHtml`)
 
-**`renderPreviewHtml(usfm, options?)`** turns a USFM source string into publication-style HTML with a fixed, hardcoded markup. Parser errors (if any) are surfaced as an `<aside class="usfm-preview-errors">` banner at the top of the output. The optional **`RenderPreviewOptions`** currently supports `{ versePerLine: true }` to expand multi-verse paragraphs into one `<p>` per verse. Customize presentation by styling the emitted CSS class hooks (`usfm-document`, `usfm-book`, `usfm-chapter`, `usfm-line`, `usfm-line--prose`, `usfm-line--poetry`, `usfm-v`, `usfm-txt`, `usfm-nd`, `usfm-note`, `usfm-ref`, …) in your app's stylesheet.
+**`renderPreviewHtml(usfm, options?)`** turns a USFM source string into publication-style HTML with a fixed, hardcoded markup. Parser errors are not rendered — surface them through diagnostics instead. The optional **`RenderPreviewOptions`** currently supports `{ versePerLine: true }` to expand multi-verse paragraphs into one `<p>` per verse. Customize presentation by styling the emitted CSS class hooks (`usfm-document`, `usfm-book`, `usfm-chapter`, `usfm-line`, `usfm-line--prose`, `usfm-line--poetry`, `usfm-v`, `usfm-txt`, `usfm-nd`, `usfm-note`, `usfm-ref`, …) in your app's stylesheet.
 
 ```typescript
 import { renderPreviewHtml } from "@usfm-tools/model";

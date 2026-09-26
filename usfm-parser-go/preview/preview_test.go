@@ -157,18 +157,9 @@ func TestRenderMultiVerseParagraph(t *testing.T) {
 	}
 }
 
-func TestRenderErrorBanner(t *testing.T) {
+func TestRenderOmitsParseErrors(t *testing.T) {
 	html := Render("\\id GEN\n\\c 1\n\\p\n\\v 1 \\zzz bad", Options{})
-	aside := strings.Index(html, `<aside class="usfm-preview-errors"`)
-	article := strings.Index(html, `<article class="usfm-document"`)
-	if aside < 0 || article < 0 || aside > article {
-		t.Errorf("banner not before document: aside=%d article=%d", aside, article)
-	}
-}
-
-func TestRenderEscapesErrorMessages(t *testing.T) {
-	html := Render("\\id GEN\n\\c 1\n\\p\n\\v 1 \\<inj> bad", Options{})
-	if regexp.MustCompile(`<aside[^>]*>.*<inj>`).MatchString(html) {
-		t.Errorf("unescaped error message: %q", html)
+	if !strings.HasPrefix(html, `<article class="usfm-document"`) || strings.Contains(html, "<aside") {
+		t.Errorf("parse errors should not be rendered: %q", html)
 	}
 }

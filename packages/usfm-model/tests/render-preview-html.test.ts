@@ -40,17 +40,9 @@ describe("renderPreviewHtml", () => {
     expect(on).not.toBe(off);
   });
 
-  it("emits a parse-error banner before the document for invalid input", () => {
+  it("does not render parse errors for invalid input", () => {
     const html = renderPreviewHtml("\\id GEN\n\\c 1\n\\p\n\\v 1 \\zzz bad");
-    expect(html).toContain('<aside class="usfm-preview-errors"');
-    expect(html.indexOf('<aside class="usfm-preview-errors"')).toBeLessThan(
-      html.indexOf('<article class="usfm-document"'),
-    );
-  });
-
-  it("escapes parse-error messages", () => {
-    // Force an error that contains an angle-bracketed marker name in the message.
-    const html = renderPreviewHtml("\\id GEN\n\\c 1\n\\p\n\\v 1 \\<inj> bad");
-    expect(html).not.toMatch(/<aside[^>]*>.*<inj>/);
+    expect(html.startsWith('<article class="usfm-document"')).toBe(true);
+    expect(html).not.toContain("<aside");
   });
 });

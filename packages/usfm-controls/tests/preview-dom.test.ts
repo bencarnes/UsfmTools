@@ -22,20 +22,10 @@ describe("splitPreviewHtml", () => {
   it("splits head and one chunk per chapter, reassembling to the input", () => {
     const html = renderPreviewHtml(CLEAN);
     const chunks = splitPreviewHtml(html);
-    expect(chunks.errors).toBe("");
     expect(chunks.head.startsWith("<article")).toBe(true);
     expect(chunks.chapters).toHaveLength(3);
     expect(chunks.incompatible).toBe(false);
-    expect(chunks.errors + chunks.head + chunks.chapters.join("")).toBe(html);
-  });
-
-  it("separates the leading errors aside", () => {
-    const html = renderPreviewHtml(CLEAN + "\n\\zbad x");
-    const chunks = splitPreviewHtml(html);
-    expect(chunks.errors.startsWith('<aside class="usfm-preview-errors"')).toBe(true);
-    expect(chunks.errors.endsWith("</aside>")).toBe(true);
-    expect(chunks.head.startsWith("<article")).toBe(true);
-    expect(chunks.errors + chunks.head + chunks.chapters.join("")).toBe(html);
+    expect(chunks.head + chunks.chapters.join("")).toBe(html);
   });
 
   it("flags multi-book documents as incompatible", () => {
@@ -71,24 +61,6 @@ describe("applyPreviewHtml", () => {
     expect(after[2]).toBe(before[2]);
     expect(after[1]).not.toBe(before[1]);
     expect(after[1]!.textContent).toContain("Two edited.");
-  });
-
-  it("inserts and removes the errors aside without touching chapters", () => {
-    const container = host();
-    let chunks = apply(container, CLEAN, null);
-    const sections = Array.from(container.querySelectorAll("section.usfm-chapter"));
-
-    chunks = apply(container, CLEAN + "\n\\zbad x", chunks);
-    const aside = container.querySelector("aside.usfm-preview-errors");
-    expect(aside).not.toBeNull();
-    expect(aside).toBe(container.firstElementChild);
-    // The bad marker lands in chapter 3: chapters 1-2 DOM reused.
-    const now = Array.from(container.querySelectorAll("section.usfm-chapter"));
-    expect(now[0]).toBe(sections[0]);
-    expect(now[1]).toBe(sections[1]);
-
-    chunks = apply(container, CLEAN, chunks);
-    expect(container.querySelector("aside.usfm-preview-errors")).toBeNull();
   });
 
   it("falls back to a full swap when the chapter count changes", () => {
