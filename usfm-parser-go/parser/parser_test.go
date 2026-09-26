@@ -611,3 +611,43 @@ func TestConvenienceParse(t *testing.T) {
 		t.Errorf("document = %+v", result.Document)
 	}
 }
+
+// The parser carves nodes and children slices from shared slabs; these
+// guard the invariants that makes observable.
+func TestSlabAllocatedChildren(t *testing.T) {
+	// An empty first parent must still get a non-nil Children slice.
+	doc := Parse("\\c 1\n\\p\n\\p a\n\\p b\n").Document
+	chapter := doc.Children[0]
+	paras := filterChildren(chapter, usfm.NodeParagraph)
+	if len(paras) != 3 {
+		t.Fatalf("got %d paragraphs, want 3", len(paras))
+	}
+	if paras[0].Children == nil || len(paras[0].Children) != 0 {
+		t.Errorf("empty paragraph children = %#v, want non-nil empty", paras[0].Children)
+	}
+
+	// Appending to one node's children must not overwrite a neighbor's
+	// children in the slab.
+	want := paras[2].Children[0]
+	paras[1].Children = append(paras[1].Children, &usfm.Node{Type: usfm.NodeText, Text: "x"})
+	if got := paras[2].Children[0]; got != want {
+		t.Errorf("sibling child = %#v after append, want %#v", got, want)
+	}
+
+	// Many nodes and children spanning several slab chunks stay intact.
+	var b strings.Builder
+	b.WriteString("\\id PSA\n\\c 1\n\\p\n")
+	for i := 0; i < 3000; i++ {
+		b.WriteString("\\v 1 word \\w w\\w*\n")
+	}
+	ch := Parse(b.String()).Document.Children[0].Children[0]
+	p := ch.Children[0]
+	if n := len(filterChildren(p, usfm.NodeVerse)); n != 3000 {
+		t.Errorf("got %d verses, want 3000", n)
+	}
+	for _, c := range filterChildren(p, usfm.NodeChar) {
+		if len(c.Children) != 1 || c.Children[0].Text != " w" {
+			t.Fatalf("char children = %#v, want one text node \" w\"", c.Children)
+		}
+	}
+}

@@ -51,7 +51,7 @@ type Token struct {
 
 // Tokenize converts USFM source text into a token stream.
 func Tokenize(source string) []Token {
-	l := &lexer{src: source}
+	l := &lexer{src: source, tokens: make([]Token, 0, estimateTokens(source))}
 	for l.pos < len(l.src) {
 		switch {
 		case l.src[l.pos] == '\\':
@@ -67,6 +67,16 @@ func Tokenize(source string) []Token {
 		}
 	}
 	return l.tokens
+}
+
+// estimateTokens predicts the token count so the token slice is allocated
+// once: typically each marker yields a marker token plus the text after it,
+// and each line break a newline token. Across the BSB corpus this lands
+// within ~1% of the actual count; the 1/8 slack absorbs the difference
+// (regrowing a slice of ~80-byte tokens was the parser's largest allocation).
+func estimateTokens(source string) int {
+	n := 2*strings.Count(source, "\\") + strings.Count(source, "\n") + 1
+	return n + n/8
 }
 
 type lexer struct {
@@ -108,6 +118,18 @@ func utf16Len(r rune) int {
 // advance moves past one rune, updating line/column/offset counters.
 func (l *lexer) advance() {
 	if l.pos >= len(l.src) {
+		return
+	}
+	if b := l.src[l.pos]; b < utf8.RuneSelf {
+		// ASCII fast path (all markup and much of the text)
+		if b == '\n' {
+			l.line++
+			l.col = 0
+		} else {
+			l.col++
+		}
+		l.pos++
+		l.off16++
 		return
 	}
 	r, size := utf8.DecodeRuneInString(l.src[l.pos:])
