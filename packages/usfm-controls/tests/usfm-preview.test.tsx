@@ -21,11 +21,12 @@ describe("UsfmPreview", () => {
     expect(container.textContent).toContain("Hello");
   });
 
-  it("surfaces parse errors without throwing", async () => {
+  it("renders invalid input without an error banner", async () => {
     const { container } = render(<UsfmPreview value={"\\id GEN\n\\c 1\n\\p\n\\v 1 \\zzz bad"} />);
     await waitFor(() => {
-      expect(container.querySelector(".usfm-preview-errors")).toBeTruthy();
+      expect(container.querySelector("article.usfm-document")).toBeTruthy();
     });
+    expect(container.querySelector("aside")).toBeNull();
   });
 
   it("renders a single <p> for a multi-verse paragraph when versePerLine is off", async () => {

@@ -11,23 +11,20 @@ export type RenderPreviewOptions = {
 
 /**
  * Render a USFM source string as publication-style HTML using a fixed
- * default markup. Parser errors (if any) are surfaced as a banner at the
- * top of the output. CSS hooks (class names like `usfm-line`, `usfm-v`,
+ * default markup. Parser errors are not rendered (editors report them via
+ * diagnostics). CSS hooks (class names like `usfm-line`, `usfm-v`,
  * `usfm-chapter`, `usfm-nd`, …) are the only customization surface —
  * style them in your app's stylesheet.
  */
 export function renderPreviewHtml(usfm: string, options?: RenderPreviewOptions): string {
-  const { document, errors } = parse(usfm);
+  const { document } = parse(usfm);
   const preview = PublicationViewModel.buildPreview(document, {
     versePerLine: options?.versePerLine,
   });
   const booksHtml = preview.books.map(renderBook).join("");
   const firstCode = preview.books[0]?.code;
   const idAttr = firstCode ? ` data-usfm-id="${escapeText(firstCode)}"` : "";
-  const body = `<article class="usfm-document"${idAttr}>${booksHtml}</article>`;
-  if (errors.length === 0) return body;
-  const errorParts = errors.map((e) => `<span>${escapeText(e.message)}</span>`).join(" ");
-  return `<aside class="usfm-preview-errors" role="status">${errorParts}</aside>${body}`;
+  return `<article class="usfm-document"${idAttr}>${booksHtml}</article>`;
 }
 
 function escapeText(html: string): string {

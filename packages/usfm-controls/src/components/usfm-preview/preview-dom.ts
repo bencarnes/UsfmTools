@@ -4,21 +4,16 @@
  * Replacing the whole preview via innerHTML forces the browser to restyle
  * and lay out the entire book on every refresh — multi-second freezes for
  * large books on modest hardware. The renderer's markup has stable
- * boundaries (an optional leading errors aside, an article/book head, then
- * flat chapter sections), so successive renders are diffed as string chunks
+ * boundaries (an article/book head, then flat chapter sections), so successive renders are diffed as string chunks
  * and only the changed sections' DOM is swapped: typing restyles one
  * chapter, not one hundred and fifty.
  */
 
 const CHAPTER_MARK = '<section class="usfm-chapter"';
 const BOOK_MARK = '<section class="usfm-book"';
-const ERRORS_OPEN = '<aside class="usfm-preview-errors"';
-const ERRORS_CLOSE = "</aside>";
 
 export interface PreviewChunks {
-  /** Leading errors aside markup, or "" when the document has no problems. */
-  readonly errors: string;
-  /** Markup between the aside and the first chapter (article/book head). */
+  /** Markup before the first chapter (article/book head). */
   readonly head: string;
   /**
    * One chunk per chapter section, in document order. The last chunk carries
@@ -35,36 +30,26 @@ export interface PreviewChunks {
 }
 
 export function splitPreviewHtml(html: string): PreviewChunks {
-  let errors = "";
-  let rest = html;
-  if (rest.startsWith(ERRORS_OPEN)) {
-    const close = rest.indexOf(ERRORS_CLOSE);
-    if (close >= 0) {
-      errors = rest.slice(0, close + ERRORS_CLOSE.length);
-      rest = rest.slice(errors.length);
-    }
-  }
-  const first = rest.indexOf(CHAPTER_MARK);
+  const first = html.indexOf(CHAPTER_MARK);
   if (first < 0) {
-    return { errors, head: rest, chapters: [], incompatible: false };
+    return { head: html, chapters: [], incompatible: false };
   }
-  const head = rest.slice(0, first);
+  const head = html.slice(0, first);
   const chapters: string[] = [];
   let pos = first;
-  while (pos < rest.length) {
-    const next = rest.indexOf(CHAPTER_MARK, pos + CHAPTER_MARK.length);
+  while (pos < html.length) {
+    const next = html.indexOf(CHAPTER_MARK, pos + CHAPTER_MARK.length);
     if (next < 0) {
-      chapters.push(rest.slice(pos));
+      chapters.push(html.slice(pos));
       break;
     }
-    chapters.push(rest.slice(pos, next));
+    chapters.push(html.slice(pos, next));
     pos = next;
   }
   return {
-    errors,
     head,
     chapters,
-    incompatible: rest.indexOf(BOOK_MARK, first) >= 0,
+    incompatible: html.indexOf(BOOK_MARK, first) >= 0,
   };
 }
 
@@ -105,22 +90,6 @@ export function applyPreviewHtml(
 
   const sections = container.querySelectorAll("section.usfm-chapter");
   if (sections.length !== next.chapters.length) return fullSwap();
-
-  if (next.errors !== prev.errors) {
-    // The aside, when present, is always the container's first element.
-    const first = container.firstElementChild;
-    const existing =
-      first && first.tagName === "ASIDE" && first.classList.contains("usfm-preview-errors")
-        ? first
-        : null;
-    if (next.errors === "") {
-      existing?.remove();
-    } else {
-      const fragment = parseFragment(doc, next.errors);
-      if (existing) existing.replaceWith(fragment);
-      else container.prepend(fragment);
-    }
-  }
 
   for (let i = 0; i < next.chapters.length; i++) {
     if (next.chapters[i] === prev.chapters[i]) continue;

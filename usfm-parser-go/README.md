@@ -88,7 +88,7 @@ import "github.com/usfm-tools/usfm-parser-go/preview"
 html := preview.Render(source, preview.Options{VersePerLine: true})
 ```
 
-Parse errors surface as a banner `<aside>` before the document; all
+Parse errors are not rendered (they are reported as diagnostics); all
 user-supplied text is escaped. Styling happens entirely through the emitted
 `usfm-*` class hooks (`usfm-line`, `usfm-v`, `usfm-chapter`, `usfm-note`, …).
 

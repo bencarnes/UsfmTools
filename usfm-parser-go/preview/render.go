@@ -9,12 +9,11 @@ import (
 
 // Render parses a USFM source string and renders it as publication-style
 // HTML using a fixed default markup, exactly like the TS renderPreviewHtml.
-// Parse errors (if any) are surfaced as a banner before the document. CSS
+// Parse errors are not rendered (editors report them via diagnostics). CSS
 // hooks (class names like usfm-line, usfm-v, usfm-chapter, usfm-nd, …) are
 // the only customization surface — style them in the application stylesheet.
 func Render(source string, opts Options) string {
-	result := parser.Parse(source)
-	doc := BuildPreview(result.Document, opts)
+	doc := BuildPreview(parser.Parse(source).Document, opts)
 
 	var books strings.Builder
 	for _, book := range doc.Books {
@@ -24,15 +23,7 @@ func Render(source string, opts Options) string {
 	if len(doc.Books) > 0 && doc.Books[0].Code != "" {
 		idAttr = ` data-usfm-id="` + escapeText(doc.Books[0].Code) + `"`
 	}
-	body := `<article class="usfm-document"` + idAttr + `>` + books.String() + `</article>`
-	if len(result.Errors) == 0 {
-		return body
-	}
-	parts := make([]string, len(result.Errors))
-	for i, e := range result.Errors {
-		parts[i] = "<span>" + escapeText(e.Message) + "</span>"
-	}
-	return `<aside class="usfm-preview-errors" role="status">` + strings.Join(parts, " ") + `</aside>` + body
+	return `<article class="usfm-document"` + idAttr + `>` + books.String() + `</article>`
 }
 
 var htmlEscaper = strings.NewReplacer(
