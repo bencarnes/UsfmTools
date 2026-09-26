@@ -7,7 +7,7 @@ import { cleanup, render, screen, fireEvent, waitFor } from "./testing-react.ts"
 import { spy } from "@std/testing/mock";
 import { UsfmPane } from "../src/components/usfm-pane/UsfmPane.js";
 import { VIEW_MODE_LABELS } from "../src/components/usfm-pane/view-mode-toggle.js";
-import { createLocalLanguageClient } from "../src/language-service/local-client.js";
+import { createStubLanguageClient } from "../src/language-service/stub-client.js";
 
 
 describe("UsfmPane", () => {
@@ -19,7 +19,7 @@ describe("UsfmPane", () => {
       <UsfmPane
         value={"\\id GEN\n\\c 1\n\\p\n\\v 1 Hello.\n\\c 2\n\\p\n\\v 1 More."}
         defaultViewMode="split"
-        languageClient={createLocalLanguageClient()}
+        languageClient={createStubLanguageClient()}
       />,
     );
     const sw = screen.getByRole("switch", { name: /scroll sync between editor and preview/i });

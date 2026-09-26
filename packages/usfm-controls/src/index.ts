@@ -82,30 +82,23 @@ export type {
 } from "./components/usfm-file-picker/index.js";
 export { ChapterPicker } from "./components/chapter-picker/index.js";
 export type { ChapterPickerProps, ChapterPickerSelectDetail } from "./components/chapter-picker/index.js";
-// Parser-backed APIs (TS fallback client, preview renderer, book picker) live
-// in the "./local" entry point so apps injecting an engine client don't
-// bundle the TS parser.
 export {
   buildUsfmFilePickerGroups,
-  listChapterNumbersFromBook,
-  listChapterMarkersInBook,
   listChapterMarkersInUsfm,
   bookIdMarkerOffsetInUsfm,
   chapterNumberAtOrBeforeSourceOffset,
-} from "@usfm-tools/model/scan";
+} from "@usfm-tools/model";
 export type {
-  UsfmBookPickerCanonGroup,
-  UsfmBookPickerFileInput,
-  UsfmBookPickerBook,
-  UsfmBookPickerGroups,
+  UsfmFilePickerCanonGroup,
   UsfmFilePickerFileInput,
   UsfmFilePickerFile,
   UsfmFilePickerGroups,
   ChapterMarkerInBook,
-} from "@usfm-tools/model/scan";
+} from "@usfm-tools/model";
 export {
-  createDeferredLocalLanguageClient,
-  sharedLocalLanguageClient,
+  applyChangesToText,
+  createStubLanguageClient,
+  sharedStubLanguageClient,
   createDocumentSessionManager,
   changesFromChangeSet,
   DocumentSync,
@@ -113,8 +106,6 @@ export {
   TokenType,
 } from "./language-service/index.js";
 export type {
-  RequestMessage,
-  ResponseMessage,
   Position,
   Range,
   Diagnostic,
@@ -127,7 +118,6 @@ export type {
   DiagnosticsResult,
   DocumentChange,
   DocumentSyncOptions,
-  LocalLanguageClientOptions,
   DocumentSessionManager,
   DocumentSessionMembership,
   SessionViewPort,

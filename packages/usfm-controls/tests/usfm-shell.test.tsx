@@ -10,6 +10,7 @@ import { createFixtureUsfmShellHost } from "../src/components/usfm-shell/fixture
 import type { UsfmShellHost } from "../src/components/usfm-shell/host.js";
 import type { ApplicationSettings } from "../src/components/settings-pane/settings-model.js";
 import { lineColumnToSourceOffset, sourceOffsetToLineColumn } from "../src/components/usfm-shell/line-offsets.js";
+import { createFakeLanguageClient } from "./fake-language-client.ts";
 
 
 /**
@@ -228,10 +229,10 @@ describe("UsfmShell", () => {
 
   it("renders the errors tab with bug icon and validation count", async () => {
     const host = makeHost([
-      // \xyz is an unknown marker — triggers a diagnostic from the language service.
+      // \xyz is an unknown marker — the fake client reports it.
       { id: "f://bad", name: "Bad.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n\\v 1 ok\n\\xyz unknown\n" },
     ]);
-    render(<UsfmShell host={host} />);
+    render(<UsfmShell host={host} languageClient={createFakeLanguageClient()} />);
     await waitFor(() => screen.getByTestId("usfm-shell-file-Bad.usfm"));
     fireEvent.click(screen.getByTestId("usfm-shell-file-Bad.usfm"));
     const count = await screen.findByTestId("usfm-shell-errors-count", undefined, { timeout: 2500 });
@@ -244,7 +245,7 @@ describe("UsfmShell", () => {
       { id: "f://bad", name: "Bad.usfm", usfm: "\\id GEN\n\\c 1\n\\p\n\\v 1 ok\n\\xyz unknown\n" },
       { id: "f://good", name: "Good.usfm", usfm: "\\id EXO\n\\c 1\n\\p\n\\v 1 fine" },
     ]);
-    render(<UsfmShell host={host} />);
+    render(<UsfmShell host={host} languageClient={createFakeLanguageClient()} />);
     await waitFor(() => screen.getByTestId("usfm-shell-file-Bad.usfm"));
 
     // Open Bad in the only (active) group; its error surfaces in the errors panel.

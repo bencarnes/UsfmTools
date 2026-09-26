@@ -8,7 +8,8 @@ import { EditorView } from "@codemirror/view";
 import { undo } from "@codemirror/commands";
 import { render, waitFor } from "./testing-react.ts";
 import { UsfmEditor } from "../src/components/usfm-editor/UsfmEditor.js";
-import { createLocalLanguageClient } from "../src/language-service/local-client.js";
+import { createStubLanguageClient } from "../src/language-service/stub-client.js";
+import { createFakeLanguageClient } from "./fake-language-client.ts";
 import {
   createDocumentSessionManager,
   type DocumentSessionManager,
@@ -18,15 +19,27 @@ import type { DocumentChange, UsfmLanguageClient } from "../src/language-service
 const INITIAL = "\\id GEN Genesis\n\\c 1\n\\p\n\\v 1 In the beginning God created.\n\\v 2 The earth was formless.";
 
 /** Two editors sharing one value buffer, like two workspace tabs on one file. */
-function TwinEditors() {
+function TwinEditors({ client }: { client: UsfmLanguageClient }) {
   const [value, setValue] = useState(INITIAL);
   return (
     <>
       <div data-testid="ed-a">
-        <UsfmEditor value={value} onChange={setValue} onChangeDebounceMs={30} className="h-48" />
+        <UsfmEditor
+          value={value}
+          onChange={setValue}
+          onChangeDebounceMs={30}
+          languageClient={client}
+          className="h-48"
+        />
       </div>
       <div data-testid="ed-b">
-        <UsfmEditor value={value} onChange={setValue} onChangeDebounceMs={30} className="h-48" />
+        <UsfmEditor
+          value={value}
+          onChange={setValue}
+          onChangeDebounceMs={30}
+          languageClient={client}
+          className="h-48"
+        />
       </div>
     </>
   );
@@ -91,7 +104,7 @@ describe("twin editors sharing one buffer", () => {
     // bridge on every cross-tab echo; the editor must trim the common
     // prefix/suffix and forward only the actual edit.
     const batches: DocumentChange[][] = [];
-    const inner = createLocalLanguageClient();
+    const inner = createStubLanguageClient();
     const client: UsfmLanguageClient = {
       ...inner,
       applyChanges(id, version, changes) {
@@ -124,7 +137,7 @@ describe("twin editors sharing one buffer", () => {
   });
 
   it("shares one client document and converges synchronously when sessions are shared", async () => {
-    const inner = createLocalLanguageClient();
+    const inner = createFakeLanguageClient();
     const opens: string[] = [];
     const applies: DocumentChange[][] = [];
     const client: UsfmLanguageClient = {
@@ -193,7 +206,7 @@ describe("twin editors sharing one buffer", () => {
     // Regression: a delayed value echo of tab A's emission reaching tab B
     // after further typing used to make B "correct" its buffer backward —
     // deleting the newest keystrokes in both tabs via the session.
-    const client = createLocalLanguageClient();
+    const client = createStubLanguageClient();
     const manager = createDocumentSessionManager(client);
     const { container, rerender } = render(
       <UsfmEditor
@@ -225,7 +238,7 @@ describe("twin editors sharing one buffer", () => {
   });
 
   it("keeps tab B's syntax highlighting aligned after edits in tab A", async () => {
-    const { container } = render(<TwinEditors />);
+    const { container } = render(<TwinEditors client={createFakeLanguageClient()} />);
     await waitFor(() => {
       expect(container.querySelectorAll(".cm-editor").length).toBe(2);
     });

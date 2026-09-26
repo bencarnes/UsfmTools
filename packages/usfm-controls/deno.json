@@ -2,8 +2,7 @@
   "name": "@usfm-tools/controls",
   "version": "0.1.0",
   "exports": {
-    ".": "./src/index.ts",
-    "./local": "./src/local.ts"
+    ".": "./src/index.ts"
   },
   "tasks": {
     "test": "deno test -A --unstable-sloppy-imports",

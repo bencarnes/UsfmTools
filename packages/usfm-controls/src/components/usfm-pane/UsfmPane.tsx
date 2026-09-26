@@ -8,7 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { chapterNumberAtOrBeforeSourceOffset } from "@usfm-tools/model/scan";
+import { chapterNumberAtOrBeforeSourceOffset } from "@usfm-tools/model";
 import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
 import {
   chapterStructureFromEngine,

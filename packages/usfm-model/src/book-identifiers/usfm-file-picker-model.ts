@@ -1,11 +1,13 @@
-import type { UsfmBookPickerBook, UsfmBookPickerGroups } from "./usfm-book-picker-model.js";
 import { scanUsfmBookCode } from "./usfm-book-code-scan.js";
 import {
   getStandardUsfmBookIdentifier,
   getStandardUsfmBookOrderIndex,
   isStandardUsfmBookIdentifier,
   normalizeUsfmBookCode,
+  type StandardBookCanonGroup,
 } from "./standard-book-identifiers.js";
+
+export type UsfmFilePickerCanonGroup = StandardBookCanonGroup | "nonStandard";
 
 export interface UsfmFilePickerFileInput {
   /** Stable id for the file (e.g. path or key); not read from USFM. */
@@ -15,10 +17,34 @@ export interface UsfmFilePickerFileInput {
   readonly usfm: string;
 }
 
-/** Same grouping as the book picker; {@link UsfmFilePickerFile.displayLabel} is the file name. */
-export type UsfmFilePickerFile = UsfmBookPickerBook;
+export interface UsfmFilePickerFile {
+  readonly fileId: string;
+  /**
+   * Identifier code from the first `\\id` line (uppercase first token), or an empty string
+   * when the file has no `\\id` or the `\\id` line has no code token.
+   */
+  readonly code: string;
+  /** The file name ({@link UsfmFilePickerFileInput.name}). */
+  readonly displayLabel: string;
+  readonly canonGroup: UsfmFilePickerCanonGroup;
+  /**
+   * For standard books: index in the official USFM book table (sorting).
+   * For non-standard files: unused.
+   */
+  readonly sortIndex: number;
+}
 
-export type UsfmFilePickerGroups = UsfmBookPickerGroups;
+export interface UsfmFilePickerGroups {
+  readonly oldTestament: readonly UsfmFilePickerFile[];
+  readonly newTestament: readonly UsfmFilePickerFile[];
+  /** Standard identifiers outside Old/New Testament (peripherals, deuterocanon, etc.). */
+  readonly other: readonly UsfmFilePickerFile[];
+  /**
+   * Non-standard entries: a non-empty `\\id` code not in the USFM standard list, **or**
+   * a missing/empty `\\id` (non-empty USFM with no book code).
+   */
+  readonly nonStandard: readonly UsfmFilePickerFile[];
+}
 
 function compareFilePickerRows(a: UsfmFilePickerFile, b: UsfmFilePickerFile): number {
   const byTable = a.sortIndex - b.sortIndex;
@@ -29,15 +55,13 @@ function compareFilePickerRows(a: UsfmFilePickerFile, b: UsfmFilePickerFile): nu
 
 /**
  * Groups files for the USFM file picker control by each file's `\\id` code
- * (read with a parser-free scan, so the app's file browser never loads the
- * TS parser). Standard `\\id` codes are split into Old Testament, New
- * Testament, and other; non-standard rows include unknown `\\id` codes, an
+ * (read with a lightweight text scan). Standard `\\id` codes are split into
+ * Old Testament, New Testament, and other; non-standard rows include unknown `\\id` codes, an
  * empty `\\id` line, or **no** `\\id` at all (non-empty USFM).
  * Labels are always the supplied {@link UsfmFilePickerFileInput.name} — table-of-contents
  * markers are not used. Multiple files with the same standard `\\id` (for example two
  * `GEN.usfm` copies) each appear as separate rows, ordered by the book table, then file
- * name when the table index ties. Groups match {@link buildUsfmBookPickerGroups} apart
- * from labels and ordering.
+ * name when the table index ties.
  */
 export function buildUsfmFilePickerGroups(
   files: readonly UsfmFilePickerFileInput[],

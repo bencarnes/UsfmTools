@@ -9,8 +9,8 @@ React UI controls for editing USFM scripture text, built on [CodeMirror 6](https
 - **Autocomplete** — type `\` to get a filtered list of USFM markers with descriptions; navigate with arrows, accept with Tab
 - **Find and replace** — **Ctrl+F** / **Ctrl+H** open a VS Code–style search widget in the upper-right (built on [`@codemirror/search`](https://codemirror.net/docs/ref/#search)); chevron toggles the replace row; icon buttons for match case (**Aa**), whole word (**ab**), and regex (**.\***)
 - **Async language service** — LSP-inspired message protocol for clean separation between editor UI and language intelligence
-- **Publication preview** — **`UsfmPreview`** renders USFM as continuous reading text (similar to a Bible app) using **`renderPreviewHtml`** from `@usfm-tools/model`; HTML output is memoized for fast updates next to the editor
-- **Book picker** — **`UsfmBookPicker`** lists books from caller-supplied USFM strings (no filesystem access): standard `\\id` codes in Old Testament, New Testament, and other standard groups, plus a fourth list for non-standard `\\id` values; selection is reported through **`onBookSelect`**
+- **Publication preview** — **`UsfmPreview`** shows USFM as continuous reading text (similar to a Bible app), rendered by the language client (the Go engine in BibleEdit); only changed chapters are swapped into the DOM
+- **File picker** — **`UsfmFilePicker`** groups a folder's files by `\\id` code into Old Testament, New Testament, other standard, and non-standard lists; selection is reported through **`onFileSelect`**
 - **Chapter picker** — **`ChapterPicker`** lays out one book’s **`\\c`** markers as a wrapping row of equal-width buttons (labels are shown exactly as in the USFM, in source order); selection is reported through **`onChapterSelect`**
 
 ## Installation
@@ -38,7 +38,7 @@ function App() {
 
 ### UsfmPreview
 
-Renders USFM as HTML for reading (not editing). Uses **`renderPreviewHtml`** from **`@usfm-tools/model`**, which emits a fixed set of `usfm-*` CSS class hooks — style them in your app's stylesheet to customize presentation.
+Renders USFM as HTML for reading (not editing). The HTML comes from the language client's **`renderPreview`** / **`renderPreviewDocument`** (in BibleEdit, the Go engine's preview renderer), which emits a fixed set of `usfm-*` CSS class hooks — style them in your app's stylesheet to customize presentation. Without an injected **`languageClient`** the stub client shows the escaped source in a `<pre>`.
 
 ```tsx
 import { useState } from "react";
@@ -61,34 +61,6 @@ function App() {
 | `value` | `string` | USFM source to render |
 | `versePerLine` | `boolean` | When true, split paragraphs that contain multiple `\\v` milestones so each verse appears on its own preview line (default `false`) |
 | `updateDebounceMs` | `number` | Milliseconds to wait after the last `value` change before re-rendering (default `0`). **`UsfmPane`** passes `1500` in split mode so preview HTML is not rebuilt on every keystroke |
-| `className` | `string` | CSS class on the root wrapper |
-
-### UsfmBookPicker
-
-Exported from **`@usfm-tools/controls/local`** (it parses every file with the TS reference parser; see [Entry points](#entry-points)). Lists books from an array of `{ id, usfm }` entries (your app supplies file contents and stable ids). The model’s **`buildUsfmBookPickerGroups`** parses each `usfm` string and splits results into **Old Testament** and **New Testament** (responsive grids of short labels), **other** standard identifiers (for example apocrypha or front matter), and **non-standard** material: unknown `\\id` codes, an empty/missing `\\id` on the first book, or **no `\\id` at all** (with titles from top-level `\\toc` markers when there is no book node). The last two sections are single-column lists, each separated by a horizontal rule when present.
-
-```tsx
-import { UsfmBookPicker } from "@usfm-tools/controls/local";
-
-const files = [
-  { id: "path/to/GEN.usfm", usfm: "\\id GEN\n\\toc3 Gen\n..." },
-  { id: "path/to/MAT.usfm", usfm: "\\id MAT\n\\toc3 Mat\n..." },
-  { id: "path/to/hymnal.usfm", usfm: "\\id HYM\n\\toc1 Hymnal\n..." },
-];
-
-<UsfmBookPicker
-  files={files}
-  onBookSelect={({ fileId, code }) => {
-    /* wire navigation or editor load */
-  }}
-  className="max-w-2xl border rounded-md p-3"
-/>;
-```
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `files` | `{ id: string; usfm: string }[]` | One entry per file; `id` is an application-defined key (path, URI, etc.); `usfm` is the file body |
-| `onBookSelect` | `(detail: { fileId: string; code: string }) => void` | Optional; called when the user activates a book (click or keyboard). **`code`** is empty when the file has no `\\id` or an empty `\\id` line. |
 | `className` | `string` | CSS class on the root wrapper |
 
 ### UsfmPane
@@ -308,7 +280,7 @@ Dropdown with a **2×2 grid** trigger icon. The menu shows four squares; clickin
 
 ### UsfmFilePicker
 
-Folder-oriented file list with the same OT / NT / other / non-standard grouping as **`UsfmBookPicker`**, but keyed by file **`id`** and **`name`**. Accept either raw **`files`** (`{ id, name, usfm }[]`) or pre-built **`groups`** from **`buildUsfmFilePickerGroups`**. **`UsfmShell`**’s sidebar file browser uses this control.
+Folder-oriented file list grouped into Old Testament / New Testament / other standard / non-standard books by each file's `\\id` code, keyed by file **`id`** and labeled by **`name`**. Accept either raw **`files`** (`{ id, name, usfm }[]`) or pre-built **`groups`** from **`buildUsfmFilePickerGroups`**. **`UsfmShell`**’s sidebar file browser uses this control.
 
 | Prop | Type | Description |
 |------|------|-------------|
@@ -320,7 +292,7 @@ Folder-oriented file list with the same OT / NT / other / non-standard grouping 
 
 ### ChapterPicker
 
-Shows chapter numbers as a **wrapping row of equal-width buttons** (labels are the raw `\\c` number strings in **document order** — no sorting or reformatting). Pass **`chapterNumbers`** from **`listChapterNumbersFromBook`** (parsed AST) or map **`listChapterMarkersInUsfm`** results to `.number`.
+Shows chapter numbers as a **wrapping row of equal-width buttons** (labels are the raw `\\c` number strings in **document order** — no sorting or reformatting). Pass **`chapterNumbers`** by mapping **`listChapterMarkersInUsfm`** results (or the engine's `getStructure` chapters) to `.number`.
 
 ```tsx
 import { ChapterPicker } from "@usfm-tools/controls";
@@ -343,12 +315,11 @@ const markers = listChapterMarkersInUsfm("\\id PSA\n\\c 1\n\\p\n\\v 1\n\\c 2\n\\
 | `onChapterSelect` | `(detail: { chapterNumber: string }) => void` | Optional; fired when the user activates a chapter button |
 | `className` | `string` | CSS class on the root wrapper |
 
-### Entry points
+### Language clients
 
-- **`@usfm-tools/controls`** — the components and language-client plumbing. It never loads the TS reference parser statically: components without an injected `languageClient` fall back to **`sharedLocalLanguageClient()`** / **`createDeferredLocalLanguageClient()`**, which `import()` the in-process TS client on first use, so an app that injects an engine-backed client (bible-edit) bundles the parser only as a lazy chunk it never loads. `tests/entry-point-graph.test.ts` guards this.
-- **`@usfm-tools/controls/local`** — the parser-backed API: **`createLocalLanguageClient`** (synchronous construction of the TS client), **`applyChangesToText`**, **`UsfmLanguageService`** / **`createLanguageClient`**, **`UsfmBookPicker`**, and the model re-exports **`renderPreviewHtml`**, **`RenderPreviewOptions`**, **`ViewModels`**, **`PublicationViewModel`**, **`buildUsfmBookPickerGroups`**.
+Components take an optional **`languageClient`** (**`UsfmLanguageClient`**, see `src/language-service/protocol.ts`). BibleEdit injects one backed by the Go engine. Without one, components fall back to **`createStubLanguageClient()`** / **`sharedStubLanguageClient()`**: an inert in-process client that keeps the document lifecycle but returns no diagnostics, tokens, or completions, derives book/chapter structure from the `@usfm-tools/model` text scans, and previews the escaped source. It keeps stories and tests self-contained; it is not a USFM analyzer.
 
-The main entry also **re-exports** the parser-free part of **`@usfm-tools/model`** (from `@usfm-tools/model/scan`): **`listChapterNumbersFromBook`**, **`listChapterMarkersInBook`**, **`listChapterMarkersInUsfm`**, **`bookIdMarkerOffsetInUsfm`**, **`chapterNumberAtOrBeforeSourceOffset`**, picker types, and **`ChapterMarkerInBook`**.
+The package also **re-exports** from **`@usfm-tools/model`**: **`buildUsfmFilePickerGroups`**, **`listChapterMarkersInUsfm`**, **`bookIdMarkerOffsetInUsfm`**, **`chapterNumberAtOrBeforeSourceOffset`**, the file-picker types, and **`ChapterMarkerInBook`**.
 
 ### UsfmEditor props
 
@@ -375,39 +346,19 @@ The main entry also **re-exports** the parser-free part of **`@usfm-tools/model`
 │  UsfmShell / UsfmWorkspace / UsfmPane / UsfmEditor (React)   │
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │  CodeMirror 6 — live document, viewport highlight,     │  │
-│  │  lint squiggles from shell-provided diagnostics        │  │
+│  │  lint squiggles from pushed diagnostics                │  │
 │  └────────────────────────────────────────────────────────┘  │
-└───────────────┬──────────────────────────────┬───────────────┘
-                │                              │
-                │ renderPreviewHtml            │ validate / classify / complete
-                ▼                              ▼
-        ┌───────────────────┐        ┌─────────────────────────┐
-        │  @usfm-tools/model │        │  USFM Language Service │
-        │  view models + HTML│        │  (@usfm-tools/parser)    │
-        └───────────────────┘        └─────────────────────────┘
+└──────────────────────────────┬───────────────────────────────┘
+                               │ UsfmLanguageClient: document sync (incremental edits),
+                               │ pushed analyses, classify / complete / structure / preview
+                               ▼
+        ┌──────────────────────────────────────────────────────┐
+        │  Go engine (usfm-parser-go) via Wails bindings        │
+        │  — or the inert stub client when none is injected     │
+        └──────────────────────────────────────────────────────┘
 ```
 
-**Validation** is owned by **`UsfmShell`**: one debounced `validate` request reads the focused editor’s live buffer and pushes diagnostics to both the errors panel and **`UsfmEditor`** (via CodeMirror **`setDiagnostics`**). **Syntax highlighting** classifies only the visible viewport (plus a few lines of margin) inside the editor.
-
-### Language Service Protocol
-
-The language service uses a simple request/response protocol inspired by LSP:
-
-```typescript
-// Request types
-{ type: "validate", id, content }
-{ type: "complete", id, content, position: { line, column } }
-{ type: "classify", id, content }
-{ type: "classifyRange", id, content, from, to }
-
-// Response types
-{ type: "validate", id, diagnostics: [...] }
-{ type: "complete", id, items: [...] }
-{ type: "classify", id, tokens: [...] }
-{ type: "classifyRange", id, tokens: [...] }
-```
-
-The service runs synchronously on the main thread via **`createLanguageClient()`**. The message-based design allows a future upgrade to Web Worker transport or incremental document sync without changing call sites.
+Editors open a client document, forward CodeMirror change sets incrementally (**`DocumentSync`**; views of the same file share one document via **`createDocumentSessionManager`**), and receive diagnostics as pushed analyses. **Syntax highlighting** classifies only the visible viewport (plus a few lines of margin).
 
 ### Token Types
 
@@ -424,7 +375,7 @@ The service runs synchronously on the main thread via **`createLanguageClient()`
 
 **Full-book editing:** **`UsfmPane`** targets entire files (multiple **`\\c`** markers). The live document stays in CodeMirror; React workspace state, preview HTML, chapter-marker scans, scroll sync, and validation are debounced so large books (for example Psalms) stay responsive with the preview pane open. Further gains are possible with Web Workers, chapter-scoped preview HTML, or incremental document sync to the language service.
 
-**Lightweight:** No VS Code / Monaco fork. CodeMirror 6 provides the editing primitives; the USFM-specific intelligence lives in our language service.
+**Lightweight:** No VS Code / Monaco fork. CodeMirror 6 provides the editing primitives; the USFM-specific intelligence lives in the Go engine behind the language-client protocol.
 
 **Self-contained pane state:** cross-cutting state that nothing else in the shell reads (for example **settings**) lives in a **host-backed context store** the pane reads and writes directly (**`SettingsProvider`** + **`useSettings()`**), rather than bubbling change events up through **`UsfmWorkspace`** to **`UsfmShell`**. The shell only wires the provider to the host; it does not own or mediate the state. Reserve the shell-owned, fully-controlled pattern (state + callbacks threaded through the workspace) for data genuinely shared across the shell — open tabs, focus, dirty flags, and diagnostics.
 
@@ -470,7 +421,6 @@ packages/usfm-controls/
 │   │   │   ├── codemirror-usfm.ts   # CM6 extensions (highlight, lint, autocomplete)
 │   │   │   └── usfm-search-panel.ts
 │   │   ├── usfm-preview/
-│   │   ├── usfm-book-picker/
 │   │   ├── usfm-file-picker/
 │   │   ├── usfm-pane/
 │   │   ├── usfm-workspace/
@@ -487,15 +437,14 @@ packages/usfm-controls/
 │   │   ├── settings-pane/
 │   │   └── chapter-picker/
 │   └── language-service/
-│       ├── protocol.ts
-│       ├── service.ts
-│       ├── diagnostics.ts
-│       ├── completions.ts
-│       └── classifier.ts
+│       ├── protocol.ts          # UsfmLanguageClient protocol
+│       ├── document-sync.ts     # incremental edit forwarding
+│       ├── document-sessions.ts # views of one file share a document
+│       └── stub-client.ts       # inert fallback client
 ├── tests/
 │   ├── dom-setup.ts
 │   ├── testing-react.ts
-│   ├── language-service.test.ts
+│   ├── fake-language-client.ts  # regex highlighting + fake diagnostics for tests
 │   ├── unified-validation.test.ts
 │   ├── usfm-editor-debounce.test.tsx
 │   ├── usfm-editor-search.test.tsx

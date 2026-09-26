@@ -1,5 +1,5 @@
 // Package integration runs the Berean Standard Bible corpus tests against
-// the Go parser. Port of packages/usfm-parser-integration-tests/tests/bsb.test.ts.
+// the Go parser (originally ported from the removed TS integration tests).
 package integration
 
 import (

@@ -13,8 +13,7 @@ Three top-level areas:
 ```mermaid
 flowchart TB
   subgraph packages["packages/ (TypeScript, Deno workspace)"]
-    parser["usfm-parser\n(reference only — superseded by Go)"]
-    model["usfm-model\n(preview fallback, pickers, chapter scans)"]
+    model["usfm-model\n(book identifiers, pickers, chapter scans)"]
     controls["usfm-controls\n(React + CodeMirror UI, language-client protocol)"]
   end
   subgraph go["usfm-parser-go/ (Go module)"]
@@ -23,8 +22,6 @@ flowchart TB
   subgraph app["apps/bible-edit/ (Wails)"]
     bibleedit["Go backend + React frontend"]
   end
-  parser -.-> model
-  parser -.-> controls
   model --> controls
   controls --> bibleedit
   engine --> bibleedit
@@ -32,14 +29,12 @@ flowchart TB
 
 | Name | Role |
 |--------|------|
-| **usfm-parser-go** | The USFM parser and analysis engine: error-tolerant parsing, diagnostics, syntax classification, completions, book/chapter structure, and preview HTML rendering — as a Go library, an asynchronous LSP-like engine, and the `usfm` CLI (`check`, `parse`). Verified byte-for-byte against the TS parser across the Berean corpus. |
-| **usfm-controls** | React controls: **`UsfmEditor`**, **`UsfmPreview`**, **`UsfmPane`**, **`UsfmWorkspace`**, **`UsfmShell`**, pickers — plus the **`UsfmLanguageClient`** protocol (LSP-like document sync + feature requests) they consume. In BibleEdit the client is backed by the Go engine; standalone/stories fall back to an in-process TS client, loaded lazily so the app never bundles the TS parser statically (parser-backed APIs live in `@usfm-tools/controls/local`). |
-| **usfm-model** | View models and helpers still used by the UI layer: publication preview rendering (**`renderPreviewHtml`**, the TS fallback for `UsfmPreview`), standard USFM **book identifier** metadata, picker grouping, and regex-based chapter/marker scans. |
-| **usfm-parser** | ⚠️ **Reference only.** The original TypeScript parser, superseded by `usfm-parser-go` and excluded from the build/check/test pipeline. Kept while remaining `usfm-model`/fallback imports resolve against it. |
-| **usfm-parser-integration-tests** | The TS parser's Berean-corpus tests — reference only, excluded from the pipeline (the corpus tests were ported to `usfm-parser-go/integration/`). |
+| **usfm-parser-go** | The USFM parser and analysis engine: error-tolerant parsing, diagnostics, syntax classification, completions, book/chapter structure, and preview HTML rendering — as a Go library, an asynchronous LSP-like engine, and the `usfm` CLI (`check`, `parse`). The only USFM parser in the repository (it replaced the original TypeScript parser). |
+| **usfm-controls** | React controls: **`UsfmEditor`**, **`UsfmPreview`**, **`UsfmPane`**, **`UsfmWorkspace`**, **`UsfmShell`**, pickers — plus the **`UsfmLanguageClient`** protocol (LSP-like document sync + feature requests) they consume. In BibleEdit the client is backed by the Go engine; standalone use, stories and tests fall back to an inert stub client (no diagnostics or highlighting, escaped-source preview). |
+| **usfm-model** | Parser-free helpers used by the UI layer: standard USFM **book identifier** metadata, file-picker grouping, and lightweight text scans (book code, picker header, chapter markers). |
 | **apps/bible-edit** | Desktop USFM editor. The Go side binds the engine (`UsfmService`) and enforces file-access rules; the frontend implements the language-client protocol over the Wails bindings, forwarding CodeMirror change sets as incremental updates and receiving pushed diagnostics. |
 
-Supporting directories: **`bibles/`** holds the Berean Standard Bible USFM corpus used by tests and differential verification; **`Plan/`** holds Obsidian-style planning notes (not part of the build); **`todo.md`** tracks in-flight work.
+Supporting directories: **`bibles/`** holds the Berean Standard Bible USFM corpus used by tests; **`Plan/`** holds Obsidian-style planning notes (not part of the build); **`todo.md`** tracks in-flight work.
 
 ## Requirements
 
@@ -57,7 +52,7 @@ deno task build
 
 The build logic lives in `build.ts`; `./build.sh` is a thin wrapper around `deno task build` for POSIX shells.
 
-This type-checks and tests the active Deno packages (`usfm-model`, `usfm-controls`), then runs `go vet ./...` and `go test ./...` in `usfm-parser-go/`. (`usfm-parser` and its integration tests are reference-only and skipped.)
+This type-checks and tests the active Deno packages (`usfm-model`, `usfm-controls`), then runs `go vet ./...` and `go test ./...` in `usfm-parser-go/`.
 
 Workspace tasks directly:
 

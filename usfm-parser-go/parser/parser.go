@@ -1,13 +1,12 @@
 // Package parser parses USFM text into a document AST.
 //
-// Port of packages/usfm-parser/src/parser.ts, method for method, including
-// its error recovery; the two are kept byte-identical. Parsing is
-// error-tolerant: it always produces a document and collects errors, unless
-// the strict variant is used.
+// Originally ported method for method (including its error recovery) from
+// the since-removed TypeScript parser. Parsing is error-tolerant: it always
+// produces a document and collects errors, unless the strict variant is used.
 //
-// Whitespace splitting matches JavaScript semantics (Unicode whitespace plus
-// U+FEFF) rather than Go's strings.Fields, so documents with a BOM or exotic
-// spaces parse identically to the TS parser.
+// Whitespace splitting follows JavaScript semantics (Unicode whitespace plus
+// U+FEFF) rather than Go's strings.Fields, as the TS parser did, so documents
+// with a BOM or exotic spaces parse as they always have.
 package parser
 
 import (

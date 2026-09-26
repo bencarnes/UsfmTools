@@ -1,6 +1,6 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { createLocalLanguageClient } from "../src/language-service/local-client.js";
+import { createStubLanguageClient } from "../src/language-service/stub-client.js";
 import {
   chapterStructureFromEngine,
   chapterStructureFromText,
@@ -9,9 +9,9 @@ import {
 
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
-/** Structure of `text` as the client (real parse) reports it. */
+/** Structure of `text` as the stub client reports it. */
 async function fromClient(text: string) {
-  const client = createLocalLanguageClient();
+  const client = createStubLanguageClient();
   await client.openDocument("d", 1, text);
   const result = await client.getStructure("d");
   await client.closeDocument("d");
@@ -51,7 +51,7 @@ describe("chapterStructureFromEngine", () => {
   });
 });
 
-describe("engine structure agrees with the regex scan", () => {
+describe("stub client structure agrees with the regex scan", () => {
   const cases: Record<string, string> = {
     "typical book": "\\id GEN Genesis\n\\c 1\n\\p\n\\v 1 A.\n\\c 2\n\\p\n\\v 1 B.\n\\c 3\n\\p\n\\v 1 C.",
     "leading whitespace before id": "  \\id GEN\n\\c 1\n\\p\n\\v 1 A.",

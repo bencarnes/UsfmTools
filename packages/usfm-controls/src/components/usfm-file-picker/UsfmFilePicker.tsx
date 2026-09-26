@@ -5,7 +5,7 @@ import {
   type UsfmFilePickerFile,
   type UsfmFilePickerFileInput,
   type UsfmFilePickerGroups,
-} from "@usfm-tools/model/scan";
+} from "@usfm-tools/model";
 
 export interface UsfmFilePickerSelectDetail {
   readonly fileId: string;

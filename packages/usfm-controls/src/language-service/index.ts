@@ -10,8 +10,6 @@ export type {
   PreviewOptions,
   PreviewResult,
   Range,
-  RequestMessage,
-  ResponseMessage,
   StructureResult,
   TokenClassification,
   TokensResult,
@@ -27,7 +25,7 @@ export type {
   SessionViewPort,
 } from "./document-sessions.js";
 export {
-  createDeferredLocalLanguageClient,
-  sharedLocalLanguageClient,
-} from "./default-client.js";
-export type { LocalLanguageClientOptions } from "./local-client.js";
+  applyChangesToText,
+  createStubLanguageClient,
+  sharedStubLanguageClient,
+} from "./stub-client.js";

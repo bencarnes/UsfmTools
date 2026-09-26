@@ -65,11 +65,6 @@ for await (const entry of Deno.readDir(join(ROOT, "packages"))) {
   }
 }
 
-// packages/usfm-parser is reference-only (superseded by usfm-parser-go) and is
-// not checked or tested here; it stays a workspace member only so remaining
-// imports in usfm-model/usfm-controls resolve until they switch to the Go
-// engine. Its integration tests (usfm-parser-integration-tests) are skipped
-// for the same reason; the Berean corpus tests are being ported to Go.
 await runTask("packages/usfm-model", "check");
 await runTask("packages/usfm-controls", "check");
 await runTask("packages/usfm-model", "test");
