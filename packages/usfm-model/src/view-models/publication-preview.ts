@@ -277,15 +277,17 @@ function nodeToBlocks(node: UsfmNode): PublicationViewModel.PreviewBlock[] {
 }
 
 function figureBlock(fig: FigureNode): PublicationViewModel.LineBlock {
-  const alt = fig.attributes?.alt ?? "";
   return {
     kind: "line",
     marker: "fig",
     flow: "prose",
-    segments: alt
-      ? [{ kind: "text", text: `[Figure: ${normalizeSpaces(alt)}]` }]
-      : [{ kind: "text", text: "[Figure]" }],
+    segments: [{ kind: "text", text: figureLabel(fig) }],
   };
+}
+
+function figureLabel(fig: FigureNode): string {
+  const alt = fig.attributes?.alt ?? "";
+  return alt ? `[Figure: ${normalizeSpaces(alt)}]` : "[Figure]";
 }
 
 function orphanVerseLine(v: VerseNode): PublicationViewModel.LineBlock {
@@ -412,6 +414,13 @@ function nodeToSegment(
       return null;
     case "optbreak":
       return { kind: "text", text: " " };
+    case "figure":
+      // Inline (USFM 3 character-level) figure: a styled span like \nd
+      return {
+        kind: "styled",
+        marker: "fig",
+        children: [{ kind: "text", text: figureLabel(node as FigureNode) }],
+      };
     case "milestone":
       return null;
     default:

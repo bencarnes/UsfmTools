@@ -32,10 +32,14 @@ describe("scanUsfmBookCode", () => {
     expect(scanUsfmBookCode("\\+id GEN")).toBe("GEN");
   });
 
-  it("still reports an \\id after an unclosed \\fig or \\esb (known divergence)", () => {
-    // The parser nests these into the figure/sidebar; USFM requires \id first.
+  it("agrees with the parser on an \\id after an unclosed \\fig", () => {
+    // An unclosed figure ends at the next structural marker
     expect(scanUsfmBookCode("\\fig \\id GEN")).toBe("GEN");
-    expect(parsedBookCode("\\fig \\id GEN")).toBeUndefined();
+    expect(parsedBookCode("\\fig \\id GEN")).toBe("GEN");
+  });
+
+  it("still reports an \\id after an unclosed \\esb (known divergence)", () => {
+    // The parser nests it into the sidebar; USFM requires \id first.
     expect(scanUsfmBookCode("\\esb\\id GEN")).toBe("GEN");
     expect(parsedBookCode("\\esb\\id GEN")).toBeUndefined();
   });
@@ -56,8 +60,9 @@ describe("scanUsfmBookCode", () => {
   });
 
   it("matches the parser on randomized marker soup", () => {
-    // Excludes \fig and \esb (see the known divergence above).
+    // Excludes \esb (see the known divergence above).
     const pieces = [
+      "\\fig ", "\\fig*",
       "\\", "\\\\", "id", "id*", "+", "|", '"', "=", "a", "x=", " ", "\t", "\n", "\r",
       "/", "//", "~", "*", "GEN", "exo Exodus", "\\c 1", "\\p ", "\\v 2 ", "\\f + ",
       "\\f*", "\\w ", "\\w*", "\\toc1 T", "\\id ", "\\+id ", "\\\n", "\\x - ", "\\x*",

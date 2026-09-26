@@ -10,7 +10,7 @@
  * differential test (corpus + randomized inputs).
  *
  * Known divergence: the parser nests an `\id` inside a preceding unclosed
- * top-level `\fig` or `\esb` (so it yields no top-level book), while this scan
+ * top-level `\esb` (so it yields no top-level book), while this scan
  * still reports it. Only malformed files hit this — USFM requires `\id` to be
  * the first marker.
  */

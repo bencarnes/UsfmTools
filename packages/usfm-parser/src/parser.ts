@@ -201,9 +201,17 @@ export class Parser {
     const textToken = this.current();
     if (textToken && textToken.type === TokenType.Text) {
       const text = textToken.value.trimStart();
-      const parts = text.split(/\s+/);
-      number = parts[0] ?? "";
-      this.advance();
+      const match = text.match(/^(\S*)\s*([\s\S]*)/)!;
+      number = match[1];
+      const remaining = match[2];
+      if (remaining) {
+        // \c takes only a number: report the extra text but keep it as
+        // chapter content rather than dropping it
+        this.addError(`Unexpected text after chapter number '\\c ${number}'`, position);
+        this.tokens[this.pos] = { ...textToken, value: remaining };
+      } else {
+        this.advance();
+      }
     }
 
     // Skip newline after chapter number
@@ -402,13 +410,14 @@ export class Parser {
 
     let caller = "";
 
-    // First text token after note marker is the caller (e.g. "+", "-", "a")
+    // First text token after note marker is the caller (e.g. "+", "-", "a");
+    // the rest of the token is note text, kept verbatim
     const textToken = this.current();
     if (textToken && textToken.type === TokenType.Text) {
       const text = textToken.value.trimStart();
-      const parts = text.split(/\s+/);
-      caller = parts[0] ?? "";
-      const remaining = parts.slice(1).join(" ");
+      const match = text.match(/^(\S*)\s*([\s\S]*)/)!;
+      caller = match[1];
+      const remaining = match[2];
       if (remaining) {
         this.tokens[this.pos] = { ...textToken, value: remaining };
       } else {
@@ -566,12 +575,19 @@ export class Parser {
       attributes: {},
     };
 
-    // Consume text and attributes until \fig*
+    // Consume text and attributes until \fig*, or until a structural marker
+    // if it is unclosed (so a half-typed \fig doesn't swallow the book)
     while (this.pos < this.tokens.length) {
       const cur = this.current();
       if (!cur) break;
       if (cur.type === TokenType.EndMarker && cur.value === "fig") {
         this.advance();
+        break;
+      }
+      if (
+        cur.type === TokenType.Marker &&
+        (isParaMarker(cur.value) || cur.value === "c" || cur.value === "id")
+      ) {
         break;
       }
       if (cur.type === TokenType.Attribute) {
@@ -709,6 +725,11 @@ export class Parser {
       // element in inline context (e.g. \ref John 1:1|JHN 1:1\ref*)
       if (marker === "ref") {
         return this.parseRef();
+      }
+
+      // \fig is character-level in USFM 3, normally inside a paragraph
+      if (marker === "fig") {
+        return this.parseFigure();
       }
 
       // Handle footnote/crossref char markers before general char markers,

@@ -18,6 +18,21 @@ describe("ViewModels.Publication", () => {
     expect(line.segments.some((s) => s.kind === "text" && s.text.includes("Hello"))).toBe(true);
   });
 
+  it("renders an inline figure as a styled span", () => {
+    const { document } = parse(
+      '\\id GEN\n\\c 1\n\\p\n\\v 1 A \\fig Cap|alt="Map" src="m.jpg"\\fig* B.',
+    );
+    const preview = ViewModels.Publication.buildPreview(document);
+    const lines = preview.books[0]!.chapters[0]!.blocks.filter((b) => b.kind === "line");
+    expect(lines).toHaveLength(1);
+    expect((lines[0] as PublicationViewModel.LineBlock).segments).toEqual([
+      { kind: "verse", number: "1" },
+      { kind: "text", text: "A" },
+      { kind: "styled", marker: "fig", children: [{ kind: "text", text: "[Figure: Map]" }] },
+      { kind: "text", text: "B." },
+    ]);
+  });
+
   it("classifies poetry markers", () => {
     const { document } = parse("\\id PSA\n\\c 1\n\\q1 \\v 1 Line one\n\\q2 second.");
     const preview = ViewModels.Publication.buildPreview(document);

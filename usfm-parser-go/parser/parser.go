@@ -1,8 +1,7 @@
 // Package parser parses USFM text into a document AST.
 //
 // Port of packages/usfm-parser/src/parser.ts, method for method, including
-// its recovery quirks (e.g. text after a chapter number is dropped, a \fig
-// in inline context is reported as an unknown marker). Parsing is
+// its error recovery; the two are kept byte-identical. Parsing is
 // error-tolerant: it always produces a document and collects errors, unless
 // the strict variant is used.
 //
@@ -229,11 +228,20 @@ func (p *parser) parseChapter() *usfm.Node {
 
 	number := ""
 	if t := p.current(); t != nil && t.Type == lexer.Text {
-		fields := jsstr.Fields(jsstr.TrimStart(t.Value))
-		if len(fields) > 0 {
-			number = fields[0]
+		var remaining string
+		number, remaining = jsstr.SplitFirstField(jsstr.TrimStart(t.Value))
+		if remaining != "" {
+			// \c takes only a number: report the extra text but keep it as
+			// chapter content rather than dropping it
+			p.addError(
+				usfm.CodeChapterText,
+				fmt.Sprintf("Unexpected text after chapter number '\\c %s'", number),
+				position,
+			)
+			p.tokens[p.pos].Value = remaining
+		} else {
+			p.advance()
 		}
-		p.advance()
 	}
 
 	// Skip newline after chapter number
@@ -434,14 +442,11 @@ func (p *parser) parseNote() *usfm.Node {
 
 	caller := ""
 
-	// First text token after note marker is the caller (e.g. "+", "-", "a")
+	// First text token after note marker is the caller (e.g. "+", "-", "a");
+	// the rest of the token is note text, kept verbatim
 	if t := p.current(); t != nil && t.Type == lexer.Text {
-		fields := jsstr.Fields(jsstr.TrimStart(t.Value))
-		if len(fields) > 0 {
-			caller = fields[0]
-		}
-		// Rejoining collapses interior whitespace, matching the TS parser
-		remaining := strings.Join(fields[1:], " ")
+		var remaining string
+		caller, remaining = jsstr.SplitFirstField(jsstr.TrimStart(t.Value))
 		if remaining != "" {
 			p.tokens[p.pos].Value = remaining
 		} else {
@@ -603,11 +608,16 @@ func (p *parser) parseFigure() *usfm.Node {
 		Attributes: map[string]string{},
 	})
 
-	// Consume text and attributes until \fig*
+	// Consume text and attributes until \fig*, or until a structural marker
+	// if it is unclosed (so a half-typed \fig doesn't swallow the book)
 	for p.pos < len(p.tokens) {
 		cur := p.current()
 		if cur.Type == lexer.EndMarker && cur.Value == "fig" {
 			p.advance()
+			break
+		}
+		if cur.Type == lexer.Marker &&
+			(grammar.IsParaMarker(cur.Value) || cur.Value == "c" || cur.Value == "id") {
 			break
 		}
 		if cur.Type == lexer.Attribute {
@@ -740,6 +750,11 @@ func (p *parser) parseInlineContent() *usfm.Node {
 		// element in inline context (e.g. \ref John 1:1|JHN 1:1\ref*)
 		if marker == "ref" {
 			return p.parseRef()
+		}
+
+		// \fig is character-level in USFM 3, normally inside a paragraph
+		if marker == "fig" {
+			return p.parseFigure()
 		}
 
 		// Handle footnote/crossref char markers before general char markers,

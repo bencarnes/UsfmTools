@@ -251,17 +251,19 @@ func nodeToBlocks(node *usfm.Node) []Block {
 }
 
 func figureBlock(fig *usfm.Node) Block {
-	alt := fig.Attributes["alt"]
-	text := "[Figure]"
-	if alt != "" {
-		text = "[Figure: " + normalizeSpaces(alt) + "]"
-	}
 	return Block{
 		Kind:     BlockLine,
 		Marker:   "fig",
 		Flow:     FlowProse,
-		Segments: []Segment{{Kind: SegText, Text: text}},
+		Segments: []Segment{{Kind: SegText, Text: figureLabel(fig)}},
 	}
+}
+
+func figureLabel(fig *usfm.Node) string {
+	if alt := fig.Attributes["alt"]; alt != "" {
+		return "[Figure: " + normalizeSpaces(alt) + "]"
+	}
+	return "[Figure]"
 }
 
 func orphanVerseLine(v *usfm.Node) Block {
@@ -377,6 +379,13 @@ func nodeToSegment(node *usfm.Node) (Segment, bool) {
 		return Segment{}, false
 	case usfm.NodeOptBreak:
 		return Segment{Kind: SegText, Text: " "}, true
+	case usfm.NodeFigure:
+		// Inline (USFM 3 character-level) figure: a styled span like \nd
+		return Segment{
+			Kind:     SegStyled,
+			Marker:   "fig",
+			Children: []Segment{{Kind: SegText, Text: figureLabel(node)}},
+		}, true
 	default:
 		// milestone and anything else contribute nothing inline
 		return Segment{}, false

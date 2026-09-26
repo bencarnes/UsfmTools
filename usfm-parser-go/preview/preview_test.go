@@ -61,6 +61,20 @@ func TestBuildPreviewChapterAndVerse(t *testing.T) {
 	}
 }
 
+func TestBuildPreviewInlineFigure(t *testing.T) {
+	preview := buildFrom(t, "\\id GEN\n\\c 1\n\\p\n\\v 1 A \\fig Cap|alt=\"Map\" src=\"m.jpg\"\\fig* B.", Options{})
+	lines := lineBlocks(preview.Books[0].Chapters[0].Blocks)
+	if len(lines) != 1 {
+		t.Fatalf("line blocks = %+v, want 1", lines)
+	}
+	segs := lines[0].Segments
+	if len(segs) != 4 || segs[1].Text != "A" || segs[3].Text != "B." ||
+		segs[2].Kind != SegStyled || segs[2].Marker != "fig" ||
+		len(segs[2].Children) != 1 || segs[2].Children[0].Text != "[Figure: Map]" {
+		t.Errorf("segments = %+v, want verse, A, fig span [Figure: Map], B.", segs)
+	}
+}
+
 func TestBuildPreviewPoetryFlow(t *testing.T) {
 	preview := buildFrom(t, "\\id PSA\n\\c 1\n\\q1 \\v 1 Line one\n\\q2 second.", Options{})
 	for _, b := range preview.Books[0].Chapters[0].Blocks {

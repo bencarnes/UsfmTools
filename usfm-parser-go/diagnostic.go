@@ -24,6 +24,7 @@ const (
 	CodeUnknownMarker       = "unknown-marker"
 	CodeUnexpectedEndMarker = "unexpected-end-marker"
 	CodeUnattachedAttribute = "unattached-attribute"
+	CodeChapterText         = "chapter-text"
 )
 
 // Diagnostic is an editor-facing problem report with a source range.

@@ -588,20 +588,80 @@ func TestPsalmPoetry(t *testing.T) {
 	}
 }
 
-// TestNoteTextKeepsTrailingSpace pins a TS-parser quirk found by the corpus
-// differential test: splitting the note caller off with split(/\s+/) yields a
-// trailing empty field for trailing whitespace, so the rejoined note text
-// keeps a trailing space.
-func TestNoteTextKeepsTrailingSpace(t *testing.T) {
-	result := Parse("\\id GEN\n\\c 1\n\\p\n\\v 1 Text\\f + note text \\f*")
+// The note text after the caller is kept verbatim (interior and trailing
+// whitespace included), like the text after a verse number.
+func TestNoteTextKeepsWhitespace(t *testing.T) {
+	result := Parse("\\id GEN\n\\c 1\n\\p\n\\v 1 Text\\f +  note   text \\f*")
 	_, _, para := mustChapterPara(t, result)
 	note := findChild(para, usfm.NodeNote)
 	if note == nil {
 		t.Fatal("no note node")
 	}
+	if note.Caller != "+" {
+		t.Errorf("caller = %q, want +", note.Caller)
+	}
 	text := findChild(note, usfm.NodeText)
-	if text == nil || text.Text != "note text " {
-		t.Errorf("note text = %+v, want \"note text \" (trailing space)", text)
+	if text == nil || text.Text != "note   text " {
+		t.Errorf("note text = %+v, want \"note   text \"", text)
+	}
+}
+
+func TestChapterTextIsKeptAndReported(t *testing.T) {
+	result := Parse("\\id GEN\n\\c 1 extra words\n\\p\n\\v 1 Text")
+	chapter := findChild(result.Document.Children[0], usfm.NodeChapter)
+	if chapter == nil || chapter.Number != "1" {
+		t.Fatalf("chapter = %+v, want number 1", chapter)
+	}
+	if len(chapter.Children) == 0 || chapter.Children[0].Type != usfm.NodeText ||
+		chapter.Children[0].Text != "extra words" {
+		t.Errorf("chapter children = %+v, want leading text \"extra words\"", chapter.Children)
+	}
+	if len(result.Errors) != 1 || result.Errors[0].Code != usfm.CodeChapterText ||
+		result.Errors[0].Position.Line != 1 || result.Errors[0].Position.Column != 0 {
+		t.Errorf("errors = %+v, want one chapter-text error at \\c", result.Errors)
+	}
+
+	// Trailing whitespace alone is not extra text
+	if errs := Parse("\\id GEN\n\\c 1 \n\\p").Errors; len(errs) != 0 {
+		t.Errorf("errors = %+v, want none", errs)
+	}
+}
+
+func TestInlineFigure(t *testing.T) {
+	result := Parse("\\id GEN\n\\c 1\n\\p\n\\v 1 Before \\fig Caption|src=\"a.jpg\" size=\"col\"\\fig* after.")
+	if len(result.Errors) != 0 {
+		t.Errorf("errors = %+v, want none", result.Errors)
+	}
+	_, _, para := mustChapterPara(t, result)
+	fig := findChild(para, usfm.NodeFigure)
+	if fig == nil {
+		t.Fatalf("no figure in paragraph: %+v", para.Children)
+	}
+	if fig.Attributes["src"] != "a.jpg" || fig.Attributes["caption"] != "Caption" {
+		t.Errorf("figure attributes = %+v", fig.Attributes)
+	}
+	last := para.Children[len(para.Children)-1]
+	if last.Type != usfm.NodeText || last.Text != " after." {
+		t.Errorf("last child = %+v, want text \" after.\"", last)
+	}
+}
+
+// An unclosed \fig stops at the next structural marker instead of consuming
+// the rest of the book.
+func TestUnclosedFigureStopsAtStructure(t *testing.T) {
+	result := Parse("\\id GEN\n\\c 1\n\\p\n\\v 1 Text \\fig Caption|src=\"a.jpg\"\n\\p\n\\v 2 More\n\\c 2")
+	book := result.Document.Children[0]
+	chapters := filterChildren(book, usfm.NodeChapter)
+	if len(chapters) != 2 {
+		t.Fatalf("got %d chapters, want 2", len(chapters))
+	}
+	if paras := filterChildren(chapters[0], usfm.NodeParagraph); len(paras) != 2 {
+		t.Errorf("got %d paragraphs in chapter 1, want 2", len(paras))
+	}
+
+	top := Parse("\\fig \\id GEN")
+	if len(top.Document.Children) != 2 || top.Document.Children[1].Type != usfm.NodeBook {
+		t.Errorf("document children = %+v, want figure then book", top.Document.Children)
 	}
 }
 
