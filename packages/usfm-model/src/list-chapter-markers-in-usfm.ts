@@ -1,4 +1,9 @@
-import type { ChapterMarkerInBook } from "./list-chapter-markers-in-book.js";
+/** One `\c` chapter marker in a book, with the source offset of the marker token. */
+export interface ChapterMarkerInBook {
+  readonly number: string;
+  /** UTF-16 offset in the USFM source where the `\c` marker begins. */
+  readonly markerOffset: number;
+}
 
 /** Matches a USFM chapter marker at the start of a line (`\c` or `\c 1`). */
 const CHAPTER_LINE_RE = /^\s*\\c(\s|$)/;
@@ -53,8 +58,8 @@ export function bookIdMarkerOffsetInUsfm(usfm: string): number | null {
 /**
  * Lists every `\c` chapter marker in the first `\id` book of {@link usfm}, in document
  * order, with the source offset where each `\c` marker begins. Scanning stops before a
- * second `\id` line. This is a lightweight alternative to `parse` + `listChapterMarkersInBook`
- * for editor tooling that only needs chapter navigation offsets.
+ * second `\id` line. Used by editor tooling that only needs chapter navigation
+ * offsets.
  */
 export function listChapterMarkersInUsfm(usfm: string): readonly ChapterMarkerInBook[] {
   const out: ChapterMarkerInBook[] = [];
@@ -77,4 +82,20 @@ export function listChapterMarkersInUsfm(usfm: string): readonly ChapterMarkerIn
   }
 
   return out;
+}
+
+/**
+ * Returns the chapter number for the last `\c` marker whose {@link ChapterMarkerInBook.markerOffset}
+ * is still at or before {@link sourceOffset}, or `null` when there is no such marker
+ * (for example, the viewport is entirely before the first `\c`, or the book has no chapters).
+ */
+export function chapterNumberAtOrBeforeSourceOffset(
+  markers: readonly ChapterMarkerInBook[],
+  sourceOffset: number,
+): string | null {
+  let best: string | null = null;
+  for (const m of markers) {
+    if (m.markerOffset <= sourceOffset) best = m.number;
+  }
+  return best;
 }

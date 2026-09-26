@@ -211,7 +211,12 @@ export const usfmHighlighter = (session: EditorLanguageSession) =>
     // self-clocks to round-trip time during bursts.
     scheduleRefresh() {
       this.dirty = true;
-      void this.pump();
+      // Plugins update before the editor's update listener forwards the
+      // edit to the session; defer so the classify request is queued after
+      // that edit and sees the text this view shows.
+      queueMicrotask(() => {
+        if (!this.destroyed) void this.pump();
+      });
     }
 
     async pump() {

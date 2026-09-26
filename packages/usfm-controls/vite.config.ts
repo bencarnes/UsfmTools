@@ -23,8 +23,6 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@usfm-tools/parser": path.join(rootDir, "../usfm-parser/src/index.ts"),
-      "@usfm-tools/model/scan": path.join(rootDir, "../usfm-model/src/scan.ts"),
       "@usfm-tools/model": path.join(rootDir, "../usfm-model/src/index.ts"),
     },
   },

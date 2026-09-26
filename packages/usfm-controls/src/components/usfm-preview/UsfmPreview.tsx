@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react";
 import type { UsfmLanguageClient } from "../../language-service/protocol.js";
-import { sharedLocalLanguageClient } from "../../language-service/default-client.js";
+import { sharedStubLanguageClient } from "../../language-service/stub-client.js";
 import { applyPreviewHtml, type PreviewChunks } from "./preview-dom.js";
 
 /** Storybook (and URL state) may supply boolean controls as strings. */
@@ -32,7 +32,7 @@ export interface UsfmPreviewProps {
   updateDebounceMs?: number;
   /**
    * Language client whose `renderPreview` produces the HTML (e.g. the Go
-   * engine in bible-edit). Defaults to the in-process TypeScript renderer.
+   * engine in bible-edit). Defaults to the inert stub client, which shows the escaped source.
    */
   languageClient?: UsfmLanguageClient;
   /**
@@ -86,7 +86,7 @@ export const UsfmPreview = memo(function UsfmPreview({
   }, [value, updateDebounceMs]);
 
   useEffect(() => {
-    const client = languageClient ?? sharedLocalLanguageClient();
+    const client = languageClient ?? sharedStubLanguageClient();
     const generation = ++generationRef.current;
     const renderFromText = () => client.renderPreview(renderValue, { versePerLine: versePerLineOn });
     const rendering = documentId

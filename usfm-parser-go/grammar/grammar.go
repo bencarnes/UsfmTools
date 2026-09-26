@@ -2,9 +2,8 @@
 // their categories, category groupings (paragraph, character, note), and
 // default attribute names.
 //
-// Port of packages/usfm-parser/src/grammar.ts; the marker lists are kept in
-// the same category → space-separated-markers form so the two files stay easy
-// to diff while the TS parser remains in the repo for reference.
+// Originally ported from the (since removed) TypeScript parser's grammar.ts;
+// the marker lists keep its category → space-separated-markers form.
 package grammar
 
 import "strings"

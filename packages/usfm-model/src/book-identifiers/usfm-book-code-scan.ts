@@ -1,13 +1,12 @@
 /**
- * Parser-free extraction of a USFM file's book code: the first token after the
- * first `\id` marker — the same value as `parse(usfm)`'s first `book` node's
- * `code`, without pulling the parser into the caller's bundle.
+ * Lightweight extraction of a USFM file's book code: the first token after the
+ * first `\id` marker — the same value as the parser's first `book` node's
+ * `code` (see `usfm-parser-go`), without a full parse.
  *
- * The scan mirrors the reference lexer's tokenization rules wherever they
- * decide whether a backslash starts a marker: escapes (`\\`, `\|`, `\~`),
- * nested (`\+id`) and end (`\id*`) markers, and quoted attribute values
- * (which may contain backslashes). Agreement with the parser is covered by a
- * differential test (corpus + randomized inputs).
+ * The scan mirrors the lexer's tokenization rules wherever they decide
+ * whether a backslash starts a marker: escapes (`\\`, `\|`, `\~`), nested
+ * (`\+id`) and end (`\id*`) markers, and quoted attribute values (which may
+ * contain backslashes).
  *
  * Known divergence: the parser nests an `\id` inside a preceding unclosed
  * top-level `\esb` (so it yields no top-level book), while this scan

@@ -2,7 +2,7 @@ import {
   bookIdMarkerOffsetInUsfm,
   listChapterMarkersInUsfm,
   type ChapterMarkerInBook,
-} from "@usfm-tools/model/scan";
+} from "@usfm-tools/model";
 import type { StructureResult } from "../../language-service/protocol.js";
 
 /**

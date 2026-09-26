@@ -26,7 +26,7 @@ import {
   type DocumentSessionMembership,
   type SessionViewPort,
 } from "../../language-service/document-sessions.js";
-import { sharedLocalLanguageClient } from "../../language-service/default-client.js";
+import { sharedStubLanguageClient } from "../../language-service/stub-client.js";
 import {
   languageDiagnosticsToCm,
   usfmHighlighter,
@@ -83,7 +83,7 @@ export interface UsfmEditorProps {
    * Language client serving diagnostics, highlighting, and completions. The
    * editor opens its own engine document, forwards CodeMirror change sets
    * incrementally, and closes it on unmount. Must be stable for the editor's
-   * lifetime; defaults to the in-process TypeScript client.
+   * lifetime; defaults to the inert stub client (`createStubLanguageClient`).
    */
   languageClient?: UsfmLanguageClient;
   /** Fired with fresh parse diagnostics whenever the engine re-analyzes. */
@@ -278,7 +278,7 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     // forwarded to the client once and to sibling views synchronously.
     // Without an injected manager/key the editor gets a private session,
     // which behaves like the previous one-document-per-editor model.
-    const client = languageClientRef.current ?? sharedLocalLanguageClient();
+    const client = languageClientRef.current ?? sharedStubLanguageClient();
     const manager = documentSessionsRef.current ?? createDocumentSessionManager(client);
     const joinKey = documentKeyRef.current ?? crypto.randomUUID();
     let membership!: DocumentSessionMembership; // assigned below, before any dispatch

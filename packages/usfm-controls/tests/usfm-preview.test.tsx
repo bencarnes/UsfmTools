@@ -5,8 +5,25 @@ import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import { render, waitFor } from "./testing-react.ts";
 import { UsfmPreview } from "../src/components/usfm-preview/UsfmPreview.js";
+import { createStubLanguageClient } from "../src/language-service/stub-client.js";
+import type { UsfmLanguageClient } from "../src/language-service/protocol.js";
 
 const MULTI_VERSE = "\\id GEN\n\\c 1\n\\p\n\\v 1 One. \\v 2 Two.";
+
+/** Stub client whose preview records the `versePerLine` option it was given. */
+function optionsClient(): UsfmLanguageClient {
+  return {
+    ...createStubLanguageClient(),
+    renderPreview: (_text, options) =>
+      Promise.resolve(
+        `<article class="usfm-document" data-verse-per-line="${!!options?.versePerLine}"></article>`,
+      ),
+  };
+}
+
+function versePerLineRendered(container: HTMLElement): string | undefined {
+  return container.querySelector<HTMLElement>("article.usfm-document")?.dataset.versePerLine;
+}
 
 describe("UsfmPreview", () => {
   it("renders publication HTML", async () => {
@@ -29,47 +46,54 @@ describe("UsfmPreview", () => {
     expect(container.querySelector("aside")).toBeNull();
   });
 
-  it("renders a single <p> for a multi-verse paragraph when versePerLine is off", async () => {
-    const { container } = render(<UsfmPreview value={MULTI_VERSE} />);
+  it("renders without versePerLine by default", async () => {
+    const { container } = render(<UsfmPreview value={MULTI_VERSE} languageClient={optionsClient()} />);
     await waitFor(() => {
-      expect(container.querySelectorAll("p.usfm-line").length).toBe(1);
+      expect(versePerLineRendered(container)).toBe("false");
     });
   });
 
-  it("renders one <p> per verse when versePerLine is true", async () => {
-    const { container } = render(<UsfmPreview value={MULTI_VERSE} versePerLine />);
+  it("asks the client for one line per verse when versePerLine is true", async () => {
+    const { container } = render(
+      <UsfmPreview value={MULTI_VERSE} versePerLine languageClient={optionsClient()} />,
+    );
     await waitFor(() => {
-      expect(container.querySelectorAll("p.usfm-line").length).toBe(2);
+      expect(versePerLineRendered(container)).toBe("true");
     });
   });
 
   it("treats Storybook-style string 'true' as versePerLine on", async () => {
     const { container } = render(
-      <UsfmPreview value={MULTI_VERSE} versePerLine={"true" as unknown as boolean} />,
+      <UsfmPreview
+        value={MULTI_VERSE}
+        versePerLine={"true" as unknown as boolean}
+        languageClient={optionsClient()}
+      />,
     );
     await waitFor(() => {
-      expect(container.querySelectorAll("p.usfm-line").length).toBe(2);
+      expect(versePerLineRendered(container)).toBe("true");
     });
   });
 
   it("updates the rendered HTML when the versePerLine prop toggles", async () => {
+    const client = optionsClient();
     const { container, rerender } = render(
-      <UsfmPreview value={MULTI_VERSE} versePerLine={false} />,
+      <UsfmPreview value={MULTI_VERSE} versePerLine={false} languageClient={client} />,
     );
     // Rendering is asynchronous (the language client returns a promise), so
     // each assertion waits for the refreshed HTML to land.
     await waitFor(() => {
-      expect(container.querySelectorAll("p.usfm-line").length).toBe(1);
+      expect(versePerLineRendered(container)).toBe("false");
     });
 
-    rerender(<UsfmPreview value={MULTI_VERSE} versePerLine={true} />);
+    rerender(<UsfmPreview value={MULTI_VERSE} versePerLine={true} languageClient={client} />);
     await waitFor(() => {
-      expect(container.querySelectorAll("p.usfm-line").length).toBe(2);
+      expect(versePerLineRendered(container)).toBe("true");
     });
 
-    rerender(<UsfmPreview value={MULTI_VERSE} versePerLine={false} />);
+    rerender(<UsfmPreview value={MULTI_VERSE} versePerLine={false} languageClient={client} />);
     await waitFor(() => {
-      expect(container.querySelectorAll("p.usfm-line").length).toBe(1);
+      expect(versePerLineRendered(container)).toBe("false");
     });
   });
 

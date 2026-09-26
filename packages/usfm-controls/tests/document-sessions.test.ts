@@ -4,7 +4,7 @@ import {
   createDocumentSessionManager,
   type SessionViewPort,
 } from "../src/language-service/document-sessions.js";
-import { applyChangesToText } from "../src/language-service/local-client.js";
+import { applyChangesToText } from "../src/language-service/stub-client.js";
 import type { DocumentChange, UsfmLanguageClient } from "../src/language-service/protocol.js";
 
 interface Call {

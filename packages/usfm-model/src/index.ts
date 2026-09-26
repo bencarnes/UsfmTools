@@ -1,32 +1,47 @@
 /**
  * @usfm-tools/model
  *
- * Application-level model for USFM scripture data.
- * Built on top of @usfm-tools/parser, this package provides higher-level
- * abstractions for working with parsed USFM content — including indexing,
- * querying, and facilities for rendering to a UI.
+ * Application-level model for USFM scripture data: standard book identifier
+ * metadata, lightweight text scans (book code, picker header, chapter
+ * markers), and file-picker grouping. Parsing, diagnostics and preview
+ * rendering live in the Go engine (`usfm-parser-go`).
  *
  * This package is a work in progress. APIs will be added as needs arise.
  */
 
-export { parse } from "@usfm-tools/parser";
-export type { ParseResult, DocumentNode } from "@usfm-tools/parser";
+export {
+  STANDARD_USFM_BOOK_IDENTIFIERS,
+  normalizeUsfmBookCode,
+  isStandardUsfmBookIdentifier,
+  getStandardUsfmBookOrderIndex,
+  getStandardUsfmBookIdentifier,
+} from "./book-identifiers/standard-book-identifiers.js";
+export type {
+  StandardBookIdentifier,
+  StandardBookCanonGroup,
+} from "./book-identifiers/standard-book-identifiers.js";
 
-export { PublicationViewModel } from "./view-models/publication-preview.js";
-import { PublicationViewModel } from "./view-models/publication-preview.js";
+export { scanUsfmBookCode } from "./book-identifiers/usfm-book-code-scan.js";
+export {
+  scanUsfmPickerHeader,
+  scanUsfmPickerHeaderFromText,
+} from "./book-identifiers/usfm-picker-header-scan.js";
+export type {
+  UsfmPickerHeaderScanResult,
+  UsfmPickerHeaderScanState,
+} from "./book-identifiers/usfm-picker-header-scan.js";
 
-/**
- * Container for view-model namespaces. {@link PublicationViewModel} is the first;
- * additional domains can be hung here as the package grows.
- */
-export const ViewModels = {
-  Publication: PublicationViewModel,
-} as const;
+export { buildUsfmFilePickerGroups } from "./book-identifiers/usfm-file-picker-model.js";
+export type {
+  UsfmFilePickerCanonGroup,
+  UsfmFilePickerFileInput,
+  UsfmFilePickerFile,
+  UsfmFilePickerGroups,
+} from "./book-identifiers/usfm-file-picker-model.js";
 
-export { renderPreviewHtml } from "./renderer/index.js";
-export type { RenderPreviewOptions } from "./renderer/index.js";
-
-export { buildUsfmBookPickerGroups } from "./book-identifiers/usfm-book-picker-model.js";
-
-// Parser-free API (also available alone as "@usfm-tools/model/scan").
-export * from "./scan.js";
+export {
+  bookIdMarkerOffsetInUsfm,
+  chapterNumberAtOrBeforeSourceOffset,
+  listChapterMarkersInUsfm,
+} from "./list-chapter-markers-in-usfm.js";
+export type { ChapterMarkerInBook } from "./list-chapter-markers-in-usfm.js";

@@ -1,9 +1,9 @@
 # usfm-parser-go
 
 A Go parser and editing engine for [USFM](https://ubsicap.github.io/usfm/)
-(Unified Standard Format Markers) scripture text. It is a faithful rewrite of
-the repository's original TypeScript parser (`packages/usfm-parser`, now kept
-for reference only) and serves three roles:
+(Unified Standard Format Markers) scripture text. It began as a faithful
+rewrite of the repository's original TypeScript parser (since removed) and is
+now the only USFM parser in the repository. It serves three roles:
 
 - a **Go library** — parse USFM, compute editor diagnostics, classify tokens
   for syntax highlighting, complete markers/book codes, and render
@@ -30,7 +30,6 @@ the JS/Deno packages). Module path: `github.com/usfm-tools/usfm-parser-go`
 | `engine` | The LSP-like engine: document store, async analysis, feature requests |
 | `cmd/usfm` | CLI tool |
 | `integration` | Berean Standard Bible corpus tests and benchmarks |
-| `internal/*dump` | Differential-testing tools (see [Testing](#testing)) |
 
 ## Positions and offsets
 
@@ -45,7 +44,7 @@ Editor integration drives the position model. Every `Position` carries:
 UTF-16 everywhere the frontend looks means values cross the Wails bridge
 without conversion. String handling (whitespace splitting, trimming) matches
 JavaScript semantics rather than Go's, so documents with BOMs or exotic
-Unicode spaces behave identically to the original TS parser.
+Unicode spaces behave as they did in the original TS parser.
 
 ## Library usage
 
@@ -399,7 +398,7 @@ apply. `Position` is where the node's opening marker (or the text) starts.
 | `ref` | `\ref` | `Attributes` (`loc`, …) | inline content |
 | `row` | `\tr` | `Marker: "tr"` | `cell`s, plus any stray inline content |
 | `cell` | `\th1`, `\tc1`, `\tcr2`, … | `Marker` | inline content |
-| `table` | none | | Declared (it mirrors the TS type union) but never produced. Consecutive `row`s are siblings in the chapter |
+| `table` | none | | Declared (inherited from the original TS type union) but never produced. Consecutive `row`s are siblings in the chapter |
 | `milestone` | `\qt-s`, `\ts-e`, … | `Marker`, `Attributes` (optional) | leaf |
 | `figure` | `\fig` | `Attributes`: `caption` (the first text run, trimmed) plus any `key="value"` pairs such as `src`, `size`, `ref` | leaf |
 | `sidebar` | `\esb` … `\esbe` | `Marker: "esb"` | top-level content |
@@ -441,10 +440,8 @@ document
 
 ## Known limitations
 
-These are behaviors shared with the TS reference parser. The Go↔TS
-differential tests depend on the two matching, so fixing any of them means
-changing both parsers, or first removing the TS one. The BSB corpus uses
-none of these constructs.
+These are behaviors inherited from the original TS parser. The BSB corpus
+uses none of these constructs.
 
 - **Milestone self-closers.** The lexer doesn't recognize the `\*` that ends
   a milestone (`\qt-s |who="Pilate"\*`). The `\*` stays in the output as
@@ -479,9 +476,7 @@ none of these constructs.
    dispatch to it from `parseTopLevel` and/or `parseInlineContent`.
 3. Check how `preview` renders it and how the engine classifies it
    (syntax highlighting and completions come from the grammar).
-4. Add tests. While the TS reference parser still exists, make the same
-   change in `packages/usfm-parser/src/` and re-run the differential tools
-   (see [Testing](#testing)).
+4. Add tests.
 
 ## The engine (LSP-like, simplified)
 
@@ -592,7 +587,8 @@ CodeMirror editor ──change sets──▶ DocumentSync (usfm-controls, TS)
   `DocumentSync` (ordered queue, monotonic versions, self-healing reopen if
   an update is rejected).
 
-Components fall back to an in-process TypeScript client when no engine is
+Components fall back to an inert stub client (`createStubLanguageClient`:
+no diagnostics or highlighting, escaped-source preview) when no engine is
 injected (component stories, tests), so `usfm-controls` remains usable
 without Go.
 
@@ -609,28 +605,21 @@ Both `go vet` and `go test` also run as part of the repo-root `./build.sh`.
 
 ## Testing
 
-Three layers keep the port honest:
+Two layers:
 
-1. **Unit tests** per package, ported from the TS test suites (grammar,
-   lexer, parser, diagnostics, preview, engine, CLI) plus Go-side additions
-   (UTF-16 edge cases, concurrency/staleness, `-race`).
+1. **Unit tests** per package, originally ported from the TS test suites
+   (grammar, lexer, parser, diagnostics, preview, engine, CLI) plus Go-side
+   additions (UTF-16 edge cases, concurrency/staleness, `-race`).
 2. **Corpus tests** (`integration/`): all 66 books of the Berean Standard
    Bible (`bibles/bsb/usfm`) parse with zero errors; the full Bible parses
    in ~0.25 s. `BenchmarkParsePsalms` tracks single-book latency on the
    largest book.
-3. **Differential verification** against the TS implementation across the
-   whole corpus, byte-for-byte: token streams (`internal/lexdump`),
-   normalized ASTs + error lists (`internal/astdump`), syntax
-   classifications (`internal/classdump`), and preview HTML in both
-   verse-per-line modes (`internal/previewdump`). Each tool dumps
-   normalized output for every corpus file; a matching Deno script does the
-   same with the TS code and the outputs are diffed.
 
 ## Fidelity notes
 
-The port reproduces the TS parser's behavior exactly, including its error
-recovery, so the differential tests stay meaningful; behavior changes are
-made in both parsers together. Recovery rules worth knowing:
+The port reproduced the TS parser's behavior exactly, including its error
+recovery (verified byte-for-byte across the corpus before the TS parser was
+removed). Recovery rules worth knowing:
 
 - Text after a chapter number (`\c 1 extra`) is reported
   (`chapter-text`) and kept as chapter content, not dropped.

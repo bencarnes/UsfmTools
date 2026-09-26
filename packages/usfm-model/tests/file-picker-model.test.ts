@@ -1,9 +1,6 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import {
-  buildUsfmBookPickerGroups,
-  buildUsfmFilePickerGroups,
-} from "../src/book-identifiers/index.js";
+import { buildUsfmFilePickerGroups } from "../src/book-identifiers/index.js";
 
 describe("buildUsfmFilePickerGroups", () => {
   it("orders Old and New Testament by standard table number, not input order", () => {
@@ -93,7 +90,7 @@ describe("buildUsfmFilePickerGroups", () => {
     expect(groups.other.map((b) => b.displayLabel)).toEqual(["TOB.usfm", "FRT.usfm"]);
     expect(groups.nonStandard).toHaveLength(0);
   });
-  it("groups the same files as the parse-based book picker", async () => {
+  it("groups the BSB corpus and edge-case files", async () => {
     const dir = new URL("../../../bibles/bsb/usfm/", import.meta.url);
     const files: { id: string; name: string; usfm: string }[] = [];
     for await (const entry of Deno.readDir(dir)) {
@@ -107,17 +104,20 @@ describe("buildUsfmFilePickerGroups", () => {
       { id: "custom", name: "custom.usfm", usfm: "\\id ZZZ\n" },
       { id: "blank", name: "blank.usfm", usfm: "  \n" },
     );
-    const summarize = (g: ReturnType<typeof buildUsfmFilePickerGroups>) =>
-      Object.fromEntries(
-        Object.entries(g).map(([k, rows]) => [
-          k,
-          (rows as { fileId: string; code: string; sortIndex: number }[])
-            .map((r) => `${r.fileId}:${r.code}:${r.sortIndex}`)
-            .sort(),
-        ]),
-      );
-    expect(summarize(buildUsfmFilePickerGroups(files))).toEqual(
-      summarize(buildUsfmBookPickerGroups(files)),
+    const groups = buildUsfmFilePickerGroups(files);
+    expect(groups.oldTestament).toHaveLength(39);
+    expect(groups.oldTestament[0]).toEqual({
+      fileId: "GEN.usfm",
+      code: "GEN",
+      displayLabel: "GEN.usfm",
+      canonGroup: "ot",
+      sortIndex: groups.oldTestament[0]!.sortIndex,
+    });
+    expect(groups.newTestament).toHaveLength(27);
+    expect(groups.newTestament.at(-1)!.code).toBe("REV");
+    expect(groups.other.map((r) => `${r.fileId}:${r.code}`)).toEqual(["lower:TOB"]);
+    expect(groups.nonStandard.map((r) => `${r.fileId}:${r.code}`).sort()).toEqual(
+      ["custom:ZZZ", "empty-id:", "no-id:"],
     );
   });
 });

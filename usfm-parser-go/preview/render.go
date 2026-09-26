@@ -8,7 +8,7 @@ import (
 )
 
 // Render parses a USFM source string and renders it as publication-style
-// HTML using a fixed default markup, exactly like the TS renderPreviewHtml.
+// HTML using a fixed default markup.
 // Parse errors are not rendered (editors report them via diagnostics). CSS
 // hooks (class names like usfm-line, usfm-v, usfm-chapter, usfm-nd, …) are
 // the only customization surface — style them in the application stylesheet.

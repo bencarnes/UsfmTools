@@ -1,11 +1,11 @@
 // Package preview builds a publication-style reading layout from parsed
 // USFM and renders it as HTML.
 //
-// Port of packages/usfm-model/src/view-models/publication-preview.ts and
-// renderer/render-preview-html.ts; the block/segment model and the emitted
-// markup (class names like usfm-line, usfm-v, usfm-chapter, …) are kept
-// identical so the HTML is verified byte-for-byte against the TS renderer
-// across the BSB corpus.
+// Originally ported from the (since removed) TypeScript publication view
+// model and preview renderer; the block/segment model and the emitted markup
+// (class names like usfm-line, usfm-v, usfm-chapter, …) are unchanged from
+// it, and front ends style and diff that markup (see usfm-controls'
+// preview-dom.ts).
 package preview
 
 import (

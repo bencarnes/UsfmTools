@@ -2,7 +2,7 @@ import {
   buildUsfmFilePickerGroups,
   scanUsfmPickerHeaderFromText,
   type UsfmFilePickerGroups,
-} from "@usfm-tools/model/scan";
+} from "@usfm-tools/model";
 import type { UsfmShellFileEntry, UsfmShellHost } from "./host.js";
 
 type FileCatalogHost = Pick<UsfmShellHost, "readFile"> &

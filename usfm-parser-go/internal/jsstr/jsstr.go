@@ -1,7 +1,7 @@
-// Package jsstr reproduces the JavaScript string semantics the TS parser
-// relies on (Unicode whitespace incl. U+FEFF, UTF-16 code-unit lengths, the
-// split(/\s+/) trailing-empty-field quirk), so ported code behaves
-// identically to its TS counterpart.
+// Package jsstr reproduces the JavaScript string semantics the original TS
+// parser relied on (Unicode whitespace incl. U+FEFF, UTF-16 code-unit
+// lengths, the split(/\s+/) trailing-empty-field quirk), which the ported
+// code keeps (and UTF-16 offsets are what the editor front end uses).
 package jsstr
 
 import (

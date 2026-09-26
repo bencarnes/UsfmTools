@@ -9,7 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
 } from "react";
-import { createDeferredLocalLanguageClient } from "../../language-service/default-client.js";
+import { createStubLanguageClient } from "../../language-service/stub-client.js";
 import { createDocumentSessionManager } from "../../language-service/document-sessions.js";
 import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
 import { UsfmWorkspace } from "../usfm-workspace/UsfmWorkspace.js";
@@ -49,7 +49,7 @@ import {
   SearchIcon,
 } from "./shell-icons.js";
 import { lineColumnToSourceOffset } from "./line-offsets.js";
-import type { UsfmFilePickerGroups } from "@usfm-tools/model/scan";
+import type { UsfmFilePickerGroups } from "@usfm-tools/model";
 import type { UsfmShellFileEntry, UsfmShellHost, UsfmShellRecentFolder } from "./host.js";
 import { buildUsfmFilePickerCatalog, EMPTY_FILE_CATALOG } from "./file-catalog.js";
 
@@ -58,7 +58,7 @@ export interface UsfmShellProps {
   /**
    * Language client serving diagnostics, syntax highlighting, and
    * completions for all editor tabs (e.g. the Wails-backed Go engine in
-   * bible-edit). Defaults to the in-process TypeScript client.
+   * bible-edit). Defaults to the inert stub client (`createStubLanguageClient`).
    */
   readonly languageClient?: UsfmLanguageClient;
   /** Initial expanded state for the left sidebar. Default `true`. */
@@ -107,7 +107,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
 ) {
   // One client instance serves every editor tab for the shell's lifetime.
   const languageClient = useMemo(
-    () => languageClientProp ?? createDeferredLocalLanguageClient(),
+    () => languageClientProp ?? createStubLanguageClient(),
     [languageClientProp],
   );
   // Tabs showing the same file share one client document through this

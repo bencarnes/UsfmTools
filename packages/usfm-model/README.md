@@ -1,106 +1,48 @@
 # @usfm-tools/model
 
-Application-level model for [USFM](https://docs.usfm.bible/usfm/3.1.1/index.html) scripture data, built on top of [`@usfm-tools/parser`](../usfm-parser/).
+Application-level helpers for [USFM](https://docs.usfm.bible/usfm/3.1.1/index.html) scripture data that don't need a parser: standard book identifier metadata, file-picker grouping, and lightweight text scans (book code, picker header, chapter markers).
 
 ## Purpose
 
-The parser produces a low-level AST that faithfully represents the USFM markup structure. This package provides higher-level abstractions closer to what applications need — including **view models** for UI-friendly projections and **HTML rendering** for publication-style reading views.
+Parsing, diagnostics, syntax classification and preview rendering live in the Go engine ([`usfm-parser-go`](../../usfm-parser-go/README.md)), reached from the UI through the `UsfmLanguageClient` protocol in `@usfm-tools/controls`. This package holds the small, synchronous pieces the UI needs without a round trip to the engine — for example grouping a folder's files in a sidebar, or tracking chapter markers while typing.
 
 ## Installation
 
 Add `@usfm-tools/model` as a dependency in your Deno workspace or import map.
 
-The parser-free subset (standard book identifiers, `scanUsfmBookCode`, picker header scan, `buildUsfmFilePickerGroups`, chapter-marker scans and `BookNode` helpers) is also available as **`@usfm-tools/model/scan`**, which never imports `@usfm-tools/parser` at runtime — use it where the TS parser must not be bundled (as `@usfm-tools/controls` does).
-
 ## Usage
 
-### Parse (re-exported from the parser)
-
-```typescript
-import { parse } from "@usfm-tools/model";
-
-const result = parse(`\\id GEN
-\\c 1
-\\p
-\\v 1 In the beginning God created the heavens and the earth.`);
-```
-
-### View models
-
-View models reshape the AST for specific UI tasks. They live under the **`ViewModels`** object so additional families can be added later without colliding.
-
-- **`ViewModels.Publication`** — alias of **`PublicationViewModel`**: publication / “Bible app” reading layout (`buildPreview`, `applyVersePerLine`, and types such as `PreviewDocument`).
-
-```typescript
-import { ViewModels, parse } from "@usfm-tools/model";
-
-const { document } = parse(usfmText);
-const preview = ViewModels.Publication.buildPreview(document, { versePerLine: true });
-```
-
-### Standard book identifiers and book picker model
+### Standard book identifiers and file picker model
 
 The USFM specification defines a fixed set of [book identifiers](https://ubsicap.github.io/usfm/identification/books.html) (the three-character code after `\\id`). This package exposes that table as **`STANDARD_USFM_BOOK_IDENTIFIERS`** (in official table order, with each row’s **Number** field and a canon grouping: Old Testament, New Testament, or other).
 
 Helpers such as **`isStandardUsfmBookIdentifier`**, **`normalizeUsfmBookCode`**, and **`getStandardUsfmBookIdentifier`** support validation and metadata lookup.
 
-For UI that lists available books from in-memory USFM files, **`buildUsfmBookPickerGroups(files)`** parses each file’s USFM (via the bundled parser), reads `\\toc1` / `\\toc2` / `\\toc3`, and returns four collections: **`oldTestament`**, **`newTestament`**, and **`other`** (standard codes outside OT/NT), each sorted by the official table order, plus **`nonStandard`**. The latter includes files whose first `\\id` code is not in the standard list, files with a **missing or empty** `\\id` line on the first book, and files **with no `\\id` at all** (non-empty USFM): for those, TOC markers are read from **top-level** paragraphs on the document, and **`code`** is an empty string when there is no id token. Order within **`nonStandard`** follows the input **`files`** array. Old/New Testament titles prefer `\\toc3` with code fallback; other standard books and non-standard rows use `\\toc1`, then `\\toc2`, then `\\toc3`, then the `\\id` code, then the file **`id`** when no code and no toc text. The **`UsfmBookPicker`** React control in **`@usfm-tools/controls`** consumes this function.
-
-**`buildUsfmFilePickerGroups(files)`** uses the same grouping rules but is keyed by file **`id`** / **`name`** (for folder sidebars). It does not parse: labels are file names, so it only needs each file's `\\id` code, read by the parser-free **`scanUsfmBookCode(usfm)`** (differentially tested against the parser; it only disagrees when an unclosed top-level `\\esb` precedes the `\\id`). **`UsfmFilePicker`** in **`@usfm-tools/controls`** and **`UsfmShell`**’s file browser consume it.
+**`buildUsfmFilePickerGroups(files)`** groups `{ id, name, usfm }` entries (for folder sidebars) into **`oldTestament`**, **`newTestament`**, and **`other`** (standard codes outside OT/NT), each sorted by the official table order and then file name, plus **`nonStandard`**: files whose first `\\id` code is not in the standard list, files with an empty `\\id` line, and non-empty files with no `\\id` at all. Labels are the file names, so it only needs each file's `\\id` code, read by **`scanUsfmBookCode(usfm)`** — a lightweight scan that follows the lexer's rules for escapes, nested/end markers and attribute values (it only disagrees with the parser when an unclosed top-level `\\esb` precedes the `\\id`). **`UsfmFilePicker`** in **`@usfm-tools/controls`** and **`UsfmShell`**’s file browser consume it.
 
 ```typescript
-import { buildUsfmBookPickerGroups } from "@usfm-tools/model";
+import { buildUsfmFilePickerGroups } from "@usfm-tools/model";
 
-const { oldTestament, newTestament, other, nonStandard } = buildUsfmBookPickerGroups([
-  { id: "file-gen", usfm: "\\id GEN\n\\toc3 Gen\n..." },
-  { id: "file-hym", usfm: "\\id HYM\n\\toc1 Hymnal\n..." },
-  { id: "file-extra", usfm: "\\toc1 Music supplement\n\\c 1\n\\p\n" }, // no \\id → nonStandard, code ""
+const { oldTestament, newTestament, other, nonStandard } = buildUsfmFilePickerGroups([
+  { id: "f1", name: "01-GEN.usfm", usfm: "\\id GEN\n\\c 1\n..." },
+  { id: "f2", name: "hymns.usfm", usfm: "\\id HYM\n..." }, // not a standard code → nonStandard
 ]);
 ```
 
-### Chapter numbers on a book (`listChapterNumbersFromBook`)
+### Chapter markers with source offsets (`listChapterMarkersInUsfm`, `chapterNumberAtOrBeforeSourceOffset`)
 
-**`listChapterNumbersFromBook(book)`** walks a parsed **`BookNode`** and returns every **`\\c`** chapter number string in **document order**. Values are taken verbatim from the AST (no sorting, deduplication, or numeric parsing), so non–Western Arabic numerals, gaps, or duplicate markers are preserved exactly as encoded. Pass the result to **`ChapterPicker`** as **`chapterNumbers`**, or use **`listChapterMarkersInUsfm`** when you only have raw USFM text.
-
-```typescript
-import { parse, listChapterNumbersFromBook } from "@usfm-tools/model";
-
-const { document } = parse("\\id PSA\n\\c 10\n\\p\n\\v 1\n\\c 2\n\\p\n\\v 1");
-const book = document.children.find((n) => n.type === "book")!;
-const chapters = listChapterNumbersFromBook(book); // ["10", "2"]
-```
-
-### Chapter markers with source offsets (`listChapterMarkersInBook`, `listChapterMarkersInUsfm`, `chapterNumberAtOrBeforeSourceOffset`)
-
-**`listChapterMarkersInBook(book)`** returns `{ number, markerOffset }[]` for each chapter child on a **`BookNode`** that has a parser **`position`** (the offset is the start of the `\\c` marker in the USFM source). Use this when you already have a parsed AST.
-
-**`listChapterMarkersInUsfm(usfm)`** scans raw USFM for `\\c` markers without a full parse — fast enough to refresh on debounced editor updates in **`UsfmPane`**. **`bookIdMarkerOffsetInUsfm(usfm)`** locates the first `\\id` marker the same way.
+**`listChapterMarkersInUsfm(usfm)`** scans raw USFM for the first book's `\\c` markers and returns `{ number, markerOffset }[]` in **document order** (the offset is the UTF-16 start of the `\\c` marker). Numbers are verbatim — no sorting, deduplication, or numeric parsing — so non–Western Arabic numerals, gaps, or duplicates are preserved. It is fast enough to refresh on debounced editor updates in **`UsfmPane`**; pass the numbers to **`ChapterPicker`** as **`chapterNumbers`**. **`bookIdMarkerOffsetInUsfm(usfm)`** locates the first `\\id` marker the same way.
 
 **`chapterNumberAtOrBeforeSourceOffset(markers, sourceOffset)`** returns the chapter **number** for the last marker whose offset is still at or before **`sourceOffset`**, or **`null`** when the offset lies before the first chapter marker or the book has no chapters.
 
 ```typescript
 import {
-  parse,
-  listChapterMarkersInBook,
   listChapterMarkersInUsfm,
   chapterNumberAtOrBeforeSourceOffset,
 } from "@usfm-tools/model";
 
-const { document } = parse("\\id GEN\\n\\c 1\\n\\p\\n\\v 1\\n\\c 2\\n\\p\\n\\v 1");
-const book = document.children.find((n) => n.type === "book")!;
-const fromAst = listChapterMarkersInBook(book as import("@usfm-tools/parser").BookNode);
-const fromText = listChapterMarkersInUsfm("\\id GEN\\n\\c 1\\n\\p\\n\\v 1\\n\\c 2\\n\\p\\n\\v 1");
-chapterNumberAtOrBeforeSourceOffset(fromText, fromText[1]!.markerOffset); // "2"
-```
-
-### HTML rendering (`renderPreviewHtml`)
-
-**`renderPreviewHtml(usfm, options?)`** turns a USFM source string into publication-style HTML with a fixed, hardcoded markup. Parser errors are not rendered — surface them through diagnostics instead. The optional **`RenderPreviewOptions`** currently supports `{ versePerLine: true }` to expand multi-verse paragraphs into one `<p>` per verse. Customize presentation by styling the emitted CSS class hooks (`usfm-document`, `usfm-book`, `usfm-chapter`, `usfm-line`, `usfm-line--prose`, `usfm-line--poetry`, `usfm-v`, `usfm-txt`, `usfm-nd`, `usfm-note`, `usfm-ref`, …) in your app's stylesheet.
-
-```typescript
-import { renderPreviewHtml } from "@usfm-tools/model";
-
-const html = renderPreviewHtml(src, { versePerLine: true });
+const markers = listChapterMarkersInUsfm("\\id GEN\n\\c 1\n\\p\n\\v 1\n\\c 2\n\\p\n\\v 1");
+chapterNumberAtOrBeforeSourceOffset(markers, markers[1]!.markerOffset); // "2"
 ```
 
 ## Development
@@ -129,31 +71,11 @@ cd packages/usfm-model
 packages/usfm-model/
 ├── src/
 │   ├── index.ts                         # Public API
-│   ├── book-identifiers/                # Standard \\id codes + picker group builders
-│   ├── list-chapter-numbers-from-book.ts
-│   ├── list-chapter-markers-in-book.ts  # Offsets from a parsed BookNode
-│   ├── list-chapter-markers-in-usfm.ts  # Lightweight \\c scan on raw USFM
-│   ├── view-models/
-│   │   └── publication-preview.ts       # PublicationViewModel + ViewModels.Publication alias
-│   └── renderer/
-│       ├── render-preview-html.ts       # renderPreviewHtml(usfm, options?)
-│       └── index.ts
+│   ├── book-identifiers/                # Standard \\id codes, book-code/header scans, file picker groups
+│   └── list-chapter-markers-in-usfm.ts  # Lightweight \\c / \\id scans on raw USFM
 ├── tests/
-│   ├── model.test.ts
-│   ├── book-picker-model.test.ts
-│   ├── list-chapter-markers-in-usfm.test.ts
-│   ├── publication-preview.test.ts
-│   └── render-preview-html.test.ts
 └── deno.json
 ```
-
-## Architecture
-
-```
-USFM text → @usfm-tools/parser (AST) → view models (e.g. PublicationViewModel) → renderPreviewHtml → HTML
-```
-
-The publication view model flattens the AST into blocks (headings, poetry/prose lines, tables, etc.) and inline **segments** (verse milestones, text, character styles, notes). **`renderPreviewHtml`** walks that structure and emits HTML with a fixed set of `usfm-*` CSS class hooks — customize presentation through CSS rather than markup overrides.
 
 ## License
 
