@@ -39,7 +39,7 @@ cd packages/usfm-parser-integration-tests
 deno task test
 ```
 
-From the repository root, `./build.sh` runs checks and all workspace tests in dependency order.
+From the repository root, `deno task build` runs checks and all workspace tests in dependency order.
 
 ## Test Data
 

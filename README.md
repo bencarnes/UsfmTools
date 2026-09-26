@@ -35,11 +35,13 @@ The **`Plan/`** directory holds Obsidian-style planning notes and is not part of
 
 ## Build and test everything
 
-From the repository root:
+From the repository root (works on Windows, macOS, and Linux):
 
 ```bash
-./build.sh
+deno task build
 ```
+
+The build logic lives in `build.ts`; `./build.sh` is a thin wrapper around `deno task build` for POSIX shells.
 
 This runs `deno task check` on parser, model, and controls, then `deno task test` on all four workspace packages in dependency order.
 

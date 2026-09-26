@@ -41,7 +41,7 @@ This is an accepted limitation. Working around it (e.g. querying the GTK theme t
 
 - Go 1.22+
 - [Wails v2](https://wails.io/docs/gettingstarted/installation) CLI (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`)
-- Linux: `libgtk-3-dev`, `libwebkit2gtk-4.1-dev` (Ubuntu 24.04+). If only WebKitGTK 4.1 is available, pass `-tags webkit2_41` to `wails build` (the included `build.sh` does this automatically).
+- Linux: `libgtk-3-dev`, `libwebkit2gtk-4.1-dev` (Ubuntu 24.04+). If only WebKitGTK 4.1 is available, pass `-tags webkit2_41` to `wails build` (the included build script does this automatically).
 - Node.js (for the frontend bundle)
 
 ## Development
@@ -70,9 +70,13 @@ blank page for this app.
 
 ## Build
 
+From the repository root (works on Windows, macOS, and Linux; requires [Deno 2+](https://docs.deno.com/runtime/getting_started/installation/)):
+
 ```bash
-./build.sh
+deno task build:bible-edit
 ```
+
+The build logic lives in `build.ts`; `./build.sh` is a thin wrapper around it for POSIX shells.
 
 Or manually:
 
@@ -81,7 +85,7 @@ cd frontend && npm install && npm run build && cd ..
 wails build -tags webkit2_41   # omit -tags on systems with webkit2gtk-4.0
 ```
 
-The binary is emitted as `build/bin/BibleEdit` (platform name may vary).
+The binary is emitted as `build/bin/BibleEdit` (`BibleEdit.exe` on Windows, `BibleEdit.app` on macOS).
 
 ## Go tests
 
