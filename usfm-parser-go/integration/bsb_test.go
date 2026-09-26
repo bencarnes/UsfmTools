@@ -289,7 +289,8 @@ func TestRevelation(t *testing.T) {
 
 // BenchmarkParsePsalms measures single-book parse latency on the largest
 // book — the number that matters for editor responsiveness (the TS parser
-// was ~16ms here; see the perf notes in todo.md).
+// was ~16ms here; the Go parser ~6ms / ~1.4k allocs after slab allocation;
+// see the perf notes in todo.md).
 func BenchmarkParsePsalms(b *testing.B) {
 	data, err := os.ReadFile(filepath.Join(bsbDir, "PSA.usfm"))
 	if err != nil {

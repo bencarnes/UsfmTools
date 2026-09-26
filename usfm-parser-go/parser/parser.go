@@ -71,6 +71,50 @@ type parser struct {
 	errors []usfm.ParseError
 	strict bool
 	doc    *usfm.Node
+
+	// Allocation slabs: nodes, their positions, and children slices are
+	// carved from chunks instead of allocated one by one (an AST is built
+	// and dropped as a whole, so per-node lifetimes don't matter).
+	nodes     []usfm.Node
+	positions []usfm.Position
+	childSlab []*usfm.Node
+	// stack collects the children of the nodes being built; each parent
+	// records its base, pushes children, and collects them on completion.
+	stack []*usfm.Node
+}
+
+// slabSize is the chunk length for the allocation slabs.
+const slabSize = 1024
+
+func (p *parser) newNode(n usfm.Node) *usfm.Node {
+	if len(p.nodes) == cap(p.nodes) {
+		p.nodes = make([]usfm.Node, 0, slabSize)
+	}
+	p.nodes = append(p.nodes, n)
+	return &p.nodes[len(p.nodes)-1]
+}
+
+func (p *parser) newPosition(pos usfm.Position) *usfm.Position {
+	if len(p.positions) == cap(p.positions) {
+		p.positions = make([]usfm.Position, 0, slabSize)
+	}
+	p.positions = append(p.positions, pos)
+	return &p.positions[len(p.positions)-1]
+}
+
+// collect pops the children pushed since base into an exactly sized,
+// non-nil slice. Its capacity is clipped so appending to it (e.g. by AST
+// consumers) copies instead of overwriting a neighbor in the slab.
+func (p *parser) collect(base int) []*usfm.Node {
+	n := len(p.stack) - base
+	if p.childSlab == nil || n > cap(p.childSlab)-len(p.childSlab) {
+		p.childSlab = make([]*usfm.Node, 0, max(slabSize, n))
+	}
+	start := len(p.childSlab)
+	p.childSlab = append(p.childSlab, p.stack[base:]...)
+	clear(p.stack[base:])
+	p.stack = p.stack[:base]
+	return p.childSlab[start:len(p.childSlab):len(p.childSlab)]
 }
 
 func (p *parser) parseTopLevel() *usfm.Node {
@@ -155,14 +199,14 @@ func (p *parser) parseId() *usfm.Node {
 		}
 	}
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:        usfm.NodeBook,
 		Marker:      "id",
 		Code:        code,
 		Description: description,
-		Position:    &position,
-		Children:    []*usfm.Node{},
-	}
+		Position:    p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	// Parse remaining book-level content (headers, etc.) until next \id or end
 	for p.pos < len(p.tokens) {
@@ -171,10 +215,11 @@ func (p *parser) parseId() *usfm.Node {
 			break
 		}
 		if child := p.parseTopLevel(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -194,13 +239,13 @@ func (p *parser) parseChapter() *usfm.Node {
 	// Skip newline after chapter number
 	p.skipNewlines()
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeChapter,
 		Marker:   "c",
 		Number:   number,
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	// Consume chapter-level content
 	for p.pos < len(p.tokens) {
@@ -209,10 +254,11 @@ func (p *parser) parseChapter() *usfm.Node {
 			break
 		}
 		if child := p.parseTopLevel(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -238,12 +284,12 @@ func (p *parser) parseVerse() *usfm.Node {
 		}
 	}
 
-	return &usfm.Node{
+	return p.newNode(usfm.Node{
 		Type:     usfm.NodeVerse,
 		Marker:   "v",
 		Number:   number,
-		Position: &position,
-	}
+		Position: p.newPosition(position),
+	})
 }
 
 func (p *parser) parseParagraph() *usfm.Node {
@@ -252,12 +298,12 @@ func (p *parser) parseParagraph() *usfm.Node {
 	marker := token.Value
 	p.advance()
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeParagraph,
 		Marker:   marker,
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	// Skip leading newlines
 	p.skipNewlines()
@@ -273,10 +319,11 @@ func (p *parser) parseParagraph() *usfm.Node {
 			}
 		}
 		if child := p.parseInlineContent(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -286,12 +333,12 @@ func (p *parser) parseChar() *usfm.Node {
 	marker := token.Value
 	p.advance()
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeChar,
 		Marker:   marker,
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	// Consume content until the closing marker.
 	// Verse milestones (\v) are allowed inside char spans per the USFM spec,
@@ -319,10 +366,11 @@ func (p *parser) parseChar() *usfm.Node {
 		}
 
 		if child := p.parseInlineContent(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -330,12 +378,12 @@ func (p *parser) parseRef() *usfm.Node {
 	position := p.current().Position
 	p.advance() // skip \ref
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeRef,
 		Marker:   "ref",
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	for p.pos < len(p.tokens) {
 		cur := p.current()
@@ -370,10 +418,11 @@ func (p *parser) parseRef() *usfm.Node {
 		}
 
 		if child := p.parseInlineContent(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -400,13 +449,13 @@ func (p *parser) parseNote() *usfm.Node {
 		}
 	}
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeNote,
 		Marker:   marker,
 		Caller:   caller,
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	// Consume note content until end marker
 	for p.pos < len(p.tokens) {
@@ -424,10 +473,11 @@ func (p *parser) parseNote() *usfm.Node {
 		}
 
 		if child := p.parseInlineContent(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -435,12 +485,12 @@ func (p *parser) parseTableRow() *usfm.Node {
 	position := p.current().Position
 	p.advance() // skip \tr
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeRow,
 		Marker:   "tr",
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	// Skip newlines after \tr
 	p.skipNewlines()
@@ -453,7 +503,7 @@ func (p *parser) parseTableRow() *usfm.Node {
 				break
 			}
 			if grammar.IsCellMarker(cur.Value) {
-				node.Children = append(node.Children, p.parseCell())
+				p.stack = append(p.stack, p.parseCell())
 				continue
 			}
 			if grammar.IsParaMarker(cur.Value) || cur.Value == "c" || cur.Value == "id" {
@@ -468,10 +518,11 @@ func (p *parser) parseTableRow() *usfm.Node {
 
 		// Preserve non-cell inline content (text, char markers, etc.)
 		if child := p.parseInlineContent(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -481,12 +532,12 @@ func (p *parser) parseCell() *usfm.Node {
 	marker := token.Value
 	p.advance()
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeCell,
 		Marker:   marker,
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	// Consume cell content until next cell, row, or structure marker
 	for p.pos < len(p.tokens) {
@@ -503,10 +554,11 @@ func (p *parser) parseCell() *usfm.Node {
 		}
 
 		if child := p.parseInlineContent(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -516,11 +568,11 @@ func (p *parser) parseMilestone() *usfm.Node {
 	marker := token.Value
 	p.advance()
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeMilestone,
 		Marker:   marker,
-		Position: &position,
-	}
+		Position: p.newPosition(position),
+	})
 
 	// Consume attributes if present
 	if next := p.current(); next != nil && next.Type == lexer.Attribute {
@@ -544,12 +596,12 @@ func (p *parser) parseFigure() *usfm.Node {
 	position := p.current().Position
 	p.advance() // skip \fig
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:       usfm.NodeFigure,
 		Marker:     "fig",
-		Position:   &position,
+		Position:   p.newPosition(position),
 		Attributes: map[string]string{},
-	}
+	})
 
 	// Consume text and attributes until \fig*
 	for p.pos < len(p.tokens) {
@@ -585,12 +637,12 @@ func (p *parser) parseSidebar() *usfm.Node {
 	position := p.current().Position
 	p.advance() // skip \esb
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeSidebar,
 		Marker:   "esb",
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	p.skipNewlines()
 
@@ -602,10 +654,11 @@ func (p *parser) parseSidebar() *usfm.Node {
 			break
 		}
 		if child := p.parseTopLevel(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -615,12 +668,12 @@ func (p *parser) parseHeaderOrMisc() *usfm.Node {
 	marker := token.Value
 	p.advance()
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeParagraph,
 		Marker:   marker,
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	// Consume content on this line (text, char styles, attributes, etc.)
 	for p.pos < len(p.tokens) {
@@ -636,10 +689,11 @@ func (p *parser) parseHeaderOrMisc() *usfm.Node {
 		}
 
 		if child := p.parseInlineContent(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -651,11 +705,11 @@ func (p *parser) parseUnknown() *usfm.Node {
 
 	p.addError(usfm.CodeUnknownMarker, fmt.Sprintf("Unknown marker '\\%s'", marker), position)
 
-	return &usfm.Node{
+	return p.newNode(usfm.Node{
 		Type:     usfm.NodeUnknown,
 		Marker:   marker,
-		Position: &position,
-	}
+		Position: p.newPosition(position),
+	})
 }
 
 func (p *parser) parseInlineContent() *usfm.Node {
@@ -672,7 +726,7 @@ func (p *parser) parseInlineContent() *usfm.Node {
 		// Convert newlines in inline content to space text nodes
 		p.advance()
 		pos := cur.Position
-		return &usfm.Node{Type: usfm.NodeText, Text: " ", Position: &pos}
+		return p.newNode(usfm.Node{Type: usfm.NodeText, Text: " ", Position: p.newPosition(pos)})
 
 	case lexer.Marker:
 		marker := cur.Value
@@ -723,7 +777,7 @@ func (p *parser) parseInlineContent() *usfm.Node {
 	case lexer.OptBreak:
 		p.advance()
 		pos := cur.Position
-		return &usfm.Node{Type: usfm.NodeOptBreak, Position: &pos}
+		return p.newNode(usfm.Node{Type: usfm.NodeOptBreak, Position: p.newPosition(pos)})
 
 	case lexer.Attribute:
 		// Attribute token not consumed by a char/note-char node — skip but warn
@@ -742,12 +796,12 @@ func (p *parser) parseNoteChar() *usfm.Node {
 	marker := token.Value
 	p.advance()
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeChar,
 		Marker:   marker,
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	// Consume until end marker or next note-char or note end
 	for p.pos < len(p.tokens) {
@@ -778,10 +832,11 @@ func (p *parser) parseNoteChar() *usfm.Node {
 		}
 
 		if child := p.parseInlineContent(); child != nil {
-			node.Children = append(node.Children, child)
+			p.stack = append(p.stack, child)
 		}
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -791,12 +846,12 @@ func (p *parser) parseInlineAttribute() *usfm.Node {
 	marker := token.Value
 	p.advance()
 
-	node := &usfm.Node{
+	node := p.newNode(usfm.Node{
 		Type:     usfm.NodeChar,
 		Marker:   marker,
-		Position: &position,
-		Children: []*usfm.Node{},
-	}
+		Position: p.newPosition(position),
+	})
+	base := len(p.stack)
 
 	// Consume content until end marker
 	for p.pos < len(p.tokens) {
@@ -811,15 +866,16 @@ func (p *parser) parseInlineAttribute() *usfm.Node {
 
 		if cur.Type == lexer.Text {
 			pos := cur.Position
-			node.Children = append(node.Children, &usfm.Node{
+			p.stack = append(p.stack, p.newNode(usfm.Node{
 				Type:     usfm.NodeText,
 				Text:     cur.Value,
-				Position: &pos,
-			})
+				Position: p.newPosition(pos),
+			}))
 		}
 		p.advance()
 	}
 
+	node.Children = p.collect(base)
 	return node
 }
 
@@ -835,7 +891,7 @@ func (p *parser) parseTextRun() *usfm.Node {
 		p.advance()
 	}
 
-	return &usfm.Node{Type: usfm.NodeText, Text: text, Position: &position}
+	return p.newNode(usfm.Node{Type: usfm.NodeText, Text: text, Position: p.newPosition(position)})
 }
 
 func (p *parser) consumeTextLine() string {
@@ -894,7 +950,7 @@ func (p *parser) applyAttributes(node *usfm.Node, token *lexer.Token) {
 }
 
 func (p *parser) addError(code, message string, position usfm.Position) {
-	p.errors = append(p.errors, usfm.ParseError{Message: message, Position: &position, Code: code})
+	p.errors = append(p.errors, usfm.ParseError{Message: message, Position: p.newPosition(position), Code: code})
 	if p.strict {
 		panic(abort{fmt.Errorf("parse error at %d:%d: %s", position.Line, position.Column, message)})
 	}
