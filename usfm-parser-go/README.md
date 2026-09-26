@@ -237,11 +237,18 @@ Three layers keep the port honest:
 
 ## Fidelity notes
 
-The port reproduces the TS parser's behavior exactly, including a few
-inherited quirks kept deliberately so the differential tests stay
-meaningful (e.g. text after a chapter number is dropped, `\fig` in inline
-context reports as an unknown marker). They are catalogued in the
-"Follow-ups" section of the repository `todo.md`, to be fixed in both
-parsers or documented as intentional. Diagnostic *codes*
-(`unknown-marker`, `unexpected-end-marker`, `unattached-attribute`) and
-byte offsets are Go-side additions the TS parser never had.
+The port reproduces the TS parser's behavior exactly, including its error
+recovery, so the differential tests stay meaningful; behavior changes are
+made in both parsers together. Recovery rules worth knowing:
+
+- Text after a chapter number (`\c 1 extra`) is reported
+  (`chapter-text`) and kept as chapter content, not dropped.
+- `\fig` parses as a figure both at the top level and inline (USFM 3 puts
+  it inside paragraphs); an unclosed `\fig` ends at the next paragraph,
+  `\c` or `\id` marker.
+- A note's caller is its first word; the rest of that text run is kept
+  verbatim (whitespace included), as with text after a verse number.
+
+Diagnostic *codes* (`unknown-marker`, `unexpected-end-marker`,
+`unattached-attribute`, `chapter-text`) and byte offsets are Go-side
+additions the TS parser never had.

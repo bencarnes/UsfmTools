@@ -132,6 +132,17 @@ describe("Parser", () => {
       expect(chapters[0].number).toBe("1");
       expect(chapters[1].number).toBe("2");
     });
+
+    it("should keep and report text after the chapter number", () => {
+      const result = parse("\\id GEN\n\\c 1 extra words\n\\p\n\\v 1 Text");
+      const book = result.document.children[0] as BookNode;
+      const chapter = book.children.find((c) => c.type === "chapter") as ChapterNode;
+      expect(chapter.number).toBe("1");
+      expect((chapter.children[0] as TextNode).text).toBe("extra words");
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].message).toBe("Unexpected text after chapter number '\\c 1'");
+      expect(parse("\\id GEN\n\\c 1 \n\\p").errors).toHaveLength(0);
+    });
   });
 
   describe("verses", () => {
@@ -434,7 +445,40 @@ describe("Parser", () => {
     });
   });
 
+  describe("figures", () => {
+    it("should parse an inline figure inside a paragraph", () => {
+      const result = parse(
+        '\\id GEN\n\\c 1\n\\p\n\\v 1 Before \\fig Caption|src="a.jpg" size="col"\\fig* after.',
+      );
+      expect(result.errors).toHaveLength(0);
+      const book = result.document.children[0] as BookNode;
+      const chapter = book.children.find((c) => c.type === "chapter") as ChapterNode;
+      const para = chapter.children.find((c) => c.type === "paragraph") as ParagraphNode;
+      const fig = para.children.find((c) => c.type === "figure")!;
+      expect(fig.attributes).toEqual({ caption: "Caption", src: "a.jpg", size: "col" });
+      expect((para.children.at(-1) as TextNode).text).toBe(" after.");
+    });
+
+    it("should end an unclosed figure at the next structural marker", () => {
+      const result = parse('\\id GEN\n\\c 1\n\\p\n\\v 1 Text \\fig Caption|src="a.jpg"\n\\p\n\\c 2');
+      const book = result.document.children[0] as BookNode;
+      const chapters = book.children.filter((c) => c.type === "chapter") as ChapterNode[];
+      expect(chapters).toHaveLength(2);
+      expect(chapters[0].children.filter((c) => c.type === "paragraph")).toHaveLength(2);
+    });
+  });
+
   describe("footnotes", () => {
+    it("should keep note text after the caller verbatim", () => {
+      const result = parse("\\id GEN\n\\c 1\n\\p\n\\v 1 Text\\f +  note   text \\f*");
+      const book = result.document.children[0] as BookNode;
+      const chapter = book.children.find((c) => c.type === "chapter") as ChapterNode;
+      const para = chapter.children.find((c) => c.type === "paragraph") as ParagraphNode;
+      const note = para.children.find((c) => c.type === "note") as NoteNode;
+      expect(note.caller).toBe("+");
+      expect((note.children[0] as TextNode).text).toBe("note   text ");
+    });
+
     it("should parse a basic footnote", () => {
       const input = `\\id GEN
 \\c 1
