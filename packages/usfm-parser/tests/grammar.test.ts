@@ -42,6 +42,7 @@ describe("Grammar", () => {
       expect(getMarkerCategory("wj")).toBe("char");
       expect(getMarkerCategory("bk")).toBe("char");
       expect(getMarkerCategory("w")).toBe("char");
+      expect(getMarkerCategory("wl")).toBe("char"); // added in USFM 3.1.2
     });
 
     it("should identify footnote markers", () => {
@@ -61,6 +62,10 @@ describe("Grammar", () => {
       expect(getMarkerCategory("th1")).toBe("cell");
       expect(getMarkerCategory("tc1")).toBe("cell");
       expect(getMarkerCategory("tcr1")).toBe("cell");
+      expect(getMarkerCategory("tcr12")).toBe("cell");
+      expect(getMarkerCategory("thc12")).toBe("cell");
+      // tch12 is a typo in the USFM 3.1 usfm3_1.sty/usx.rng (3.0 has thc12)
+      expect(getMarkerCategory("tch12")).toBe("unknown");
     });
 
     it("should identify milestone markers", () => {

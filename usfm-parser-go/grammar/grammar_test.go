@@ -35,6 +35,7 @@ func TestCategory(t *testing.T) {
 		{"wj", Char},
 		{"bk", Char},
 		{"w", Char},
+		{"wl", Char}, // added in USFM 3.1.2
 		// footnote markers
 		{"f", Footnote},
 		{"fe", Footnote},
@@ -48,6 +49,10 @@ func TestCategory(t *testing.T) {
 		{"th1", Cell},
 		{"tc1", Cell},
 		{"tcr1", Cell},
+		{"tcr12", Cell},
+		{"thc12", Cell},
+		// tch12 is a typo in the USFM 3.1 usfm3_1.sty/usx.rng (3.0 has thc12)
+		{"tch12", Unknown},
 		// milestone markers
 		{"qt-s", Milestone},
 		{"qt-e", Milestone},
@@ -139,6 +144,7 @@ func TestDefaultAttribute(t *testing.T) {
 		{"qt-s", "who"},
 		{"fig", "alt"},
 		{"ref", "loc"},
+		{"wl", "lang"},
 	}
 	for _, tt := range tests {
 		got, ok := DefaultAttribute(tt.marker)
@@ -163,6 +169,17 @@ func TestNoMarkerInMultipleCategories(t *testing.T) {
 				t.Errorf("marker %q defined in both %q and %q", marker, prev, category)
 			}
 			seen[marker] = category
+		}
+	}
+}
+
+// TestDefaultAttributeMarkersAreKnown guards against a default attribute
+// being registered for a marker the category table doesn't know (as \wl once
+// was), which would make the marker "unknown" despite its attribute support.
+func TestDefaultAttributeMarkersAreKnown(t *testing.T) {
+	for marker := range defaultAttributes {
+		if Category(marker) == Unknown {
+			t.Errorf("marker %q has a default attribute but no category", marker)
 		}
 	}
 }
