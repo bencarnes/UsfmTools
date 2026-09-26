@@ -10,6 +10,8 @@ The parser produces a low-level AST that faithfully represents the USFM markup s
 
 Add `@usfm-tools/model` as a dependency in your Deno workspace or import map.
 
+The parser-free subset (standard book identifiers, `scanUsfmBookCode`, picker header scan, `buildUsfmFilePickerGroups`, chapter-marker scans and `BookNode` helpers) is also available as **`@usfm-tools/model/scan`**, which never imports `@usfm-tools/parser` at runtime — use it where the TS parser must not be bundled (as `@usfm-tools/controls` does).
+
 ## Usage
 
 ### Parse (re-exported from the parser)
@@ -44,7 +46,7 @@ Helpers such as **`isStandardUsfmBookIdentifier`**, **`normalizeUsfmBookCode`**,
 
 For UI that lists available books from in-memory USFM files, **`buildUsfmBookPickerGroups(files)`** parses each file’s USFM (via the bundled parser), reads `\\toc1` / `\\toc2` / `\\toc3`, and returns four collections: **`oldTestament`**, **`newTestament`**, and **`other`** (standard codes outside OT/NT), each sorted by the official table order, plus **`nonStandard`**. The latter includes files whose first `\\id` code is not in the standard list, files with a **missing or empty** `\\id` line on the first book, and files **with no `\\id` at all** (non-empty USFM): for those, TOC markers are read from **top-level** paragraphs on the document, and **`code`** is an empty string when there is no id token. Order within **`nonStandard`** follows the input **`files`** array. Old/New Testament titles prefer `\\toc3` with code fallback; other standard books and non-standard rows use `\\toc1`, then `\\toc2`, then `\\toc3`, then the `\\id` code, then the file **`id`** when no code and no toc text. The **`UsfmBookPicker`** React control in **`@usfm-tools/controls`** consumes this function.
 
-**`buildUsfmFilePickerGroups(files)`** uses the same grouping rules but is keyed by file **`id`** / **`name`** (for folder sidebars). **`UsfmFilePicker`** in **`@usfm-tools/controls`** and **`UsfmShell`**’s file browser consume it.
+**`buildUsfmFilePickerGroups(files)`** uses the same grouping rules but is keyed by file **`id`** / **`name`** (for folder sidebars). It does not parse: labels are file names, so it only needs each file's `\\id` code, read by the parser-free **`scanUsfmBookCode(usfm)`** (differentially tested against the parser; it only disagrees when an unclosed top-level `\\fig`/`\\esb` precedes the `\\id`). **`UsfmFilePicker`** in **`@usfm-tools/controls`** and **`UsfmShell`**’s file browser consume it.
 
 ```typescript
 import { buildUsfmBookPickerGroups } from "@usfm-tools/model";

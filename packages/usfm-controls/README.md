@@ -65,10 +65,10 @@ function App() {
 
 ### UsfmBookPicker
 
-Lists books from an array of `{ id, usfm }` entries (your app supplies file contents and stable ids). The model’s **`buildUsfmBookPickerGroups`** parses each `usfm` string and splits results into **Old Testament** and **New Testament** (responsive grids of short labels), **other** standard identifiers (for example apocrypha or front matter), and **non-standard** material: unknown `\\id` codes, an empty/missing `\\id` on the first book, or **no `\\id` at all** (with titles from top-level `\\toc` markers when there is no book node). The last two sections are single-column lists, each separated by a horizontal rule when present.
+Exported from **`@usfm-tools/controls/local`** (it parses every file with the TS reference parser; see [Entry points](#entry-points)). Lists books from an array of `{ id, usfm }` entries (your app supplies file contents and stable ids). The model’s **`buildUsfmBookPickerGroups`** parses each `usfm` string and splits results into **Old Testament** and **New Testament** (responsive grids of short labels), **other** standard identifiers (for example apocrypha or front matter), and **non-standard** material: unknown `\\id` codes, an empty/missing `\\id` on the first book, or **no `\\id` at all** (with titles from top-level `\\toc` markers when there is no book node). The last two sections are single-column lists, each separated by a horizontal rule when present.
 
 ```tsx
-import { UsfmBookPicker } from "@usfm-tools/controls";
+import { UsfmBookPicker } from "@usfm-tools/controls/local";
 
 const files = [
   { id: "path/to/GEN.usfm", usfm: "\\id GEN\n\\toc3 Gen\n..." },
@@ -343,7 +343,12 @@ const markers = listChapterMarkersInUsfm("\\id PSA\n\\c 1\n\\p\n\\v 1\n\\c 2\n\\
 | `onChapterSelect` | `(detail: { chapterNumber: string }) => void` | Optional; fired when the user activates a chapter button |
 | `className` | `string` | CSS class on the root wrapper |
 
-The package also **re-exports** from **`@usfm-tools/model`**: `renderPreviewHtml`, **`RenderPreviewOptions`**, `ViewModels`, `PublicationViewModel`, **`buildUsfmBookPickerGroups`**, **`buildUsfmFilePickerGroups`**, **`listChapterNumbersFromBook`**, **`listChapterMarkersInBook`**, **`listChapterMarkersInUsfm`**, **`bookIdMarkerOffsetInUsfm`**, **`chapterNumberAtOrBeforeSourceOffset`**, picker types, and **`ChapterMarkerInBook`**, so you can use the model without a second import path.
+### Entry points
+
+- **`@usfm-tools/controls`** — the components and language-client plumbing. It never loads the TS reference parser statically: components without an injected `languageClient` fall back to **`sharedLocalLanguageClient()`** / **`createDeferredLocalLanguageClient()`**, which `import()` the in-process TS client on first use, so an app that injects an engine-backed client (bible-edit) bundles the parser only as a lazy chunk it never loads. `tests/entry-point-graph.test.ts` guards this.
+- **`@usfm-tools/controls/local`** — the parser-backed API: **`createLocalLanguageClient`** (synchronous construction of the TS client), **`applyChangesToText`**, **`UsfmLanguageService`** / **`createLanguageClient`**, **`UsfmBookPicker`**, and the model re-exports **`renderPreviewHtml`**, **`RenderPreviewOptions`**, **`ViewModels`**, **`PublicationViewModel`**, **`buildUsfmBookPickerGroups`**.
+
+The main entry also **re-exports** the parser-free part of **`@usfm-tools/model`** (from `@usfm-tools/model/scan`): **`listChapterNumbersFromBook`**, **`listChapterMarkersInBook`**, **`listChapterMarkersInUsfm`**, **`bookIdMarkerOffsetInUsfm`**, **`chapterNumberAtOrBeforeSourceOffset`**, picker types, and **`ChapterMarkerInBook`**.
 
 ### UsfmEditor props
 

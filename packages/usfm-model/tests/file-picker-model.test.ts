@@ -1,6 +1,9 @@
 import { describe, it } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildUsfmFilePickerGroups } from "../src/book-identifiers/index.js";
+import {
+  buildUsfmBookPickerGroups,
+  buildUsfmFilePickerGroups,
+} from "../src/book-identifiers/index.js";
 
 describe("buildUsfmFilePickerGroups", () => {
   it("orders Old and New Testament by standard table number, not input order", () => {
@@ -89,5 +92,32 @@ describe("buildUsfmFilePickerGroups", () => {
     ]);
     expect(groups.other.map((b) => b.displayLabel)).toEqual(["TOB.usfm", "FRT.usfm"]);
     expect(groups.nonStandard).toHaveLength(0);
+  });
+  it("groups the same files as the parse-based book picker", async () => {
+    const dir = new URL("../../../bibles/bsb/usfm/", import.meta.url);
+    const files: { id: string; name: string; usfm: string }[] = [];
+    for await (const entry of Deno.readDir(dir)) {
+      if (!entry.name.endsWith(".usfm")) continue;
+      files.push({ id: entry.name, name: entry.name, usfm: await Deno.readTextFile(new URL(entry.name, dir)) });
+    }
+    files.push(
+      { id: "empty-id", name: "empty-id.usfm", usfm: "\\id\n\\toc1 T\n" },
+      { id: "no-id", name: "no-id.usfm", usfm: "\\toc1 T\n\\c 1\n" },
+      { id: "lower", name: "lower.usfm", usfm: "\\id tob Tobit\n" },
+      { id: "custom", name: "custom.usfm", usfm: "\\id ZZZ\n" },
+      { id: "blank", name: "blank.usfm", usfm: "  \n" },
+    );
+    const summarize = (g: ReturnType<typeof buildUsfmFilePickerGroups>) =>
+      Object.fromEntries(
+        Object.entries(g).map(([k, rows]) => [
+          k,
+          (rows as { fileId: string; code: string; sortIndex: number }[])
+            .map((r) => `${r.fileId}:${r.code}:${r.sortIndex}`)
+            .sort(),
+        ]),
+      );
+    expect(summarize(buildUsfmFilePickerGroups(files))).toEqual(
+      summarize(buildUsfmBookPickerGroups(files)),
+    );
   });
 });

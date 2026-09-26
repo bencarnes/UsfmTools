@@ -2,7 +2,8 @@
   "name": "@usfm-tools/model",
   "version": "0.1.0",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./scan": "./src/scan.ts"
   },
   "tasks": {
     "test": "deno test -A --unstable-sloppy-imports",

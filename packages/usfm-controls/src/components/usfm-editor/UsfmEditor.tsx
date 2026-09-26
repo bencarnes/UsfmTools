@@ -26,7 +26,7 @@ import {
   type DocumentSessionMembership,
   type SessionViewPort,
 } from "../../language-service/document-sessions.js";
-import { sharedLocalLanguageClient } from "../../language-service/local-client.js";
+import { sharedLocalLanguageClient } from "../../language-service/default-client.js";
 import {
   languageDiagnosticsToCm,
   usfmHighlighter,

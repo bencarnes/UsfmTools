@@ -1,8 +1,11 @@
+import type { UsfmBookPickerBook, UsfmBookPickerGroups } from "./usfm-book-picker-model.js";
+import { scanUsfmBookCode } from "./usfm-book-code-scan.js";
 import {
-  buildUsfmBookPickerGroups,
-  type UsfmBookPickerBook,
-  type UsfmBookPickerGroups,
-} from "./usfm-book-picker-model.js";
+  getStandardUsfmBookIdentifier,
+  getStandardUsfmBookOrderIndex,
+  isStandardUsfmBookIdentifier,
+  normalizeUsfmBookCode,
+} from "./standard-book-identifiers.js";
 
 export interface UsfmFilePickerFileInput {
   /** Stable id for the file (e.g. path or key); not read from USFM. */
@@ -17,71 +20,68 @@ export type UsfmFilePickerFile = UsfmBookPickerBook;
 
 export type UsfmFilePickerGroups = UsfmBookPickerGroups;
 
-function fileNameFor(
-  fileId: string,
-  nameById: ReadonlyMap<string, string>,
-): string {
-  return nameById.get(fileId) ?? fileId;
-}
-
-function withFileNames(
-  books: readonly UsfmBookPickerBook[],
-  nameById: ReadonlyMap<string, string>,
-): UsfmFilePickerFile[] {
-  return books.map((book) => ({
-    ...book,
-    displayLabel: fileNameFor(book.fileId, nameById),
-  }));
-}
-
-function compareFilePickerRows(
-  a: UsfmFilePickerFile,
-  b: UsfmFilePickerFile,
-  nameById: ReadonlyMap<string, string>,
-): number {
+function compareFilePickerRows(a: UsfmFilePickerFile, b: UsfmFilePickerFile): number {
   const byTable = a.sortIndex - b.sortIndex;
   if (byTable !== 0) return byTable;
 
-  return fileNameFor(a.fileId, nameById).localeCompare(
-    fileNameFor(b.fileId, nameById),
-    undefined,
-    { sensitivity: "base" },
-  );
-}
-
-function sortFilePickerGroup(
-  books: readonly UsfmFilePickerFile[],
-  nameById: ReadonlyMap<string, string>,
-): UsfmFilePickerFile[] {
-  return [...books].sort((a, b) => compareFilePickerRows(a, b, nameById));
+  return a.displayLabel.localeCompare(b.displayLabel, undefined, { sensitivity: "base" });
 }
 
 /**
- * Parses each file's USFM and groups files for the USFM file picker control.
- * Standard `\\id` codes are split into Old Testament, New Testament, and other;
- * non-standard rows include unknown `\\id` codes, an empty/missing `\\id` line on
- * the first book, or **no** `\\id` at all (non-empty USFM).
+ * Groups files for the USFM file picker control by each file's `\\id` code
+ * (read with a parser-free scan, so the app's file browser never loads the
+ * TS parser). Standard `\\id` codes are split into Old Testament, New
+ * Testament, and other; non-standard rows include unknown `\\id` codes, an
+ * empty `\\id` line, or **no** `\\id` at all (non-empty USFM).
  * Labels are always the supplied {@link UsfmFilePickerFileInput.name} — table-of-contents
  * markers are not used. Multiple files with the same standard `\\id` (for example two
  * `GEN.usfm` copies) each appear as separate rows, ordered by the book table, then file
- * name when the table index ties. Files without `\\toc3` (or any `\\toc`) are grouped
- * from `\\id` alone.
+ * name when the table index ties. Groups match {@link buildUsfmBookPickerGroups} apart
+ * from labels and ordering.
  */
 export function buildUsfmFilePickerGroups(
   files: readonly UsfmFilePickerFileInput[],
 ): UsfmFilePickerGroups {
-  const nameById = new Map(files.map((f) => [f.id, f.name] as const));
-  const groups = buildUsfmBookPickerGroups(
-    files.map((f) => ({ id: f.id, usfm: f.usfm })),
-  );
+  const oldTestament: UsfmFilePickerFile[] = [];
+  const newTestament: UsfmFilePickerFile[] = [];
+  const other: UsfmFilePickerFile[] = [];
+  const nonStandard: UsfmFilePickerFile[] = [];
 
-  const finalize = (books: readonly UsfmBookPickerBook[]) =>
-    sortFilePickerGroup(withFileNames(books, nameById), nameById);
+  for (const file of files) {
+    if (!file.usfm.trim()) continue;
+
+    const code = normalizeUsfmBookCode(scanUsfmBookCode(file.usfm) ?? "");
+    const meta = code && isStandardUsfmBookIdentifier(code)
+      ? getStandardUsfmBookIdentifier(code)
+      : undefined;
+    const order = meta ? getStandardUsfmBookOrderIndex(code) : undefined;
+    if (!meta || order === undefined) {
+      nonStandard.push({
+        fileId: file.id,
+        code,
+        displayLabel: file.name,
+        canonGroup: "nonStandard",
+        sortIndex: 0,
+      });
+      continue;
+    }
+
+    const row: UsfmFilePickerFile = {
+      fileId: file.id,
+      code: meta.code,
+      displayLabel: file.name,
+      canonGroup: meta.canonGroup,
+      sortIndex: order,
+    };
+    if (meta.canonGroup === "ot") oldTestament.push(row);
+    else if (meta.canonGroup === "nt") newTestament.push(row);
+    else other.push(row);
+  }
 
   return {
-    oldTestament: finalize(groups.oldTestament),
-    newTestament: finalize(groups.newTestament),
-    other: finalize(groups.other),
-    nonStandard: finalize(groups.nonStandard),
+    oldTestament: oldTestament.sort(compareFilePickerRows),
+    newTestament: newTestament.sort(compareFilePickerRows),
+    other: other.sort(compareFilePickerRows),
+    nonStandard: nonStandard.sort(compareFilePickerRows),
   };
 }

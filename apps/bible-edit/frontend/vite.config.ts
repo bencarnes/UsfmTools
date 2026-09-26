@@ -44,6 +44,7 @@ export default defineConfig({
       ),
       "@usfm-tools/controls": path.join(workspaceRoot, "packages/usfm-controls/src/index.ts"),
       "@usfm-tools/parser": path.join(workspaceRoot, "packages/usfm-parser/src/index.ts"),
+      "@usfm-tools/model/scan": path.join(workspaceRoot, "packages/usfm-model/src/scan.ts"),
       "@usfm-tools/model": path.join(workspaceRoot, "packages/usfm-model/src/index.ts"),
     },
   },
