@@ -39,7 +39,7 @@ cd packages/usfm-parser-integration-tests
 deno task test
 ```
 
-From the repository root, `./build.sh` runs checks and all workspace tests in dependency order.
+These tests are reference-only and are not run by the root `deno task build`; the Berean corpus tests are being ported to `usfm-parser-go/integration/`.
 
 ## Test Data
 

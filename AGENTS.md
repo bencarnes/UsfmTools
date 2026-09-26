@@ -20,26 +20,26 @@ All packages under `packages/` are **Deno projects** wired together as a [Deno w
 ### Requirements
 
 - **Deno 2+** ([install](https://docs.deno.com/runtime/getting_started/installation/))
-- **Go 1.22+** ([install](https://go.dev/dl/)) — needed by `./build.sh` for `usfm-parser-go`
+- **Go 1.22+** ([install](https://go.dev/dl/)) — needed by `deno task build` for `usfm-parser-go`
 - Desktop app builds additionally need the **Wails CLI v2**, **npm**, and (Linux) **WebKitGTK 4.0/4.1**
 
 ### Development Commands
 
 | Task | Command | Where |
 |------|---------|-------|
-| Check + test everything | `./build.sh` | repo root |
+| Check + test everything | `deno task build` (runs `build.ts`; `./build.sh` wraps it) | repo root |
 | Type-check TS | `deno task check` | repo root or a `packages/*` dir |
 | Test TS | `deno task test` | repo root or a `packages/*` dir |
 | Lint TS | `deno task lint` | repo root or a `packages/*` dir |
 | Vet/test Go | `go vet ./...` / `go test ./...` | `usfm-parser-go/` (also `apps/bible-edit/`) |
 | Engine race suite | `go test -race ./engine/` | `usfm-parser-go/` |
 | Build the CLI | `go build ./cmd/usfm` | `usfm-parser-go/` |
-| Build the desktop app | `./build.sh` | `apps/bible-edit/` (auto-adds `-tags webkit2_41` when WebKitGTK 4.0 is absent) |
+| Build the desktop app | `deno task build:bible-edit` (runs `apps/bible-edit/build.ts`; `apps/bible-edit/build.sh` wraps it) | repo root (auto-adds `-tags webkit2_41` when WebKitGTK 4.0 is absent) |
 | Run the app in dev mode | `wails dev -tags webkit2_41` | `apps/bible-edit/` (tag required on distros without WebKitGTK 4.0, e.g. Debian 13+; plain `wails dev` fails with "webkit2gtk-4.0 not found") |
 | Regenerate Wails JS bindings | `wails generate module` | `apps/bible-edit/` (after changing bound Go types/methods) |
 | Component stories (Ladle) | `deno task ladle` | `packages/usfm-controls/` |
 
-Root `deno task check`/`test` (and `./build.sh`) cover **usfm-model** and **usfm-controls** only; `usfm-parser` and its integration tests are reference-only and deliberately excluded. Dependency order: **usfm-model** → **usfm-controls**; the Go module is independent; **bible-edit** depends on the Go module (via a `replace` directive in its `go.mod`) and on `usfm-controls` source (via vite aliases).
+Root `deno task check`/`test` (and `deno task build`) cover **usfm-model** and **usfm-controls** only; `usfm-parser` and its integration tests are reference-only and deliberately excluded. Dependency order: **usfm-model** → **usfm-controls**; the Go module is independent; **bible-edit** depends on the Go module (via a `replace` directive in its `go.mod`) and on `usfm-controls` source (via vite aliases).
 
 ### Notes
 
@@ -51,4 +51,4 @@ Root `deno task check`/`test` (and `./build.sh`) cover **usfm-model** and **usfm
 - The Go parser/classifier/preview are kept **byte-identical** to the TS reference implementation, verified across the BSB corpus with the differential tools in `usfm-parser-go/internal/{lex,ast,class,preview}dump`. If you intentionally change behavior on one side, change the other (or record the divergence in `todo.md` follow-ups).
 - The **bible-edit frontend** is npm/vite (not Deno); `frontend/vite.config.ts` aliases `@usfm-tools/controls` to the package source, and `frontend/src/usfm-controls.d.ts` is a hand-maintained type shim for those imports — keep it in sync when the controls API changes. Generated bindings live in `frontend/wailsjs/` (do not edit by hand).
 - **usfm-controls** React tests use happy-dom (`tests/dom-setup.ts`, `tests/testing-react.ts`). CodeMirror-heavy suites pass `flushTimers: true` to `registerDomTestHooks()` so pending timers finish before unmount.
-- **usfm-controls** component stories use [Ladle](https://ladle.dev/) via Deno (`deno task ladle` / `deno task ladle:build` in `packages/usfm-controls/`). Ladle runs through Vite with `--node-modules-dir=auto` (see that package’s `deno.json` tasks). `vite.config.ts` uses `@vitejs/plugin-react` (Babel) instead of Ladle’s default SWC plugin so no Node.js/npm CLI is required for postinstall scripts. Config lives in `.ladle/` and `vite.config.ts`. Ladle may create a gitignored `node_modules/` at the repo root; `./build.sh` removes it so tests resolve npm packages from Deno’s cache without requiring the npm CLI.
+- **usfm-controls** component stories use [Ladle](https://ladle.dev/) via Deno (`deno task ladle` / `deno task ladle:build` in `packages/usfm-controls/`). Ladle runs through Vite with `--node-modules-dir=auto` (see that package’s `deno.json` tasks). `vite.config.ts` uses `@vitejs/plugin-react` (Babel) instead of Ladle’s default SWC plugin so no Node.js/npm CLI is required for postinstall scripts. Config lives in `.ladle/` and `vite.config.ts`. Ladle may create a gitignored `node_modules/` at the repo root; `deno task build` removes it so tests resolve npm packages from Deno’s cache without requiring the npm CLI.

@@ -49,11 +49,13 @@ Supporting directories: **`bibles/`** holds the Berean Standard Bible USFM corpu
 
 ## Build and test everything
 
-From the repository root:
+From the repository root (works on Windows, macOS, and Linux):
 
 ```bash
-./build.sh
+deno task build
 ```
+
+The build logic lives in `build.ts`; `./build.sh` is a thin wrapper around `deno task build` for POSIX shells.
 
 This type-checks and tests the active Deno packages (`usfm-model`, `usfm-controls`), then runs `go vet ./...` and `go test ./...` in `usfm-parser-go/`. (`usfm-parser` and its integration tests are reference-only and skipped.)
 
@@ -77,8 +79,7 @@ go build ./cmd/usfm        # the standalone CLI
 Desktop app:
 
 ```bash
-cd apps/bible-edit
-./build.sh                 # npm install + vite build + wails build
+deno task build:bible-edit # npm install + vite build + wails build (from repo root)
 ```
 
 ## Per-package commands
