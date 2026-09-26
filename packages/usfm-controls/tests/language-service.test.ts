@@ -4,9 +4,8 @@ import { expect } from "@std/expect";
 import {
   UsfmLanguageService,
   createLanguageClient,
-  DiagnosticSeverity,
-  TokenType,
-} from "../src/language-service/index.js";
+} from "../src/local.js";
+import { DiagnosticSeverity, TokenType } from "../src/language-service/protocol.js";
 
 describe("UsfmLanguageService", () => {
   const service = new UsfmLanguageService();

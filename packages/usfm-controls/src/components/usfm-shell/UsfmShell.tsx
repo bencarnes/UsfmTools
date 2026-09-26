@@ -9,7 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactElement,
 } from "react";
-import { createLocalLanguageClient } from "../../language-service/local-client.js";
+import { createDeferredLocalLanguageClient } from "../../language-service/default-client.js";
 import { createDocumentSessionManager } from "../../language-service/document-sessions.js";
 import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
 import { UsfmWorkspace } from "../usfm-workspace/UsfmWorkspace.js";
@@ -49,7 +49,7 @@ import {
   SearchIcon,
 } from "./shell-icons.js";
 import { lineColumnToSourceOffset } from "./line-offsets.js";
-import type { UsfmFilePickerGroups } from "@usfm-tools/model";
+import type { UsfmFilePickerGroups } from "@usfm-tools/model/scan";
 import type { UsfmShellFileEntry, UsfmShellHost, UsfmShellRecentFolder } from "./host.js";
 import { buildUsfmFilePickerCatalog, EMPTY_FILE_CATALOG } from "./file-catalog.js";
 
@@ -107,7 +107,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
 ) {
   // One client instance serves every editor tab for the shell's lifetime.
   const languageClient = useMemo(
-    () => languageClientProp ?? createLocalLanguageClient(),
+    () => languageClientProp ?? createDeferredLocalLanguageClient(),
     [languageClientProp],
   );
   // Tabs showing the same file share one client document through this

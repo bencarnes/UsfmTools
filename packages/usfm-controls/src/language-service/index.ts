@@ -1,4 +1,3 @@
-export { UsfmLanguageService, createLanguageClient } from "./service.js";
 export type {
   AnalysisEvent,
   BookInfo,
@@ -28,8 +27,7 @@ export type {
   SessionViewPort,
 } from "./document-sessions.js";
 export {
-  applyChangesToText,
-  createLocalLanguageClient,
+  createDeferredLocalLanguageClient,
   sharedLocalLanguageClient,
-} from "./local-client.js";
+} from "./default-client.js";
 export type { LocalLanguageClientOptions } from "./local-client.js";

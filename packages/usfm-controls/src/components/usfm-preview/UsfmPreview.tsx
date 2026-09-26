@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from "react";
 import type { UsfmLanguageClient } from "../../language-service/protocol.js";
-import { sharedLocalLanguageClient } from "../../language-service/local-client.js";
+import { sharedLocalLanguageClient } from "../../language-service/default-client.js";
 import { applyPreviewHtml, type PreviewChunks } from "./preview-dom.js";
 
 /** Storybook (and URL state) may supply boolean controls as strings. */

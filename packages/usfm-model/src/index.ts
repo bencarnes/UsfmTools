@@ -26,36 +26,7 @@ export const ViewModels = {
 export { renderPreviewHtml } from "./renderer/index.js";
 export type { RenderPreviewOptions } from "./renderer/index.js";
 
-export {
-  STANDARD_USFM_BOOK_IDENTIFIERS,
-  normalizeUsfmBookCode,
-  isStandardUsfmBookIdentifier,
-  getStandardUsfmBookOrderIndex,
-  getStandardUsfmBookIdentifier,
-  buildUsfmBookPickerGroups,
-  buildUsfmFilePickerGroups,
-  scanUsfmPickerHeader,
-  scanUsfmPickerHeaderFromText,
-} from "./book-identifiers/index.js";
-export type {
-  StandardBookIdentifier,
-  StandardBookCanonGroup,
-  UsfmBookPickerCanonGroup,
-  UsfmBookPickerFileInput,
-  UsfmBookPickerBook,
-  UsfmBookPickerGroups,
-  UsfmFilePickerFileInput,
-  UsfmFilePickerFile,
-  UsfmFilePickerGroups,
-} from "./book-identifiers/index.js";
+export { buildUsfmBookPickerGroups } from "./book-identifiers/usfm-book-picker-model.js";
 
-export { listChapterNumbersFromBook } from "./list-chapter-numbers-from-book.js";
-export {
-  listChapterMarkersInBook,
-  chapterNumberAtOrBeforeSourceOffset,
-} from "./list-chapter-markers-in-book.js";
-export type { ChapterMarkerInBook } from "./list-chapter-markers-in-book.js";
-export {
-  bookIdMarkerOffsetInUsfm,
-  listChapterMarkersInUsfm,
-} from "./list-chapter-markers-in-usfm.js";
+// Parser-free API (also available alone as "@usfm-tools/model/scan").
+export * from "./scan.js";

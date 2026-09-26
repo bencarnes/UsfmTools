@@ -10,6 +10,7 @@ export type { StandardBookIdentifier, StandardBookCanonGroup } from "./standard-
 export {
   buildUsfmBookPickerGroups,
 } from "./usfm-book-picker-model.js";
+export { scanUsfmBookCode } from "./usfm-book-code-scan.js";
 export {
   consumeUsfmPickerHeaderLine,
   createUsfmPickerHeaderScanState,

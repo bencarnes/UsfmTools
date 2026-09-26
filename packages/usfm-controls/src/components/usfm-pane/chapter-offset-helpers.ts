@@ -1,4 +1,4 @@
-import type { ChapterMarkerInBook } from "@usfm-tools/model";
+import type { ChapterMarkerInBook } from "@usfm-tools/model/scan";
 
 /** Index of the last marker with `markerOffset <= sourceOffset`, or `-1`. */
 export function indexOfLastChapterMarkerAtOrBefore(

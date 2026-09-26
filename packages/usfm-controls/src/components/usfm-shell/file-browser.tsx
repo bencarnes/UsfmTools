@@ -1,5 +1,5 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
-import type { UsfmFilePickerGroups } from "@usfm-tools/model";
+import type { UsfmFilePickerGroups } from "@usfm-tools/model/scan";
 import { UsfmFilePicker } from "../usfm-file-picker/index.js";
 import { FolderSelector } from "./folder-selector.js";
 import type { UsfmShellFileEntry, UsfmShellRecentFolder } from "./host.js";

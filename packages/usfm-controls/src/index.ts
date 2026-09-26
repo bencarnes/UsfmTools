@@ -75,11 +75,6 @@ export type {
 } from "./components/usfm-shell/index.js";
 export { UsfmPreview } from "./components/usfm-preview/index.js";
 export type { UsfmPreviewProps } from "./components/usfm-preview/index.js";
-export { UsfmBookPicker } from "./components/usfm-book-picker/index.js";
-export type {
-  UsfmBookPickerProps,
-  UsfmBookPickerSelectDetail,
-} from "./components/usfm-book-picker/index.js";
 export { UsfmFilePicker } from "./components/usfm-file-picker/index.js";
 export type {
   UsfmFilePickerProps,
@@ -87,20 +82,18 @@ export type {
 } from "./components/usfm-file-picker/index.js";
 export { ChapterPicker } from "./components/chapter-picker/index.js";
 export type { ChapterPickerProps, ChapterPickerSelectDetail } from "./components/chapter-picker/index.js";
+// Parser-backed APIs (TS fallback client, preview renderer, book picker) live
+// in the "./local" entry point so apps injecting an engine client don't
+// bundle the TS parser.
 export {
-  renderPreviewHtml,
-  ViewModels,
-  PublicationViewModel,
-  buildUsfmBookPickerGroups,
   buildUsfmFilePickerGroups,
   listChapterNumbersFromBook,
   listChapterMarkersInBook,
   listChapterMarkersInUsfm,
   bookIdMarkerOffsetInUsfm,
   chapterNumberAtOrBeforeSourceOffset,
-} from "@usfm-tools/model";
+} from "@usfm-tools/model/scan";
 export type {
-  RenderPreviewOptions,
   UsfmBookPickerCanonGroup,
   UsfmBookPickerFileInput,
   UsfmBookPickerBook,
@@ -109,11 +102,10 @@ export type {
   UsfmFilePickerFile,
   UsfmFilePickerGroups,
   ChapterMarkerInBook,
-} from "@usfm-tools/model";
+} from "@usfm-tools/model/scan";
 export {
-  UsfmLanguageService,
-  createLanguageClient,
-  createLocalLanguageClient,
+  createDeferredLocalLanguageClient,
+  sharedLocalLanguageClient,
   createDocumentSessionManager,
   changesFromChangeSet,
   DocumentSync,
@@ -135,6 +127,7 @@ export type {
   DiagnosticsResult,
   DocumentChange,
   DocumentSyncOptions,
+  LocalLanguageClientOptions,
   DocumentSessionManager,
   DocumentSessionMembership,
   SessionViewPort,

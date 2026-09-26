@@ -187,17 +187,6 @@ export function createLocalLanguageClient(
   };
 }
 
-let shared: UsfmLanguageClient | null = null;
-
-/**
- * Lazily created process-wide local client, used as the default when no
- * client is injected (component stories, tests, standalone library use).
- */
-export function sharedLocalLanguageClient(): UsfmLanguageClient {
-  shared ??= createLocalLanguageClient();
-  return shared;
-}
-
 /**
  * Apply an edit batch (ascending, non-overlapping, offsets into the original
  * text). JavaScript string indices are UTF-16 code units, so the protocol
