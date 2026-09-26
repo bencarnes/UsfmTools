@@ -15,8 +15,8 @@
   "tasks": {
     "build": "deno run --allow-read --allow-write --allow-run build.ts",
     "build:bible-edit": "deno run --allow-read --allow-env --allow-run apps/bible-edit/build.ts",
-    "test": "deno test -A --unstable-sloppy-imports --parallel",
+    "test": "deno test -A --unstable-sloppy-imports --parallel packages/usfm-model packages/usfm-controls",
     "lint": "deno lint packages/",
-    "check": "deno check --unstable-sloppy-imports packages/usfm-parser/src packages/usfm-model/src packages/usfm-controls/src"
+    "check": "deno check --unstable-sloppy-imports packages/usfm-model/src packages/usfm-controls/src"
   }
 }

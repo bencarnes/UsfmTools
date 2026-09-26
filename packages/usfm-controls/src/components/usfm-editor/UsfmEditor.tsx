@@ -5,22 +5,48 @@ import {
   useRef,
 } from "react";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
-import { EditorState, EditorSelection, Prec, Compartment } from "@codemirror/state";
+import {
+  EditorState,
+  EditorSelection,
+  Prec,
+  Compartment,
+  Annotation,
+  Transaction,
+} from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { setDiagnostics } from "@codemirror/lint";
-import type { Diagnostic as LanguageDiagnostic } from "../../language-service/protocol.js";
+import type {
+  Diagnostic as LanguageDiagnostic,
+  UsfmLanguageClient,
+} from "../../language-service/protocol.js";
+import {
+  createDocumentSessionManager,
+  type DocumentSessionManager,
+  type DocumentSessionMembership,
+  type SessionViewPort,
+} from "../../language-service/document-sessions.js";
+import { sharedLocalLanguageClient } from "../../language-service/local-client.js";
 import {
   languageDiagnosticsToCm,
   usfmHighlighter,
   usfmLintExtension,
   usfmAutocomplete,
+  type EditorLanguageSession,
 } from "./codemirror-usfm.js";
 import {
   usfmSearchExtensions,
   openFindPanel,
   openFindReplacePanel,
 } from "./usfm-search-panel.js";
+
+/**
+ * Marks transactions that apply changes arriving from a sibling view of the
+ * same shared document (CodeMirror's split-view pattern): they must not be
+ * forwarded back to the session, must not mark the tab dirty or emit
+ * onChange, and must not enter this view's undo history.
+ */
+const siblingSyncAnnotation = Annotation.define<boolean>();
 
 export interface UsfmEditorHandle {
   /** Scroll so that {@link offset} sits at the top of the visible editor area. */
@@ -53,8 +79,30 @@ export interface UsfmEditorProps {
   onDirty?: () => void;
   /** Fired on every document edit (before any `onChange` debounce). */
   onDocumentChange?: () => void;
-  /** Parse diagnostics for the current tab (owned by the shell; drives lint squiggles). */
-  diagnostics?: readonly LanguageDiagnostic[];
+  /**
+   * Language client serving diagnostics, highlighting, and completions. The
+   * editor opens its own engine document, forwards CodeMirror change sets
+   * incrementally, and closes it on unmount. Must be stable for the editor's
+   * lifetime; defaults to the in-process TypeScript client.
+   */
+  languageClient?: UsfmLanguageClient;
+  /** Fired with fresh parse diagnostics whenever the engine re-analyzes. */
+  onDiagnostics?: (diagnostics: readonly LanguageDiagnostic[]) => void;
+  /**
+   * Reports the language-client document id backing this editor: the id on
+   * mount, `null` on unmount. Lets siblings (e.g. the split-pane preview)
+   * issue requests against the editor's synced document copy.
+   */
+  onDocumentIdChange?: (id: string | null) => void;
+  /**
+   * Shared document sessions (must be created for the same `languageClient`).
+   * Together with `documentKey`, editors showing the same document share one
+   * client document and converge synchronously. Without them, this editor
+   * gets a private document (previous behavior).
+   */
+  documentSessions?: DocumentSessionManager;
+  /** Identity of the document this editor shows (e.g. the file id). */
+  documentKey?: string;
   /**
    * Registers a reader for the live document buffer. Called on mount/update;
    * return value unregisters on cleanup.
@@ -79,7 +127,11 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     onChangeDebounceMs = 0,
     onDirty,
     onDocumentChange,
-    diagnostics = [],
+    languageClient,
+    onDiagnostics,
+    onDocumentIdChange,
+    documentSessions,
+    documentKey,
     onRegisterDocumentReader,
     onSave,
     onViewportAnchorChange,
@@ -94,16 +146,29 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   const onChangeRef = useRef(onChange);
   const onDirtyRef = useRef(onDirty);
   const onDocumentChangeRef = useRef(onDocumentChange);
+  const onDiagnosticsRef = useRef(onDiagnostics);
+  const onDocumentIdChangeRef = useRef(onDocumentIdChange);
+  const languageClientRef = useRef(languageClient);
+  const documentSessionsRef = useRef(documentSessions);
+  const documentKeyRef = useRef(documentKey);
   const onSaveRef = useRef(onSave);
   const onViewportAnchorChangeRef = useRef(onViewportAnchorChange);
   const viewportDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const changeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastEmittedRef = useRef(value);
+  // True while an emitted change is still round-tripping through the parent
+  // as a `value` echo (cleared when the echo arrives). See the value effect.
+  const echoPendingRef = useRef(false);
   const dirtyReportedRef = useRef(false);
 
   onChangeRef.current = onChange;
   onDirtyRef.current = onDirty;
   onDocumentChangeRef.current = onDocumentChange;
+  onDiagnosticsRef.current = onDiagnostics;
+  onDocumentIdChangeRef.current = onDocumentIdChange;
+  languageClientRef.current = languageClient;
+  documentSessionsRef.current = documentSessions;
+  documentKeyRef.current = documentKey;
   onSaveRef.current = onSave;
   onViewportAnchorChangeRef.current = onViewportAnchorChange;
 
@@ -111,7 +176,19 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
 
   const emitChange = (content: string) => {
     lastEmittedRef.current = content;
+    echoPendingRef.current = onChangeRef.current != null;
     onChangeRef.current?.(content);
+  };
+
+  // Emit only when the document actually changed since the last emission (or
+  // external replace). A no-op emission would produce no state change in the
+  // parent and therefore no `value` echo, leaving the echo guard armed
+  // forever — which would block all future external value updates (e.g.
+  // edits arriving from another tab sharing this file's buffer).
+  const emitChangedDocument = () => {
+    const content = readDocument();
+    if (content !== lastEmittedRef.current) emitChange(content);
+    return content;
   };
 
   const emitPendingChange = () => {
@@ -119,21 +196,21 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
       clearTimeout(changeDebounceRef.current);
       changeDebounceRef.current = null;
     }
-    const content = readDocument();
-    emitChange(content);
-    return content;
+    return emitChangedDocument();
   };
 
-  const scheduleChange = (content: string) => {
+  // The document string is materialized when the change is emitted, not per
+  // keystroke — toString() over a large book on every edit is avoidable work.
+  const scheduleChange = () => {
     if (!onChangeRef.current) return;
     if (onChangeDebounceMs <= 0) {
-      emitChange(content);
+      emitChangedDocument();
       return;
     }
     if (changeDebounceRef.current) clearTimeout(changeDebounceRef.current);
     changeDebounceRef.current = setTimeout(() => {
       changeDebounceRef.current = null;
-      emitChange(content);
+      emitChangedDocument();
     }, onChangeDebounceMs);
   };
 
@@ -195,6 +272,38 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Each mounted editor joins the shared document session for its
+    // documentKey: all views of one document (e.g. the same file in two tab
+    // groups) share a single client document; edits made in any view are
+    // forwarded to the client once and to sibling views synchronously.
+    // Without an injected manager/key the editor gets a private session,
+    // which behaves like the previous one-document-per-editor model.
+    const client = languageClientRef.current ?? sharedLocalLanguageClient();
+    const manager = documentSessionsRef.current ?? createDocumentSessionManager(client);
+    const joinKey = documentKeyRef.current ?? crypto.randomUUID();
+    let membership!: DocumentSessionMembership; // assigned below, before any dispatch
+
+    const viewPort: SessionViewPort = {
+      getText: readDocument,
+      applyChanges(batch) {
+        const v = viewRef.current;
+        if (!v) return;
+        v.dispatch({
+          changes: batch.map((c) => ({ from: c.from, to: c.to, insert: c.text })),
+          annotations: [siblingSyncAnnotation.of(true), Transaction.addToHistory.of(false)],
+        });
+      },
+    };
+
+    const session: EditorLanguageSession = {
+      classifyRange: (from, to) =>
+        membership
+          .request(() => client.classifyRange(membership.documentId, from, to))
+          .then((r) => r.tokens),
+      getCompletions: (line, column) =>
+        membership.request(() => client.getCompletions(membership.documentId, line, column)),
+    };
+
     const scheduleViewportReport = () => {
       if (!onViewportAnchorChangeRef.current) return;
       if (viewportDebounceRef.current) clearTimeout(viewportDebounceRef.current);
@@ -212,12 +321,23 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
 
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged) {
-        onDocumentChangeRef.current?.();
-        if (!dirtyReportedRef.current) {
-          dirtyReportedRef.current = true;
-          onDirtyRef.current?.();
+        let localEdit = false;
+        for (const tr of update.transactions) {
+          // Sibling-sync transactions were already forwarded by the view
+          // that originated them; forwarding again would double-apply.
+          if (tr.docChanged && !tr.annotation(siblingSyncAnnotation)) {
+            localEdit = true;
+            membership.applyLocalChanges(tr.changes);
+          }
         }
-        scheduleChange(update.state.doc.toString());
+        if (localEdit) {
+          if (!dirtyReportedRef.current) {
+            dirtyReportedRef.current = true;
+            onDirtyRef.current?.();
+          }
+          scheduleChange();
+        }
+        onDocumentChangeRef.current?.();
       }
       // Typing moves the selection every keystroke; skip viewport sync then so split-pane
       // scroll alignment does not walk the preview DOM on each character.
@@ -245,9 +365,9 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
             },
           ]),
         ),
-        usfmHighlighter,
+        usfmHighlighter(session),
         usfmLintExtension,
-        usfmAutocomplete,
+        usfmAutocomplete(session),
         usfmSearchExtensions,
         updateListener,
         EditorView.theme({
@@ -324,12 +444,49 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
     viewRef.current = view;
     view.scrollDOM.addEventListener("scroll", scheduleViewportReport, { passive: true });
 
+    // Join the shared document session (after viewRef is set, so getText
+    // reads the live buffer) and route its pushed analyses into lint
+    // squiggles and the onDiagnostics callback.
+    membership = manager.join(joinKey, viewPort);
+    if (membership.initialText != null && membership.initialText !== readDocument()) {
+      // Late joiner: adopt the session's authoritative text — the copy this
+      // editor was created from (e.g. the workspace model) may lag the live
+      // sibling buffer by a debounce window.
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: membership.initialText },
+        annotations: [siblingSyncAnnotation.of(true), Transaction.addToHistory.of(false)],
+      });
+    }
+    onDocumentIdChangeRef.current?.(membership.documentId);
+    const unsubscribeAnalysis = client.onAnalysis((event) => {
+      if (event.id !== membership.documentId) return;
+      // An analysis older than the edits already forwarded carries pre-edit
+      // positions, and the client is guaranteed to re-analyze after every
+      // edit, so a fresh push follows. Skip it: CodeMirror has been mapping
+      // the previously applied squiggles through the edits meanwhile, which
+      // is more accurate than painting stale offsets.
+      if (event.version < membership.version) return;
+      const v = viewRef.current;
+      if (v) {
+        v.dispatch(setDiagnostics(v.state, languageDiagnosticsToCm(v.state.doc, event.diagnostics)));
+      }
+      onDiagnosticsRef.current?.(event.diagnostics);
+    });
+
     return () => {
+      onDocumentIdChangeRef.current?.(null);
+      unsubscribeAnalysis();
+      membership.leave();
       view.scrollDOM.removeEventListener("scroll", scheduleViewportReport);
       if (viewportDebounceRef.current) clearTimeout(viewportDebounceRef.current);
       viewportDebounceRef.current = null;
-      if (changeDebounceRef.current) clearTimeout(changeDebounceRef.current);
-      changeDebounceRef.current = null;
+      if (changeDebounceRef.current) {
+        clearTimeout(changeDebounceRef.current);
+        changeDebounceRef.current = null;
+        // Flush rather than drop: unmounting mid-debounce (e.g. a view-mode
+        // switch remounting the editor) must not lose the last edits.
+        emitChangedDocument();
+      }
       view.destroy();
       viewRef.current = null;
     };
@@ -347,12 +504,6 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-    view.dispatch(setDiagnostics(view.state, languageDiagnosticsToCm(view.state.doc, diagnostics)));
-  }, [diagnostics]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
     view.dispatch({
       effects: wordWrapCompartmentRef.current.reconfigure(
         wordWrap ? EditorView.lineWrapping : [],
@@ -364,11 +515,47 @@ export const UsfmEditor = forwardRef<UsfmEditorHandle, UsfmEditorProps>(function
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-    if (value === lastEmittedRef.current) return;
+    if (value === lastEmittedRef.current) {
+      echoPendingRef.current = false;
+      return;
+    }
+    // While an emitted change is still echoing back through the parent, a
+    // differing prop is a *stale* echo of an older emission (this effect runs
+    // after paint, so under main-thread congestion the next debounced
+    // emission can land before the previous echo's effect does). Treating it
+    // as an external change would replace the document with old content —
+    // wiping the newest edits and throwing the caret to offset 0. Skip it;
+    // the echo of the latest emission follows and clears the flag.
+    if (echoPendingRef.current) return;
+    // In a shared document session, sibling views converge synchronously
+    // through the session itself; the value prop is workspace bookkeeping
+    // only. A differing value here is a stale echo of a *sibling's* emission
+    // (it lags the live buffer whenever the user typed during the echo's
+    // round trip) — applying it would revert those newest keystrokes in
+    // every view of the session.
+    if (documentSessionsRef.current && documentKeyRef.current) return;
     const currentContent = view.state.doc.toString();
     if (currentContent !== value) {
+      // Dispatch the minimal single-range change (common prefix/suffix
+      // trimmed) rather than a whole-document replace: the engine sync then
+      // forwards a few bytes instead of the full book, decorations and
+      // squiggles outside the edit survive unmapped, and this editor's
+      // caret/scroll stay put (a full replace maps the caret to offset 0).
+      let from = 0;
+      const maxFrom = Math.min(currentContent.length, value.length);
+      while (from < maxFrom && currentContent.charCodeAt(from) === value.charCodeAt(from)) from++;
+      let toOld = currentContent.length;
+      let toNew = value.length;
+      while (
+        toOld > from &&
+        toNew > from &&
+        currentContent.charCodeAt(toOld - 1) === value.charCodeAt(toNew - 1)
+      ) {
+        toOld--;
+        toNew--;
+      }
       view.dispatch({
-        changes: { from: 0, to: currentContent.length, insert: value },
+        changes: { from, to: toOld, insert: value.slice(from, toNew) },
       });
       lastEmittedRef.current = value;
       dirtyReportedRef.current = false;

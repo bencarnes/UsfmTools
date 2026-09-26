@@ -108,6 +108,13 @@
     font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
     max-width: 42rem;
   }
+  /* Whole-book previews are large (Psalms ≈ thousands of lines); rendering and
+     laying out only the on-screen chapters keeps full-document swaps cheap.
+     The intrinsic-size estimate stands in for off-screen chapter heights. */
+  .usfm-preview-root .usfm-chapter {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1200px;
+  }
   /* Inner HTML is outside React; be explicit so each verse line (<p>) stacks vertically. */
   .usfm-preview-root .usfm-line {
     display: block;

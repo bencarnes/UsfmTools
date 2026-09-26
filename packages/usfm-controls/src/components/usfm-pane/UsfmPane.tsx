@@ -8,13 +8,14 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { chapterNumberAtOrBeforeSourceOffset } from "@usfm-tools/model";
+import type { Diagnostic, UsfmLanguageClient } from "../../language-service/protocol.js";
 import {
-  bookIdMarkerOffsetInUsfm,
-  chapterNumberAtOrBeforeSourceOffset,
-  listChapterMarkersInUsfm,
-  type ChapterMarkerInBook,
-} from "@usfm-tools/model";
-import type { Diagnostic } from "../../language-service/protocol.js";
+  chapterStructureFromEngine,
+  chapterStructureFromText,
+  type ChapterStructure,
+} from "./chapter-structure.js";
+import type { DocumentSessionManager } from "../../language-service/document-sessions.js";
 import type { ChapterPickerSelectDetail } from "../chapter-picker/ChapterPicker.js";
 import { ChapterNavigator } from "./chapter-navigator.js";
 import { UsfmEditor, type UsfmEditorHandle } from "../usfm-editor/UsfmEditor.js";
@@ -41,11 +42,25 @@ import { FindToolbarButton } from "./find-toolbar-button.js";
 import { SaveToolbarButton } from "./save-toolbar-button.js";
 import { themedControlButton } from "../../theme-tokens.js";
 
-/** Delay preview HTML regeneration while typing in split editor+preview mode. */
+/**
+ * Delay preview regeneration while typing in split editor+preview mode. Parsing and
+ * rendering run off the UI thread (language client), but swapping the full-book
+ * preview DOM (parse + layout) blocks the UI thread for a long time on modest
+ * hardware, so refreshes must not fire at every between-sentences pause — hence a
+ * generous idle window, driven from the live editor buffer.
+ */
 const PREVIEW_UPDATE_DEBOUNCE_MS = 1500;
 /** Defer scroll sync until typing pauses in split mode. */
 const SCROLL_SYNC_TYPING_IDLE_MS = 500;
-/** Defer chapter-marker rescans while typing in split mode (markers rarely change per keystroke). */
+/** Coalesce preview scroll events before syncing the editor (layout + text scans). */
+const PREVIEW_TO_EDITOR_SYNC_DEBOUNCE_MS = 120;
+/** Ignore preview scroll activity this long after a preview DOM swap. */
+const PREVIEW_SWAP_SYNC_SUPPRESS_MS = 300;
+/**
+ * Throttle chapter-structure refetches while typing in split mode (markers
+ * rarely change per keystroke). Now off the UI thread (an engine request), so
+ * this only limits bridge round-trips rather than guarding a UI-thread scan.
+ */
 const NAV_MARKERS_DEBOUNCE_MS = 300;
 /** Defer lifting the full document string to React while typing in the workspace. */
 const EDITOR_VALUE_SYNC_DEBOUNCE_MS = 500;
@@ -62,10 +77,14 @@ export interface UsfmPaneProps {
   readonly onSave?: (value: string) => void;
   /** When true, the tab has unsaved edits and the save control is enabled. */
   readonly dirty?: boolean;
-  /** Parse diagnostics for this tab (from unified shell validation). */
-  readonly diagnostics?: readonly Diagnostic[];
-  /** Fired on every editor document edit to schedule shell validation. */
-  readonly onValidationDocumentChange?: () => void;
+  /** Language client serving diagnostics/highlighting/completions (stable for the pane's lifetime). */
+  readonly languageClient?: UsfmLanguageClient;
+  /** Shared document sessions (created for `languageClient`); see UsfmEditor. */
+  readonly documentSessions?: DocumentSessionManager;
+  /** Identity of the shown document (e.g. the file id) for session sharing. */
+  readonly documentKey?: string;
+  /** Fired with fresh parse diagnostics for this tab whenever the engine re-analyzes. */
+  readonly onDiagnostics?: (diagnostics: readonly Diagnostic[]) => void;
   /** Register a reader for the live editor buffer with the shell. */
   readonly onRegisterDocumentReader?: (readDocument: () => string) => void | (() => void);
   /**
@@ -120,8 +139,10 @@ export function UsfmPane({
   onDirty,
   onSave,
   dirty = false,
-  diagnostics,
-  onValidationDocumentChange,
+  languageClient,
+  documentSessions,
+  documentKey,
+  onDiagnostics,
   onRegisterDocumentReader,
   toolbarMount,
   toolbarActive = true,
@@ -137,6 +158,10 @@ export function UsfmPane({
   const [previewTopChapter, setPreviewTopChapter] = useState<string | null>(null);
   const [scrollSyncEnabled, setScrollSyncEnabled] = useState(defaultScrollSyncEnabled);
   const [wordWrapEnabled, setWordWrapEnabled] = useState(true);
+  // Language-client document id of the mounted editor (null when no editor is
+  // mounted, e.g. preview-only mode). Lets the split-pane preview render the
+  // engine's synced copy instead of shipping the full text per refresh.
+  const [editorDocumentId, setEditorDocumentId] = useState<string | null>(null);
 
   const editorRef = useRef<UsfmEditorHandle>(null);
   const valueRef = useRef(value);
@@ -147,17 +172,45 @@ export function UsfmPane({
   const splitDragRef = useRef<{ startX: number; startPct: number } | null>(null);
   const previewScrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingIdleScrollSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewSyncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingAtRef = useRef(0);
+  const lastPreviewScrollTopRef = useRef(0);
+  const previewSwapAtRef = useRef(0);
   const [previewValue, setPreviewValue] = useState(value);
   const [navSource, setNavSource] = useState(value);
 
+  // Outside split mode the preview tracks `value` directly. In split mode it
+  // instead follows the live editor buffer (schedulePreviewRefresh below), so
+  // its latency does not stack on the value-lift debounce; `value` echoes of
+  // our own edits are ignored, and external replacements reach the preview
+  // through the editor's document-change notifications.
   useEffect(() => {
-    if (viewMode !== "split") {
-      setPreviewValue(value);
-      return;
-    }
-    const timer = setTimeout(() => setPreviewValue(value), PREVIEW_UPDATE_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    if (viewMode !== "split") setPreviewValue(value);
   }, [value, viewMode]);
+
+  // Entering split mode: snap the preview to the current buffer once instead
+  // of waiting out a debounce for the first render.
+  useEffect(() => {
+    if (viewMode === "split") {
+      setPreviewValue(editorRef.current?.getDocument() ?? valueRef.current);
+    }
+    return () => {
+      if (previewRefreshRef.current) {
+        clearTimeout(previewRefreshRef.current);
+        previewRefreshRef.current = null;
+      }
+    };
+  }, [viewMode]);
+
+  const schedulePreviewRefresh = useCallback(() => {
+    if (viewMode !== "split") return;
+    if (previewRefreshRef.current) clearTimeout(previewRefreshRef.current);
+    previewRefreshRef.current = setTimeout(() => {
+      previewRefreshRef.current = null;
+      setPreviewValue(editorRef.current?.getDocument() ?? valueRef.current);
+    }, PREVIEW_UPDATE_DEBOUNCE_MS);
+  }, [viewMode]);
 
   useEffect(() => {
     if (viewMode !== "split") {
@@ -171,16 +224,44 @@ export function UsfmPane({
   useEffect(() => {
     return () => {
       if (typingIdleScrollSyncRef.current) clearTimeout(typingIdleScrollSyncRef.current);
+      if (previewSyncDebounceRef.current) clearTimeout(previewSyncDebounceRef.current);
     };
   }, []);
 
+  // Chapter navigation structure (markers, book start, has-id). Served by the
+  // Go engine's real parse whenever an editor document is mounted (edit/split
+  // modes) — off the UI thread, reusing the analysis that already runs on
+  // every edit. In preview-only mode no engine document exists, so fall back
+  // to the in-process regex scan (not on the typing hot path there). The
+  // regex `markerSource` (debounced in split mode) is both the fallback text
+  // and the refetch trigger, preserving the previous refresh cadence.
   const markerSource = viewMode === "split" ? navSource : value;
-  const markers: readonly ChapterMarkerInBook[] = useMemo(
-    () => listChapterMarkersInUsfm(markerSource),
-    [markerSource],
+  const [structure, setStructure] = useState<ChapterStructure>(() =>
+    chapterStructureFromText(value),
   );
+
+  useEffect(() => {
+    if (!editorDocumentId || !languageClient) {
+      setStructure(chapterStructureFromText(markerSource));
+      return;
+    }
+    let cancelled = false;
+    languageClient
+      .getStructure(editorDocumentId)
+      .then((result) => {
+        if (!cancelled) setStructure(chapterStructureFromEngine(result));
+      })
+      .catch(() => {
+        // Document closed mid-request (editor remounting) or client
+        // unavailable: keep the last structure until the next trigger.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editorDocumentId, languageClient, markerSource]);
+
+  const { markers, bookStartOffset, hasBookId } = structure;
   const chapterNumbers = useMemo(() => markers.map((m) => m.number), [markers]);
-  const hasBookId = useMemo(() => bookIdMarkerOffsetInUsfm(markerSource) != null, [markerSource]);
 
   const navChapterText = useMemo(() => {
     if (viewMode === "preview") return previewTopChapter ?? "—";
@@ -189,8 +270,6 @@ export function UsfmPane({
   }, [viewMode, previewTopChapter, markers, editorTopOffset]);
 
   const hasChapters = markers.length > 0;
-
-  const bookStartOffset = useMemo(() => bookIdMarkerOffsetInUsfm(markerSource) ?? 0, [markerSource]);
 
   const releaseSyncLockSoon = useCallback(() => {
     window.setTimeout(() => {
@@ -230,9 +309,10 @@ export function UsfmPane({
   }, [viewMode, scrollSyncEnabled, syncPreviewToEditorOffset]);
 
   const notifyDocumentChange = useCallback(() => {
+    lastTypingAtRef.current = Date.now();
+    schedulePreviewRefresh();
     scheduleIdleScrollSync();
-    onValidationDocumentChange?.();
-  }, [scheduleIdleScrollSync, onValidationDocumentChange]);
+  }, [schedulePreviewRefresh, scheduleIdleScrollSync]);
 
   const registerDocumentReader = useCallback(() => {
     return editorRef.current?.getDocument() ?? valueRef.current;
@@ -385,10 +465,40 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
     [markers, viewMode, readPreviewChapter],
   );
 
+  // Preview→editor sync is debounced (scroll events arrive at frame rate and
+  // each sync forces layout over the large preview DOM plus text scans),
+  // paused while typing (mirroring the editor→preview direction), and
+  // suppressed briefly after a preview DOM swap — the swap itself perturbs
+  // scroll positions, and reacting to that used to drag the editor to the
+  // top of the book.
+  const schedulePreviewToEditorSync = useCallback(() => {
+    if (previewSyncDebounceRef.current) clearTimeout(previewSyncDebounceRef.current);
+    previewSyncDebounceRef.current = setTimeout(() => {
+      previewSyncDebounceRef.current = null;
+      if (Date.now() - lastTypingAtRef.current < SCROLL_SYNC_TYPING_IDLE_MS) return;
+      if (Date.now() - previewSwapAtRef.current < PREVIEW_SWAP_SYNC_SUPPRESS_MS) return;
+      syncEditorToPreviewTop();
+    }, PREVIEW_TO_EDITOR_SYNC_DEBOUNCE_MS);
+  }, [syncEditorToPreviewTop]);
+
+  // After a preview DOM swap, restore the scroll position the user (or the
+  // last sync) had established — replacing the innerHTML can reset or clamp
+  // it — and mark the swap so scroll sync ignores the resulting events.
+  const handlePreviewRendered = useCallback(() => {
+    if (viewMode !== "split") return;
+    previewSwapAtRef.current = Date.now();
+    const root = previewScrollRef.current;
+    if (root) root.scrollTop = lastPreviewScrollTopRef.current;
+  }, [viewMode]);
+
   const onPreviewScroll = useCallback(() => {
+    const root = previewScrollRef.current;
+    if (root && Date.now() - previewSwapAtRef.current >= PREVIEW_SWAP_SYNC_SUPPRESS_MS) {
+      lastPreviewScrollTopRef.current = root.scrollTop;
+    }
     if (viewMode === "preview") schedulePreviewChapterRead();
-    if (viewMode === "split") syncEditorToPreviewTop();
-  }, [viewMode, schedulePreviewChapterRead, syncEditorToPreviewTop]);
+    if (viewMode === "split") schedulePreviewToEditorSync();
+  }, [viewMode, schedulePreviewChapterRead, schedulePreviewToEditorSync]);
 
   const onSplitMouseDown = useCallback(
     (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -501,7 +611,11 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
             onChangeDebounceMs={EDITOR_VALUE_SYNC_DEBOUNCE_MS}
             onDirty={handleDirty}
             onDocumentChange={notifyDocumentChange}
-            diagnostics={diagnostics}
+            languageClient={languageClient}
+            documentSessions={documentSessions}
+            documentKey={documentKey}
+            onDiagnostics={onDiagnostics}
+            onDocumentIdChange={setEditorDocumentId}
             onSave={handleSave}
             onViewportAnchorChange={onEditorViewportAnchor}
             wordWrap={wordWrapEnabled}
@@ -515,7 +629,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
             className="flex-1 min-h-0 overflow-auto p-3"
             onScroll={onPreviewScroll}
           >
-            <UsfmPreview value={value} versePerLine={versePerLine} />
+            <UsfmPreview value={value} versePerLine={versePerLine} languageClient={languageClient} />
           </div>
         )}
 
@@ -529,7 +643,11 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 onChangeDebounceMs={EDITOR_VALUE_SYNC_DEBOUNCE_MS}
                 onDirty={handleDirty}
                 onDocumentChange={notifyDocumentChange}
-                diagnostics={diagnostics}
+                languageClient={languageClient}
+                documentSessions={documentSessions}
+                documentKey={documentKey}
+                onDiagnostics={onDiagnostics}
+                onDocumentIdChange={setEditorDocumentId}
                 onSave={handleSave}
                 onViewportAnchorChange={onEditorViewportAnchor}
                 wordWrap={wordWrapEnabled}
@@ -549,7 +667,13 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
                 className="flex-1 min-h-0 overflow-auto border-l border-gray-200 p-3 dark:border-gray-700"
                 onScroll={onPreviewScroll}
               >
-                <UsfmPreview value={previewValue} versePerLine={versePerLine} />
+                <UsfmPreview
+                  value={previewValue}
+                  documentId={editorDocumentId}
+                  versePerLine={versePerLine}
+                  languageClient={languageClient}
+                  onRendered={handlePreviewRendered}
+                />
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
-// Type-check and test all Deno workspace packages in dependency order.
+// Type-check and test the active Deno workspace packages in dependency order,
+// then vet and test the Go module (usfm-parser-go).
 // Cross-platform (Windows, macOS, Linux). Run from anywhere: `deno task build`
 
 import { dirname, fromFileUrl, join } from "@std/path";
@@ -16,6 +17,31 @@ async function runTask(rel: string, task: string): Promise<void> {
   }).output();
   if (code !== 0) {
     console.error(`\nError: [${rel}] deno task ${task} failed (exit code ${code}).`);
+    Deno.exit(code);
+  }
+}
+
+async function runGo(args: string[]): Promise<void> {
+  const rel = "usfm-parser-go";
+  console.log("");
+  console.log(`==> [${rel}] go ${args.join(" ")}`);
+  let code: number;
+  try {
+    ({ code } = await new Deno.Command("go", {
+      args,
+      cwd: join(ROOT, rel),
+      stdout: "inherit",
+      stderr: "inherit",
+    }).output());
+  } catch (e) {
+    if (e instanceof Deno.errors.NotFound) {
+      console.error("\nError: go is not installed or not on PATH (needed for usfm-parser-go).");
+      Deno.exit(1);
+    }
+    throw e;
+  }
+  if (code !== 0) {
+    console.error(`\nError: [${rel}] go ${args.join(" ")} failed (exit code ${code}).`);
     Deno.exit(code);
   }
 }
@@ -39,13 +65,18 @@ for await (const entry of Deno.readDir(join(ROOT, "packages"))) {
   }
 }
 
-await runTask("packages/usfm-parser", "check");
+// packages/usfm-parser is reference-only (superseded by usfm-parser-go) and is
+// not checked or tested here; it stays a workspace member only so remaining
+// imports in usfm-model/usfm-controls resolve until they switch to the Go
+// engine. Its integration tests (usfm-parser-integration-tests) are skipped
+// for the same reason; the Berean corpus tests are being ported to Go.
 await runTask("packages/usfm-model", "check");
 await runTask("packages/usfm-controls", "check");
-await runTask("packages/usfm-parser", "test");
 await runTask("packages/usfm-model", "test");
 await runTask("packages/usfm-controls", "test");
-await runTask("packages/usfm-parser-integration-tests", "test");
+
+await runGo(["vet", "./..."]);
+await runGo(["test", "./..."]);
 
 console.log("");
 console.log(
