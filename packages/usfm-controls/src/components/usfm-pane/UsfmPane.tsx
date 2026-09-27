@@ -37,6 +37,7 @@ import {
 } from "./scroll-sync.js";
 import { ScrollSyncToggleButton } from "./scroll-sync-toggle.js";
 import { WordWrapToggleButton } from "./word-wrap-toggle.js";
+import { VersePerLineToggleButton } from "./verse-per-line-toggle.js";
 import { nextViewMode, ViewModeCycleButton, type UsfmPaneViewMode } from "./view-mode-toggle.js";
 import { FindToolbarButton } from "./find-toolbar-button.js";
 import { SaveToolbarButton } from "./save-toolbar-button.js";
@@ -103,7 +104,11 @@ export interface UsfmPaneProps {
   /** When false, this pane does not render its toolbar into `toolbarMount` (inactive tab). */
   readonly toolbarActive?: boolean;
   readonly defaultViewMode?: UsfmPaneViewMode;
-  readonly versePerLine?: boolean;
+  /**
+   * Initial state of the toolbar's verse-per-line switch: the preview shows each verse on its own
+   * line, ignoring paragraph and poetry breaks. Default `false`.
+   */
+  readonly defaultVersePerLine?: boolean;
   readonly className?: string;
   /**
    * Initial on/off state for split-pane scroll sync when chapter markers exist.
@@ -155,7 +160,7 @@ export function UsfmPane({
   toolbarMount,
   toolbarActive = true,
   defaultViewMode = "split",
-  versePerLine,
+  defaultVersePerLine = false,
   className,
   defaultScrollSyncEnabled = true,
   selectionRequest,
@@ -166,6 +171,7 @@ export function UsfmPane({
   const [previewTopChapter, setPreviewTopChapter] = useState<string | null>(null);
   const [scrollSyncEnabled, setScrollSyncEnabled] = useState(defaultScrollSyncEnabled);
   const [wordWrapEnabled, setWordWrapEnabled] = useState(true);
+  const [versePerLine, setVersePerLine] = useState(defaultVersePerLine);
   // Language-client document id of the mounted editor (null when no editor is
   // mounted, e.g. preview-only mode). Lets the split-pane preview render the
   // engine's synced copy instead of shipping the full text per refresh.
@@ -578,6 +584,13 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
         wordWrapEnabled={wordWrapEnabled}
         buttonStyle={btnBase}
         onToggle={() => setWordWrapEnabled((v) => !v)}
+      />
+
+      <VersePerLineToggleButton
+        versePerLineEnabled={versePerLine}
+        disabled={viewMode === "edit"}
+        buttonStyle={btnBase}
+        onToggle={() => setVersePerLine((v) => !v)}
       />
 
       <FindToolbarButton

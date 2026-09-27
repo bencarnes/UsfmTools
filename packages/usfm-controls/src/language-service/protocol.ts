@@ -105,7 +105,7 @@ export type AnalysisEvent = { id: string } & DiagnosticsResult;
 
 /** Options for {@link UsfmLanguageClient.renderPreview}. */
 export interface PreviewOptions {
-  /** Render each verse on its own preview line. */
+  /** Render each verse on its own preview line, ignoring paragraph and poetry breaks. */
   versePerLine?: boolean;
 }
 
