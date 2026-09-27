@@ -19,8 +19,9 @@ import (
 
 // Options configures preview building/rendering.
 type Options struct {
-	// VersePerLine expands line blocks that contain multiple verse
-	// milestones so each verse renders on its own preview line.
+	// VersePerLine lays out consecutive line blocks as one preview line
+	// per verse: each verse milestone starts a new line and paragraph,
+	// poetry and stanza (\b) breaks within the run are ignored.
 	VersePerLine bool `json:"versePerLine,omitempty"`
 }
 
@@ -127,8 +128,8 @@ func BuildPreview(document *usfm.Node, opts Options) *Document {
 	return doc
 }
 
-// applyVersePerLine expands every line block that contains more than one
-// verse milestone into one line block per verse.
+// applyVersePerLine re-lays every run of consecutive line blocks as one
+// line block per verse (see splitRunByVerses).
 func applyVersePerLine(doc *Document) *Document {
 	books := make([]Book, len(doc.Books))
 	for i, book := range doc.Books {
@@ -148,47 +149,73 @@ func applyVersePerLine(doc *Document) *Document {
 
 func expandLineBlocks(blocks []Block) []Block {
 	out := []Block{}
+	run := []Block{}
+	flush := func() {
+		if len(run) > 0 {
+			out = append(out, splitRunByVerses(run)...)
+			run = run[:0]
+		}
+	}
 	for _, b := range blocks {
-		if b.Kind == BlockLine {
-			out = append(out, splitLineByVerses(b)...)
-		} else {
+		switch b.Kind {
+		case BlockLine:
+			run = append(run, b)
+		case BlockBlank:
+			// Stanza breaks are paragraph structure, which this mode ignores.
+			if len(run) == 0 {
+				out = append(out, b)
+			}
+		default:
+			flush()
 			out = append(out, b)
 		}
+	}
+	flush()
+	return out
+}
+
+// splitRunByVerses lays out a run of consecutive line blocks (paragraphs,
+// poetry lines, …) as one line per verse, ignoring the paragraph breaks
+// between them: a verse that spans several paragraphs stays on one line,
+// and every verse milestone starts a new one. Each line takes its marker
+// and flow from the block its first segment came from.
+func splitRunByVerses(run []Block) []Block {
+	out := []Block{}
+	var current *Block
+	for _, block := range run {
+		for i, s := range block.Segments {
+			if current == nil || (s.Kind == SegVerse && len(current.Segments) > 0) {
+				if current != nil {
+					out = append(out, *current)
+				}
+				current = &Block{Kind: BlockLine, Marker: block.Marker, Flow: block.Flow}
+			} else if i == 0 && needsSpaceBetween(current.Segments, s) {
+				// Joining across a paragraph break.
+				current.Segments = append(current.Segments, Segment{Kind: SegText, Text: " "})
+			}
+			current.Segments = append(current.Segments, s)
+		}
+	}
+	if current != nil {
+		out = append(out, *current)
 	}
 	return out
 }
 
-func splitLineByVerses(block Block) []Block {
-	verseSeenInCurrent := false
-	lines := [][]Segment{}
-	buf := []Segment{}
-
-	for _, s := range block.Segments {
-		if s.Kind == SegVerse {
-			if verseSeenInCurrent {
-				lines = append(lines, buf)
-				buf = []Segment{}
-				verseSeenInCurrent = false
-			}
-			buf = append(buf, s)
-			verseSeenInCurrent = true
-		} else {
-			buf = append(buf, s)
-		}
+// needsSpaceBetween reports whether joining next onto segments needs a
+// separating space.
+func needsSpaceBetween(segments []Segment, next Segment) bool {
+	if len(segments) == 0 {
+		return false
 	}
-	if len(buf) > 0 {
-		lines = append(lines, buf)
+	last := segments[len(segments)-1]
+	if last.Kind == SegText && strings.HasSuffix(last.Text, " ") {
+		return false
 	}
-
-	if len(lines) <= 1 {
-		return []Block{block}
+	if next.Kind == SegText && strings.HasPrefix(next.Text, " ") {
+		return false
 	}
-
-	out := make([]Block, len(lines))
-	for i, segments := range lines {
-		out[i] = Block{Kind: BlockLine, Marker: block.Marker, Flow: block.Flow, Segments: segments}
-	}
-	return out
+	return true
 }
 
 func buildBook(book *usfm.Node) Book {

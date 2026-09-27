@@ -96,6 +96,41 @@ describe("UsfmPane", () => {
     );
   });
 
+  it("toggles the preview's verse-per-line layout from the toolbar", async () => {
+    const client = {
+      ...createStubLanguageClient(),
+      renderPreview: (_text: string, options?: { versePerLine?: boolean }) =>
+        Promise.resolve(
+          `<article class="usfm-document" data-verse-per-line="${!!options?.versePerLine}"></article>`,
+        ),
+    };
+    const { container } = render(
+      <UsfmPane
+        value={"\\id GEN\n\\c 1\n\\p\n\\v 1 One. \\v 2 Two."}
+        defaultViewMode="preview"
+        languageClient={client}
+      />,
+    );
+    const rendered = () =>
+      container.querySelector<HTMLElement>("article.usfm-document")?.dataset.versePerLine;
+    await waitFor(() => expect(rendered()).toBe("false"));
+
+    const sw = screen.getByRole("switch", { name: /verse per line/i });
+    expect(sw.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(sw);
+    expect(sw.getAttribute("aria-checked")).toBe("true");
+    await waitFor(() => expect(rendered()).toBe("true"));
+
+    fireEvent.click(sw);
+    await waitFor(() => expect(rendered()).toBe("false"));
+  });
+
+  it("disables verse per line in edit-only view", () => {
+    render(<UsfmPane value={"\\id GEN\n\\c 1\n\\p\n\\v 1 Hello."} defaultViewMode="edit" />);
+    const sw = screen.getByRole("switch", { name: /verse per line/i });
+    expect(sw.hasAttribute("disabled")).toBe(true);
+  });
+
   it("shows a save button that is enabled only when dirty", () => {
     const onSave = spy(() => {});
     render(

@@ -67,11 +67,12 @@ change requests so it is clear which part is meant. Each entry gives the
 | Term | Description | Code |
 |------|-------------|------|
 | **Pane** (file pane) | Content of a USFM file tab: its toolbar plus the editor, preview, or both. | `usfm-pane/UsfmPane.tsx` |
-| **Pane toolbar** | The active tab's controls, rendered into the tab group header. In order: chapter navigator, scroll sync toggle, word wrap toggle, find button, save button, view mode button. | `toolbar` in `UsfmPane` (portaled into the header), test id `usfm-pane-toolbar` |
+| **Pane toolbar** | The active tab's controls, rendered into the tab group header. In order: chapter navigator, scroll sync toggle, word wrap toggle, verse-per-line toggle, find button, save button, view mode button. | `toolbar` in `UsfmPane` (portaled into the header), test id `usfm-pane-toolbar` |
 | **Chapter navigator** | Previous chapter ‹, current chapter button, next chapter ›. The current chapter button opens the chapter picker. | `usfm-pane/chapter-navigator.tsx` |
 | **Chapter picker** | Dropdown grid of chapter-number buttons for jumping to a chapter. | `chapter-picker/ChapterPicker.tsx` |
 | **Scroll sync toggle** | Turns synchronized scrolling between editor and preview (split view) on/off. | `usfm-pane/scroll-sync-toggle.tsx` |
 | **Word wrap toggle** | Turns soft word wrap in the editor on/off. | `usfm-pane/word-wrap-toggle.tsx` |
+| **Verse-per-line toggle** | Numbered-lines switch that lays out the preview one verse per line, ignoring paragraph and poetry breaks (disabled in edit-only view). | `usfm-pane/verse-per-line-toggle.tsx` |
 | **Find button** | Magnifier that opens the editor's find bar (disabled in preview-only view). | `usfm-pane/find-toolbar-button.tsx` |
 | **Save button** | Floppy disk; saves the tab (enabled only when dirty). | `usfm-pane/save-toolbar-button.tsx` |
 | **View mode button** | Cycles the pane through **Edit** view → **Preview** view → **Split** view (edit + preview side by side). Its icon shows the *next* mode. | `usfm-pane/view-mode-toggle.tsx` |

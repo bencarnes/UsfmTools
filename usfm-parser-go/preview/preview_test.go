@@ -134,6 +134,35 @@ func TestBuildPreviewVersePerLine(t *testing.T) {
 	}
 }
 
+func TestBuildPreviewVersePerLineIgnoresParagraphs(t *testing.T) {
+	source := "\\id PSA\n\\c 1\n\\q1\n\\v 1 Blessed\n\\q2 is the man\n\\b\n\\p\n\\v 2 Delight.\n\\s Head\n\\p More of two. \\v 3 Tree."
+	blocks := buildFrom(t, source, Options{VersePerLine: true}).Books[0].Chapters[0].Blocks
+	var got []string
+	for _, b := range blocks {
+		if b.Kind == BlockBlank {
+			t.Errorf("stanza break kept: %+v", blocks)
+		}
+		var text strings.Builder
+		for _, s := range b.Segments {
+			if s.Kind == SegVerse {
+				text.WriteString("[" + s.Number + "]")
+			}
+			text.WriteString(s.Text)
+		}
+		got = append(got, string(b.Kind)+":"+b.Marker+":"+text.String())
+	}
+	want := []string{
+		"line:q1:[1]Blessed is the man",
+		"line:p:[2]Delight.",
+		"heading:s:Head",
+		"line:p:More of two.",
+		"line:p:[3]Tree.",
+	}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Errorf("blocks =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 // --- ports of usfm-model/tests/render-preview-html.test.ts ---
 
 func TestRenderEscapesUserText(t *testing.T) {
