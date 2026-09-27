@@ -35,3 +35,13 @@ export function sourceOffsetToLineColumn(content: string, offset: number): { lin
   }
   return { line, column: clamped - lineStart };
 }
+
+/**
+ * Normalize CRLF / lone CR line breaks to LF — the text CodeMirror actually
+ * holds. Offsets computed over raw CRLF file text drift by one per preceding
+ * line relative to the editor, so text that feeds editor offsets (tab values,
+ * search matches) must be normalized first.
+ */
+export function normalizeLineEndings(content: string): string {
+  return content.indexOf("\r") < 0 ? content : content.replace(/\r\n?/g, "\n");
+}

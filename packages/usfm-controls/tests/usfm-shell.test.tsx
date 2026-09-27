@@ -9,7 +9,12 @@ import { UsfmShell, type UsfmShellHandle } from "../src/components/usfm-shell/Us
 import { createFixtureUsfmShellHost } from "../src/components/usfm-shell/fixture-host.js";
 import type { UsfmShellHost } from "../src/components/usfm-shell/host.js";
 import type { ApplicationSettings } from "../src/components/settings-pane/settings-model.js";
-import { lineColumnToSourceOffset, sourceOffsetToLineColumn } from "../src/components/usfm-shell/line-offsets.js";
+import {
+  lineColumnToSourceOffset,
+  normalizeLineEndings,
+  sourceOffsetToLineColumn,
+} from "../src/components/usfm-shell/line-offsets.js";
+import { EditorView } from "@codemirror/view";
 import { createFakeLanguageClient } from "./fake-language-client.ts";
 
 
@@ -76,6 +81,11 @@ describe("UsfmShell — line-offset helpers", () => {
     const text = "a\nb";
     expect(lineColumnToSourceOffset(text, 99, 99)).toBe(text.length);
     expect(lineColumnToSourceOffset(text, 0, 99)).toBe(1); // clamped to line length
+  });
+
+  it("normalizes CRLF and lone CR line breaks to LF", () => {
+    expect(normalizeLineEndings("a\r\nb\rc\nd")).toBe("a\nb\nc\nd");
+    expect(normalizeLineEndings("plain\ntext")).toBe("plain\ntext");
   });
 });
 
@@ -225,6 +235,29 @@ describe("UsfmShell", () => {
     await waitFor(() => screen.getByTestId("usfm-shell-search-result-0"));
     fireEvent.click(screen.getByTestId("usfm-shell-search-result-0"));
     await waitFor(() => screen.getByRole("tab", { name: /A\.usfm/i }));
+  });
+
+  it("selects the exact match in a CRLF file (editor holds LF text)", async () => {
+    const host = makeHost([
+      { id: "f://a", name: "A.usfm", usfm: "\\id GEN\r\n\\c 1\r\n\\p\r\n\\v 1 alpha\r\n\\v 2 bravo" },
+    ]);
+    const { container } = render(<UsfmShell host={host} />);
+    await waitFor(() => screen.getByTestId("usfm-shell-file-A.usfm"));
+    fireEvent.click(screen.getByTestId("usfm-shell-sidebar-tab-search"));
+    const input = screen.getByLabelText(/search query/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "bravo" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() => screen.getByTestId("usfm-shell-search-result-0"));
+    fireEvent.click(screen.getByTestId("usfm-shell-search-result-0"));
+    await waitFor(() => {
+      const dom = container.querySelector(".cm-editor") as HTMLElement | null;
+      const view = dom ? EditorView.findFromDOM(dom) : null;
+      if (!view) throw new Error("editor not mounted");
+      // happy-dom collapses the selection when the editor takes focus, so
+      // check where it starts; raw CRLF offsets would land 4 chars late.
+      const doc = view.state.doc.toString();
+      expect(view.state.selection.main.from).toBe(doc.indexOf("bravo"));
+    });
   });
 
   it("renders the errors tab with bug icon and validation count", async () => {
