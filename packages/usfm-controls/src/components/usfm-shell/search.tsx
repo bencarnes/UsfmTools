@@ -1,5 +1,5 @@
 import { useCallback, useId, useMemo, useState, type ReactNode } from "react";
-import { sourceOffsetToLineColumn } from "./line-offsets.js";
+import { normalizeLineEndings, sourceOffsetToLineColumn } from "./line-offsets.js";
 import type { UsfmShellFileEntry } from "./host.js";
 
 export interface SearchMatch {
@@ -79,8 +79,10 @@ export function FileSearch({ files, readFile, onSelectResult, loadingFiles }: Fi
     const found: SearchMatch[] = [];
     try {
       for (const entry of files) {
-        const content = await readFile(entry.id);
-        if (content == null) continue;
+        const raw = await readFile(entry.id);
+        if (raw == null) continue;
+        // Match offsets must be in the editor's LF offset space.
+        const content = normalizeLineEndings(raw);
         // RegExp instances carry lastIndex state; clone per file.
         const re = new RegExp(compiled.source, compiled.flags);
         let m: RegExpExecArray | null;

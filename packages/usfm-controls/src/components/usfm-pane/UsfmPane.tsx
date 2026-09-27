@@ -57,6 +57,14 @@ const PREVIEW_TO_EDITOR_SYNC_DEBOUNCE_MS = 120;
 /** Ignore preview scroll activity this long after a preview DOM swap. */
 const PREVIEW_SWAP_SYNC_SUPPRESS_MS = 300;
 /**
+ * After one side of the split view scrolls the other, ignore the scrolled
+ * side's resulting scroll report for this long. The anchor mapping is only
+ * verse-granular, so syncing that echo back moves the originating side away
+ * from where it was put (e.g. a search match scrolled out of view right after
+ * being revealed). Must exceed the ~120ms debounce on either side.
+ */
+const SCROLL_SYNC_ECHO_SUPPRESS_MS = 400;
+/**
  * Throttle chapter-structure refetches while typing in split mode (markers
  * rarely change per keystroke). Now off the UI thread (an engine request), so
  * this only limits bridge round-trips rather than guarding a UI-thread scan.
@@ -177,6 +185,8 @@ export function UsfmPane({
   const lastTypingAtRef = useRef(0);
   const lastPreviewScrollTopRef = useRef(0);
   const previewSwapAtRef = useRef(0);
+  const suppressPreviewToEditorUntilRef = useRef(0);
+  const suppressEditorToPreviewUntilRef = useRef(0);
   const [previewValue, setPreviewValue] = useState(value);
   const [navSource, setNavSource] = useState(value);
 
@@ -291,6 +301,11 @@ export function UsfmPane({
       const chapterMarkerOffset = mi >= 0 ? markers[mi]!.markerOffset : bookStartOffset;
       const verseNumber = lastVerseNumberBeforeOffset(value, chapterMarkerOffset, sourceOffset);
       scrollPreviewToAnchor(root, mode, { kind: "cv", chapterNumber, verseNumber });
+      suppressPreviewToEditorUntilRef.current = Date.now() + SCROLL_SYNC_ECHO_SUPPRESS_MS;
+      if (previewSyncDebounceRef.current) {
+        clearTimeout(previewSyncDebounceRef.current);
+        previewSyncDebounceRef.current = null;
+      }
       releaseSyncLockSoon();
     },
     [viewMode, hasChapters, scrollSyncEnabled, value, bookStartOffset, markers, releaseSyncLockSoon],
@@ -355,12 +370,15 @@ export function UsfmPane({
     if (targetOffset == null) return;
     syncLockRef.current = true;
     ed.scrollSourceOffsetIntoView(targetOffset);
+    suppressEditorToPreviewUntilRef.current = Date.now() + SCROLL_SYNC_ECHO_SUPPRESS_MS;
     releaseSyncLockSoon();
   }, [viewMode, hasChapters, scrollSyncEnabled, value, bookStartOffset, markers, releaseSyncLockSoon]);
 
   const onEditorViewportAnchor = useCallback(
     (offset: number) => {
       setEditorTopOffset(offset);
+      // Skip the echo of a preview→editor sync (see SCROLL_SYNC_ECHO_SUPPRESS_MS).
+      if (Date.now() < suppressEditorToPreviewUntilRef.current) return;
       syncPreviewToEditorOffset(offset);
     },
     [syncPreviewToEditorOffset],
@@ -477,6 +495,7 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
       previewSyncDebounceRef.current = null;
       if (Date.now() - lastTypingAtRef.current < SCROLL_SYNC_TYPING_IDLE_MS) return;
       if (Date.now() - previewSwapAtRef.current < PREVIEW_SWAP_SYNC_SUPPRESS_MS) return;
+      if (Date.now() < suppressPreviewToEditorUntilRef.current) return;
       syncEditorToPreviewTop();
     }, PREVIEW_TO_EDITOR_SYNC_DEBOUNCE_MS);
   }, [syncEditorToPreviewTop]);
@@ -497,7 +516,11 @@ const off = markerOffsetForChapterNumber(markers, d.chapterNumber);
       lastPreviewScrollTopRef.current = root.scrollTop;
     }
     if (viewMode === "preview") schedulePreviewChapterRead();
-    if (viewMode === "split") schedulePreviewToEditorSync();
+    // Scroll events caused by an editor→preview sync are not user scrolls;
+    // syncing them back would drag the editor off its position.
+    if (viewMode === "split" && Date.now() >= suppressPreviewToEditorUntilRef.current) {
+      schedulePreviewToEditorSync();
+    }
   }, [viewMode, schedulePreviewChapterRead, schedulePreviewToEditorSync]);
 
   const onSplitMouseDown = useCallback(

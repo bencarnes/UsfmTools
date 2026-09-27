@@ -48,7 +48,7 @@ import {
   GearIcon,
   SearchIcon,
 } from "./shell-icons.js";
-import { lineColumnToSourceOffset } from "./line-offsets.js";
+import { lineColumnToSourceOffset, normalizeLineEndings } from "./line-offsets.js";
 import type { UsfmFilePickerGroups } from "@usfm-tools/model";
 import type { UsfmShellFileEntry, UsfmShellHost, UsfmShellRecentFolder } from "./host.js";
 import { buildUsfmFilePickerCatalog, EMPTY_FILE_CATALOG } from "./file-catalog.js";
@@ -468,8 +468,11 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
         savedValue = openElsewhere.savedValue;
         dirty = openElsewhere.dirty;
       } else {
-        const usfm = await host.readFile(entry.id);
-        if (usfm == null) return;
+        const raw = await host.readFile(entry.id);
+        if (raw == null) return;
+        // The editor holds LF text; keep the tab value in the same offset
+        // space so selection requests and scroll sync line up with it.
+        const usfm = normalizeLineEndings(raw);
         value = usfm;
         savedValue = usfm;
         dirty = false;
@@ -567,6 +570,19 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
   }, []);
 
   // ---- search ----
+
+  // Search open files in their live editor buffers (unsaved edits shift
+  // offsets) and everything else from disk.
+  const readFileForSearch = useCallback(
+    async (fileId: string) => {
+      const tab = Object.values(modelRef.current.tabsById).find(
+        (t) => t.kind !== "settings" && t.fileId === fileId,
+      );
+      if (tab) return documentReadersRef.current.get(tab.id)?.() ?? tab.value;
+      return await host.readFile(fileId);
+    },
+    [host],
+  );
 
   const onSelectSearchResult = useCallback(
     (m: SearchMatch) => {
@@ -701,7 +717,7 @@ export const UsfmShell = forwardRef<UsfmShellHandle, UsfmShellProps>(function Us
             ) : (
               <FileSearch
                 files={fileEntries}
-                readFile={(id) => host.readFile(id)}
+                readFile={readFileForSearch}
                 onSelectResult={onSelectSearchResult}
                 loadingFiles={filesLoading}
               />
